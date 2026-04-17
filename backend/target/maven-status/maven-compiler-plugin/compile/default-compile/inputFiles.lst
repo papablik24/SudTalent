@@ -1,0 +1,10 @@
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\config\SecurityConfig.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\controller\AuthController.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\dto\AuthDTOs.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\model\User.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\repository\UserRepository.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\security\JwtAuthFilter.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\security\UserDetailsServiceImpl.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\service\AuthService.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\SudtalentproyectoApplication.java
+C:\Users\Pablo\Desktop\sudtalentproyecto\sudtalentproyecto\src\main\java\sudtalent\sudtalentproyecto\util\JwtUtils.java

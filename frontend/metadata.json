@@ -1,0 +1,6 @@
+{
+  "name": "SudTalent",
+  "description": "Plataforma de gestión vocal para la escuela Sudamerican Voices. Gestión de alumnos, exalumnos y demos de voz con autenticación segura.",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}

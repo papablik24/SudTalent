@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Outfit", "Inter", ui-sans-serif, system-ui, sans-serif;
+  
+  --color-sud-yellow: #fbbf24;    /* yellow-400 */
+  --color-sud-orange: #f97316;    /* orange-500 */
+  --color-sud-turquoise: #2dd4bf; /* turquoise-400 */
+  --color-sud-blue: #2563eb;      /* blue-600 */
+  --color-sud-teal: #14b8a6;      /* teal-500 */
+  
+  --color-sud-dark: #0a0a0a;
+}
+
+@layer base {
+  body {
+    @apply bg-sud-dark text-slate-100 antialiased font-sans;
+  }
+}
+
+.sud-vibrant-gradient {
+  background: linear-gradient(to right, #fbbf24, #f97316, #2dd4bf, #2563eb);
+}
+
+.sud-vibrant-text-gradient {
+  @apply bg-clip-text text-transparent bg-linear-to-r from-sud-yellow via-sud-orange via-sud-turquoise to-sud-blue;
+}
+
+.sud-card {
+  @apply bg-white/5 rounded-3xl p-6 border border-white/10 shadow-2xl backdrop-blur-md;
+}
+
+.sud-input {
+  @apply bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-sud-turquoise/50 transition-all;
+}
+
+.sud-btn-primary {
+  @apply w-full py-4 rounded-xl font-bold text-[11px] uppercase tracking-widest text-black shadow-lg shadow-sud-orange/20 active:scale-95 transition-all;
+  background: linear-gradient(to right, #fbbf24, #f97316, #2dd4bf, #2563eb);
+}
+
+.sud-btn-secondary {
+  @apply px-4 py-2 bg-white text-black text-[11px] font-bold uppercase tracking-widest rounded-full hover:bg-sud-turquoise transition-colors;
+}
+
+.sud-table-header {
+  @apply text-[10px] uppercase tracking-widest text-slate-500 border-b border-white/5;
+}
+
+.sud-glass-sidebar {
+  @apply bg-black/40 border-r border-white/10;
+}

@@ -1,0 +1,77 @@
+{
+  "entities": {
+    "AuthorizedPhone": {
+      "title": "Authorized Phone",
+      "description": "Phone numbers whitelisted by an admin.",
+      "type": "object",
+      "properties": {
+        "phone": { "type": "string", "description": "The phone number in E.164 format (+569...)" },
+        "addedAt": { "type": "string", "format": "date-time" },
+        "addedBy": { "type": "string" }
+      },
+      "required": ["phone", "addedAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "System user with role and base info.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "phone": { "type": "string" },
+        "role": { "type": "string", "enum": ["ADMIN", "USER"] },
+        "onboarded": { "type": "boolean" },
+        "profileType": { "type": "string", "enum": ["PERSONAL", "PARENT"] },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "phone", "role"]
+    },
+    "Profile": {
+      "title": "Profile",
+      "description": "Talent profile data (personal or parent).",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "type": { "type": "string", "enum": ["PERSONAL", "PARENT"] },
+        "childName": { "type": "string", "description": "Only for PARENT type" },
+        "childAge": { "type": "number", "description": "Only for PARENT type" },
+        "specialties": { "type": "array", "items": { "type": "string" } },
+        "bio": { "type": "string" }
+      },
+      "required": ["userId", "type"]
+    },
+    "VoiceDemo": {
+      "title": "Voice Demo",
+      "description": "Audio files uploaded by talent.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "title": { "type": "string" },
+        "category": { "type": "string", "enum": ["Doblaje", "Locución", "Podcast", "Presentación"] },
+        "fileUrl": { "type": "string" },
+        "duration": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "title", "category", "fileUrl", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/authorized_phones/{phoneId}": {
+      "schema": "AuthorizedPhone",
+      "description": "Whitelist of phone numbers"
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User account data"
+    },
+    "/profiles/{userId}": {
+      "schema": "Profile",
+      "description": "Extended talent profile"
+    },
+    "/users/{userId}/demos/{demoId}": {
+      "schema": "VoiceDemo",
+      "description": "Voice demos for a user"
+    }
+  }
+}

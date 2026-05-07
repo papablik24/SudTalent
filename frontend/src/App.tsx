@@ -1513,6 +1513,7 @@ function UserOnboarding({ onComplete, userPhone, profileType }: {
     email: '',
   });
   const [profileData, setProfileData] = useState({
+    age: 0, // faltaba agregar edad para perfil personal
     childName: '',
     childAge: 0,
     specialties: [] as string[],

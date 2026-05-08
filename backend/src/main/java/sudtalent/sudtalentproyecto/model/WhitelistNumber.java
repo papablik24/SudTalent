@@ -1,9 +1,6 @@
 package sudtalent.sudtalentproyecto.model;
 
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import lombok.AllArgsConstructor;
@@ -11,7 +8,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
-import jakarta.persistence.*;
 
 
 @Entity
@@ -26,9 +22,19 @@ public class WhitelistNumber {
     private Long id;
 
     @NotBlank
-    @Pattern(regexp = "^[0-9]{11}$")
-    @Column(nullable = false, unique = true, length = 11)
+    @Pattern(regexp = "^[0-9]{8,15}$")
+    @Column(nullable = false, unique = true, length = 20)
     private String phone;
+
+    @Column(length = 255)
+    private String name;
+
+    @Column(length = 100)
+    private String email;
+
+    @Column(length = 50)
+    @Builder.Default
+    private String category = "NONE"; // ADULT, MINOR, BOTH, NONE
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -42,6 +48,11 @@ public class WhitelistNumber {
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
+
+    // Relación con User (alumnos)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "usuario_id", referencedColumnName = "id")
+    private User user;
 
     public enum Status {
         ACTIVO, INACTIVO, PENDIENTE

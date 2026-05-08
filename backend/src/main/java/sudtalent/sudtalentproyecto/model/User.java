@@ -16,7 +16,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import lombok.*;
 
@@ -34,26 +33,24 @@ public class User {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @NotBlank
     @Column(nullable = false, length = 100)
-    private String name;
+    @Builder.Default
+    private String name = "";
 
     @Email
-    @NotBlank
-    @Column(nullable = false, unique = true, length = 150)
+    @Column(unique = true, length = 150)
     private String email;
 
     @NotBlank
     @Column(nullable = false)
     private String password;
 
-    @Pattern(regexp = "^[0-9]{11}$", message = "El teléfono debe contener 11 dígitos") // @Pattern: Valida que el teléfono solo contenga números (expresión regular)
-    @Column(nullable = false, unique = true, length = 11)
+    @Pattern(regexp = "^[0-9]{8,15}$", message = "El teléfono debe contener entre 8 y 15 dígitos") 
+    @Column(unique = true, length = 20)
     private String phone;
 
-    @NotNull(message = "La especialidad es obligatoria")
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false, length = 150)
+    @Column(length = 150)
     private Specialization specialization;
 
     @Enumerated(EnumType.STRING)
@@ -69,8 +66,34 @@ public class User {
     @Builder.Default
     private boolean active = true;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean onboarded = false;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    private ProfileType profileType;
+
+    @Column(length = 500)
+    private String bio;
+
+    @Column(length = 500)
+    private String specialties;
+
+    @Column(length = 100)
+    private String childName;
+
+    private Integer childAge;
+
+    private Integer age;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 20)
+    @Builder.Default
+    private ProfileStatus status = ProfileStatus.PENDING;
+
     @ManyToOne
-    @JoinColumn(name = "perfil_id", nullable = false)
+    @JoinColumn(name = "perfil_id")
     private Profile profile;
 
     public enum Role {
@@ -84,5 +107,16 @@ public class User {
         DOBLAJE,
         KIDS,
         OTRO
+    }
+
+    public enum ProfileType {
+        PERSONAL,
+        PARENT
+    }
+
+    public enum ProfileStatus {
+        PENDING,
+        APPROVED,
+        INACTIVE
     }
 }

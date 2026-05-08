@@ -54,4 +54,26 @@ export interface WhitelistEntry {
   addedBy?: string;
 }
 
-export type AppView = 'AUTH' | 'ADMIN_DASHBOARD' | 'USER_ONBOARDING' | 'USER_PROFILE' | 'USER_DEMOS' | 'PROFILE_TYPE_SELECTION' | 'ADMIN_STUDENTS' | 'ADMIN_TALENT_REVIEW';
+export interface Convocation {
+  id: string;
+  title: string;
+  description: string;
+  category: 'Doblaje' | 'Locución' | 'Podcast' | 'Voice Acting' | 'Producción';
+  requirements: string[];
+  deadline: any;
+  status: 'ACTIVA' | 'CERRADA' | 'BORRADOR';
+  createdAt: any;
+  createdBy: string;
+}
+
+export interface Application {
+  id: string;
+  userId: string;
+  convocationId: string;
+  status: 'PENDIENTE' | 'EN_REVISION' | 'SELECCIONADO' | 'FINALIZADO';
+  appliedAt: any;
+  userName?: string;
+  userPhone?: string;
+}
+
+export type AppView = 'AUTH' | 'ADMIN_DASHBOARD' | 'USER_ONBOARDING' | 'USER_PROFILE' | 'USER_DEMOS' | 'PROFILE_TYPE_SELECTION' | 'ADMIN_STUDENTS' | 'ADMIN_TALENT_REVIEW' | 'ADMIN_CONVOCATORIAS' | 'USER_CONVOCATORIAS';

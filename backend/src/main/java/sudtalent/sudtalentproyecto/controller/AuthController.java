@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -32,21 +33,46 @@ public class AuthController {
         return ResponseEntity.ok(authService.register(request, response));
     }
 
+    // Phone-based login/register (for the mobile flow)
+    @PostMapping("/phone")
+    public ResponseEntity<AuthResponse> phoneAuth(@Valid @RequestBody PhoneRegisterRequest request,
+                                                   HttpServletResponse response) {
+        return ResponseEntity.ok(authService.loginOrRegisterByPhone(request, response));
+    }
+
+    // Complete onboarding for authenticated user
+    @PostMapping("/onboard")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<AuthResponse> onboard(@AuthenticationPrincipal UserDetails userDetails,
+                                                 @Valid @RequestBody OnboardRequest request) {
+        User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow();
+        return ResponseEntity.ok(authService.onboard(user.getId(), request));
+    }
+
     @PostMapping("/logout")
     public ResponseEntity<MessageResponse> logout(HttpServletResponse response) {
         authService.logout(response);
         return ResponseEntity.ok(new MessageResponse("Sesión cerrada correctamente"));
     }
 
-    // Endpoint para que el frontend verifique si el token es válido al cargar
+    // Endpoint to verify token and get current user info
     @GetMapping("/me")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AuthResponse> me(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow();
+        System.out.println("🔍 DEBUG /me endpoint:");
+        System.out.println("  Email: " + user.getEmail());
+        System.out.println("  Role en BD: " + user.getRole());
+        System.out.println("  Authorities en UserDetails: " + userDetails.getAuthorities());
         return ResponseEntity.ok(new AuthResponse(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
-                user.getRole().name()
+                user.getPhone(),
+                user.getRole().name(),
+                user.isOnboarded(),
+                user.getProfileType() != null ? user.getProfileType().name() : null,
+                null // No need to return token on /me
         ));
     }
 }

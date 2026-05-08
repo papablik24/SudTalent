@@ -25,6 +25,9 @@ public class JwtUtils {
     public String generateToken(UserDetails userDetails) {
     return Jwts.builder()
             .subject(userDetails.getUsername()) // Antes .setSubject()
+            .claim("authorities", userDetails.getAuthorities().stream()
+                    .map(auth -> auth.getAuthority())
+                    .toList())
             .issuedAt(new Date())               // Antes .setIssuedAt()
             .expiration(new Date(System.currentTimeMillis() + jwtExpirationMs)) // Antes .setExpiration()
             .signWith(getSigningKey())          // Ya no requiere el SignatureAlgorithm explícito
@@ -45,7 +48,7 @@ public class JwtUtils {
     }
 
 
-    private Claims parseClaims(String token) {
+    public Claims parseClaims(String token) {
         return Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()

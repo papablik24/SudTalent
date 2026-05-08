@@ -41,7 +41,14 @@ export function MainLayout({ children, user, role, onLogout }: MainLayoutProps) 
 
         <footer className="h-16 bg-sud-black flex items-center px-12 border-t border-white/[0.02] justify-between relative z-20">
           <div className="flex gap-8 items-center">
-            <span className="text-[10px] text-slate-700 uppercase tracking-widest font-black">SudTalent v1.2.0</span>
+            <div className="flex items-center gap-3">
+              <img 
+                src="/logos/SUD_ISO_1.png" 
+                alt="SUD" 
+                className="h-5 w-5 object-contain opacity-40"
+              />
+              <span className="text-[10px] text-slate-700 uppercase tracking-widest font-black">SudTalent v1.2.0</span>
+            </div>
             <div className="flex items-center gap-2">
               <div className="w-1.5 h-1.5 rounded-full bg-sud-turquoise animate-pulse shadow-[0_0_8px_var(--color-sud-turquoise)]" />
               <span className="text-[10px] text-slate-700 uppercase tracking-widest font-black">Servidor En Línea</span>

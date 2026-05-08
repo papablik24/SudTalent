@@ -27,6 +27,7 @@ export interface AuthResponse {
   role: string;
   onboarded: boolean;
   profileType: string | null;
+  status?: string; // ← Agregar esta línea
   token: string | null;
 }
 
@@ -188,10 +189,15 @@ export const backendService = {
     return fetchAPI<any[]>('/whitelist', { method: 'GET' });
   },
 
-  async addToWhitelist(entry: { phone: string }): Promise<any> {
+  async addToWhitelist(entry: { phone: string; name?: string; email?: string; category?: string }): Promise<any> {
     return fetchAPI<any>('/whitelist', {
       method: 'POST',
-      body: JSON.stringify({ phone: entry.phone }),
+      body: JSON.stringify({ 
+        phone: entry.phone,
+        name: entry.name || '',
+        email: entry.email || '',
+        category: entry.category || 'NONE'
+      }),
     });
   },
 

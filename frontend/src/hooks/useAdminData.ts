@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+﻿import { useState, useEffect, useCallback } from 'react';
 import { UserProfile, TalentProfile, VoiceDemo, WhitelistEntry, ProfileStatus, ProfileCategory } from '../types';
 import { backendService } from '../services/backendService';
 
@@ -24,7 +24,8 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
       const whitelistData = await backendService.getWhitelist();
       const mapped: WhitelistEntry[] = whitelistData.map((w: any) => ({
         phone: w.phone,
-        name: w.name,
+        name: w.name || '',
+        email: w.email || '', // ✅ Asegurar que se incluya email
         category: w.category || 'NONE',
         addedAt: w.createdAt,
         addedBy: 'admin',
@@ -60,17 +61,34 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
   }, [loadData]);
 
   // Agregar a whitelist
-  const addToWhitelist = async (phone: string, name: string, category: ProfileCategory = 'NONE') => {
+  const addToWhitelist = async (phone: string, name: string, category: ProfileCategory = 'NONE', email: string = '') => {
     try {
       setError(null);
-      await backendService.addToWhitelist({ phone });
+      
+      // ✅ Normalizar teléfono: remover + y caracteres no numéricos
+      const normalizedPhone = phone.replace(/\D/g, '');
+      
+      if (normalizedPhone.length < 8 || normalizedPhone.length > 15) {
+        setError('El teléfono debe tener entre 8 y 15 dígitos');
+        return;
+      }
+      
+      // ✅ Enviar phone, name, email, category al backend
+      const response = await backendService.addToWhitelist({ 
+        phone: normalizedPhone,
+        name,
+        email,
+        category
+      });
       
       const newEntry: WhitelistEntry = {
-        phone,
+        phone: normalizedPhone,
         name,
+        email,
         category,
         addedAt: new Date().toISOString(),
-        addedBy: currentUser?.uid
+        addedBy: currentUser?.uid,
+        status: response?.status || 'PENDIENTE'
       };
       setWhitelist(prev => [newEntry, ...prev]);
     } catch (err: any) {

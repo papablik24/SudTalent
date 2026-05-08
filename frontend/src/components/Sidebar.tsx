@@ -25,13 +25,17 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
   return (
     <aside className="w-full md:w-72 sud-glass-sidebar flex flex-col p-8 space-y-10 backdrop-blur-3xl relative z-20">
       <div className="flex flex-col">
-        <h1 
-          className="text-3xl font-black tracking-tighter leading-none text-white uppercase group-hover:sud-vibrant-text-gradient transition-all cursor-pointer"
+        <button 
           onClick={() => onNavigate('/')}
+          className="group/logo transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer"
         >
-          SUD<span className="sud-vibrant-text-gradient">TALENT</span>
-        </h1>
-        <span className="text-[10px] text-slate-500 tracking-[0.2em] uppercase font-black mt-1">
+          <img 
+            src="/logos/SUD_LOGO_4.png" 
+            alt="Sudamerican Voices" 
+            className="h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(45,212,191,0.15)] group-hover/logo:drop-shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all duration-500"
+          />
+        </button>
+        <span className="text-[10px] text-slate-500 tracking-[0.2em] uppercase font-black mt-2">
           Gestión de Voces
         </span>
       </div>
@@ -65,7 +69,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               active={currentPath === '/admin/convocatorias'}
               onClick={() => onNavigate('/admin/convocatorias')}
             />
-            <NavItem icon={<Settings size={20} />} label="Ajustes" />
+            <NavItem 
+              icon={<Settings size={20} />} 
+              label="Ajustes" 
+              active={currentPath === '/admin/settings'}
+              onClick={() => onNavigate('/admin/settings')}
+            />
           </>
         ) : (
           <>

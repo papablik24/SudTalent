@@ -60,10 +60,14 @@ public class AuthController {
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AuthResponse> me(@AuthenticationPrincipal UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow();
+        // AGREGAR ESTOS LOGS
         System.out.println("🔍 DEBUG /me endpoint:");
         System.out.println("  Email: " + user.getEmail());
         System.out.println("  Role en BD: " + user.getRole());
         System.out.println("  Authorities en UserDetails: " + userDetails.getAuthorities());
+        System.out.println("  Is Admin? " + userDetails.getAuthorities().stream()
+            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
+    
         return ResponseEntity.ok(new AuthResponse(
                 user.getId(),
                 user.getName(),

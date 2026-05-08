@@ -2,10 +2,10 @@ import { useCallback } from "react";
 import { supabase } from "../services/supabaseClient";
 
 export function useSupabase() {
-  // Autenticación
+  // Autenticaciï¿½n
   const signUpWithPhone = useCallback(async (phone: string, password: string) => {
     try {
-      const { data, error } = await supabase.auth.signUpWithPassword({
+      const { data, error } = await supabase.auth.signUp({
         email: `${phone}@sudtalent.local`,
         password,
       });

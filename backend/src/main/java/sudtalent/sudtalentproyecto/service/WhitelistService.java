@@ -153,17 +153,26 @@ public class WhitelistService {
             throw new IllegalArgumentException("Número ya existe en whitelist");
         }
         
+        // Normalizar valores: convertir strings vacíos a null para DB
+        String finalName = (name != null && !name.trim().isEmpty()) ? name.trim() : null;
+        String finalEmail = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
+        
+        System.out.println("✅ createNumberWithUser:");
+        System.out.println("   phone: " + phone);
+        System.out.println("   name (input): " + name + " → (final): " + finalName);
+        System.out.println("   email (input): " + email + " → (final): " + finalEmail);
+        
         // Verificar si el usuario ya existe
         var existingUser = userRepository.findByPhone(phone);
         User user = null;
         
         if(existingUser.isEmpty()) {
             // Crear nuevo usuario
-            String syntheticEmail = email != null && !email.isEmpty() ? email : phone + "@sudtalent.app";
+            String syntheticEmail = finalEmail != null ? finalEmail : phone + "@sudtalent.app";
             String syntheticPassword = "whitelist_" + phone + "_sud2026";
             
             user = User.builder()
-                .name(name != null ? name : "")
+                .name(finalName != null ? finalName : "")
                 .email(syntheticEmail)
                 .password(syntheticPassword) // En producción, usar PasswordEncoder
                 .phone(phone)
@@ -183,13 +192,17 @@ public class WhitelistService {
         // Crear número de whitelist vinculado al usuario
         WhitelistNumber number = WhitelistNumber.builder()
             .phone(phone)
-            .name(name)
-            .email(email)
+            .name(finalName)
+            .email(finalEmail)
             .status(WhitelistNumber.Status.PENDIENTE)
             .user(user)
             .build();
         
-        return toDTO(repository.save(number));
+        System.out.println("   Guardando whitelist con name=" + number.getName() + ", email=" + number.getEmail());
+        WhitelistNumber saved = repository.save(number);
+        System.out.println("   Guardado: name=" + saved.getName() + ", email=" + saved.getEmail());
+        
+        return toDTO(saved);
     }
 
     // ==================== FUNCIONALIDAD 3: Reportes de alumnos autorizados vs pendientes ====================

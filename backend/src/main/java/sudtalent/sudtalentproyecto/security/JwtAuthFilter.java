@@ -43,24 +43,18 @@ public class JwtAuthFilter extends OncePerRequestFilter {
             try {
                 String email = jwtUtils.extractEmail(token);
                 if (email != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-                    // Extraer autoridades del JWT
-                    List<SimpleGrantedAuthority> authorities = extractAuthoritiesFromToken(token)
-                            .orElse(List.of());
+                    // ✅ SIEMPRE cargar de la BD para obtener authorities confiables
+                    UserDetails userDetails = userDetailsService.loadUserByUsername(email);
                     
-                    if (authorities.isEmpty()) {
-                        // Fallback: cargar de la BD si no están en el JWT
-                        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-                        authorities = userDetails.getAuthorities().stream()
-                                .map(auth -> new SimpleGrantedAuthority(auth.getAuthority()))
-                                .toList();
-                    }
+                    System.out.println("✅ JWT válido para: " + email);
+                    System.out.println("   Role/Authorities en BD: " + userDetails.getAuthorities());
                     
-                    // Crear token de autenticación con las autoridades del JWT
+                    // Crear token de autenticación con las autoridades de la BD
                     var authToken = new UsernamePasswordAuthenticationToken(
-                            email, null, authorities);
+                            email, null, userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
-                    System.out.println("✅ JWT válido para: " + email + " con autoridades: " + authorities);
+                    System.out.println("✅ Autenticación establecida correctamente");
                 }
             } catch (Exception e) {
                 System.out.println("❌ Error en JwtAuthFilter: " + e.getMessage());
@@ -93,17 +87,31 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     private Optional<List<SimpleGrantedAuthority>> extractAuthoritiesFromToken(String token) {
         try {
             Claims claims = jwtUtils.parseClaims(token);
+            System.out.println("🔍 ========== CLAIMS PARSEADAS DEL JWT ==========");
+            System.out.println("  Subject (email): " + claims.getSubject());
+            System.out.println("  Todas las claims: " + claims);
+            
+            // Intentar obtener authorities de diferentes formas
+            Object authObj = claims.get("authorities");
+            System.out.println("  Object 'authorities' raw: " + authObj);
+            System.out.println("  Type: " + (authObj != null ? authObj.getClass().getName() : "null"));
+            
             List<?> authorities = claims.get("authorities", List.class);
-            System.out.println("🔍 Claims en JWT: " + claims);
-            System.out.println("🔍 Authorities en JWT: " + authorities);
-            if (authorities != null) {
+            System.out.println("  Authorities como List: " + authorities);
+            
+            if (authorities != null && !authorities.isEmpty()) {
+                System.out.println("  ✓ Authorities encontradas, tamaño: " + authorities.size());
                 List<SimpleGrantedAuthority> result = authorities.stream()
-                        .map(auth -> new SimpleGrantedAuthority((String) auth))
+                        .map(auth -> {
+                            System.out.println("    - Auth item: " + auth + " (type: " + auth.getClass().getName() + ")");
+                            return new SimpleGrantedAuthority((String) auth);
+                        })
                         .toList();
-                System.out.println("✅ Autoridades extraídas del JWT: " + result);
+                System.out.println("✅ Autoridades convertidas: " + result);
                 return Optional.of(result);
             } else {
-                System.out.println("❌ No hay authorities en el JWT");
+                System.out.println("❌ No hay authorities en el JWT o está vacío");
+                System.out.println("  Todas las keys en claims: " + claims.keySet());
             }
         } catch (Exception e) {
             System.out.println("❌ Error extrayendo autoridades del JWT: " + e.getMessage());

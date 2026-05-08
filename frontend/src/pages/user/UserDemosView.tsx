@@ -1,13 +1,53 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Upload, AudioLines } from 'lucide-react';
-import { UserProfile, VoiceDemo, DemoCategory } from '../../types';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Plus, Upload, AudioLines, Film, FileAudio, Video, X, ChevronDown } from 'lucide-react';
+import { UserProfile, VoiceDemo, DemoCategory, VisualGenre, MediaType, FileFormat, VISUAL_GENRES, DEMO_CATEGORIES } from '../../types';
 import { DemoItem } from '../../components/ui/DemoItem';
+
+// ─── Allowed formats ────────────────────────────────────────────────
+const AUDIO_FORMATS = ['MP3', 'WAV'] as const;
+const VIDEO_FORMATS = ['MP4', 'MOV'] as const;
+const ACCEPT_STRING = '.mp3,.wav,.mp4,.mov,audio/mpeg,audio/wav,video/mp4,video/quicktime';
+
+function detectFormat(file: File): { mediaType: MediaType; fileFormat: FileFormat } | null {
+  const name = file.name.toLowerCase();
+  const mime = file.type.toLowerCase();
+  if (name.endsWith('.mp3') || mime.includes('mpeg')) return { mediaType: 'AUDIO', fileFormat: 'MP3' };
+  if (name.endsWith('.wav') || mime.includes('wav'))  return { mediaType: 'AUDIO', fileFormat: 'WAV' };
+  if (name.endsWith('.mp4') || mime.includes('mp4'))  return { mediaType: 'VIDEO', fileFormat: 'MP4' };
+  if (name.endsWith('.mov') || mime.includes('quicktime')) return { mediaType: 'VIDEO', fileFormat: 'MOV' };
+  return null;
+}
+
+// ─── Form state type ─────────────────────────────────────────────────
+interface DemoForm {
+  title: string;
+  category: DemoCategory;
+  visualGenre: VisualGenre | '';
+  description: string;
+  file: File | null;
+  mediaType: MediaType | null;
+  fileFormat: FileFormat | null;
+}
+
+const DEFAULT_FORM: DemoForm = {
+  title: '',
+  category: 'Doblaje',
+  visualGenre: '',
+  description: '',
+  file: null,
+  mediaType: null,
+  fileFormat: null,
+};
 
 export function UserDemosView({ user }: { user: UserProfile }) {
   const [demos, setDemos] = useState<VoiceDemo[]>([]);
   const [isUploading, setIsUploading] = useState(false);
-  const [newDemo, setNewDemo] = useState({ title: '', category: 'Doblaje' as DemoCategory });
+  const [form, setForm] = useState<DemoForm>(DEFAULT_FORM);
+  const [fileError, setFileError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
+  // ── Load from localStorage ──────────────────────────────────────────
   useEffect(() => {
     const load = () => {
       const localDemos = localStorage.getItem(`demos_${user.uid}`);
@@ -18,106 +58,301 @@ export function UserDemosView({ user }: { user: UserProfile }) {
     return () => window.removeEventListener('storage', load);
   }, [user.uid]);
 
+  // ── File picker handler ─────────────────────────────────────────────
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0] ?? null;
+    setFileError(null);
+    if (!file) {
+      setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }));
+      return;
+    }
+    const detected = detectFormat(file);
+    if (!detected) {
+      setFileError('Formato no permitido. Usa MP3, WAV, MP4 o MOV.');
+      setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }));
+      return;
+    }
+    setForm(f => ({ ...f, file, mediaType: detected.mediaType, fileFormat: detected.fileFormat }));
+  };
+
+  // ── Submit ──────────────────────────────────────────────────────────
   const handleUploadDemo = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newDemo.title) return;
-    
+    if (!form.title || !form.file) return;
+
     setIsUploading(true);
-    const simulatedUrl = `https://example.com/demos/${user.uid}/${Date.now()}.mp3`;
+
+    // Simulate file URL (in production this would be a real upload)
+    const ext = form.fileFormat?.toLowerCase() ?? 'mp3';
+    const simulatedUrl = `https://cdn.sudtalent.com/demos/${user.uid}/${Date.now()}.${ext}`;
+
     const newDemoData: VoiceDemo = {
       id: `demo_${Date.now()}`,
       userId: user.uid,
-      title: newDemo.title,
-      category: newDemo.category as any,
+      title: form.title,
+      category: form.category,
       fileUrl: simulatedUrl,
-      duration: '1:30',
-      createdAt: new Date().toISOString()
+      duration: '—',
+      createdAt: new Date().toISOString(),
+      mediaType: form.mediaType ?? 'AUDIO',
+      fileFormat: form.fileFormat ?? 'MP3',
+      visualGenre: form.visualGenre || undefined,
+      description: form.description || undefined,
     };
 
     const updated = [newDemoData, ...demos];
     setDemos(updated);
     localStorage.setItem(`demos_${user.uid}`, JSON.stringify(updated));
-    
-    setNewDemo({ title: '', category: 'Doblaje' });
+
+    // Reset
+    setForm(DEFAULT_FORM);
+    if (fileRef.current) fileRef.current.value = '';
     setIsUploading(false);
   };
 
+  // ── Delete demo ─────────────────────────────────────────────────────
+  const handleDelete = (id: string) => {
+    const updated = demos.filter(d => d.id !== id);
+    setDemos(updated);
+    localStorage.setItem(`demos_${user.uid}`, JSON.stringify(updated));
+  };
+
+  // ── Derived stats ────────────────────────────────────────────────────
+  const audioCount = demos.filter(d => !d.mediaType || d.mediaType === 'AUDIO').length;
+  const videoCount = demos.filter(d => d.mediaType === 'VIDEO').length;
+
+  // ── Render ───────────────────────────────────────────────────────────
   return (
     <div className="space-y-8">
+      {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-8 px-4">
         <div>
-          <h2 className="text-3xl font-black tracking-tighter text-white">Mis <span className="sud-vibrant-text-gradient uppercase tracking-widest">Demos</span></h2>
-          <p className="text-slate-400 mt-2 font-medium text-xs tracking-widest uppercase">Gestiona tus muestras de voz profesionales</p>
+          <h2 className="text-3xl font-black tracking-tighter text-white">
+            Mis <span className="sud-vibrant-text-gradient uppercase tracking-widest">Demos</span>
+          </h2>
+          <p className="text-slate-400 mt-2 font-medium text-xs tracking-widest uppercase">
+            Gestiona tus muestras de voz y video profesionales
+          </p>
+        </div>
+        {/* Quick stats */}
+        <div className="flex gap-4 shrink-0">
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-sud-orange/10 border border-sud-orange/20">
+            <AudioLines size={14} className="text-sud-orange" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-sud-orange">{audioCount} Audio</span>
+          </div>
+          <div className="flex items-center gap-2 px-4 py-2 rounded-2xl bg-sud-turquoise/10 border border-sud-turquoise/20">
+            <Film size={14} className="text-sud-turquoise" />
+            <span className="text-[10px] font-black uppercase tracking-widest text-sud-turquoise">{videoCount} Video</span>
+          </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* ── Upload Panel ──────────────────────────────────────────── */}
         <div className="lg:col-span-4 space-y-6">
           <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6 sticky top-8">
             <h4 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
               <Plus className="text-sud-turquoise" size={20} />
               Añadir Nueva Demo
             </h4>
-            <div className="p-4 bg-sud-turquoise/5 border border-sud-turquoise/10 rounded-2xl flex items-center gap-4">
-              <Upload className="text-sud-turquoise" size={24} />
-              <p className="text-[10px] font-bold text-sud-turquoise uppercase tracking-widest">Carga archivos MP3 o WAV</p>
+
+            {/* Format info banner */}
+            <div className="p-4 bg-white/[0.02] border border-white/10 rounded-2xl space-y-3">
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Formatos permitidos</p>
+              <div className="flex flex-wrap gap-2">
+                {['MP3', 'WAV'].map(f => (
+                  <span key={f} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sud-orange/10 border border-sud-orange/20 text-[9px] font-black uppercase text-sud-orange">
+                    <AudioLines size={10} /> {f}
+                  </span>
+                ))}
+                {['MP4', 'MOV'].map(f => (
+                  <span key={f} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sud-turquoise/10 border border-sud-turquoise/20 text-[9px] font-black uppercase text-sud-turquoise">
+                    <Film size={10} /> {f}
+                  </span>
+                ))}
+              </div>
             </div>
-            <form onSubmit={handleUploadDemo} className="space-y-6">
+
+            <form onSubmit={handleUploadDemo} className="space-y-5">
+              {/* File picker */}
               <div className="space-y-2">
-                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Título de la Demo</label>
-                <input 
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                  Archivo de Demo *
+                </label>
+                <div
+                  onClick={() => fileRef.current?.click()}
+                  className={`relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
+                    form.file
+                      ? form.mediaType === 'VIDEO'
+                        ? 'border-sud-turquoise/40 bg-sud-turquoise/5'
+                        : 'border-sud-orange/40 bg-sud-orange/5'
+                      : 'border-white/10 hover:border-white/20 bg-black/20'
+                  }`}
+                >
+                  {form.file ? (
+                    <>
+                      {form.mediaType === 'VIDEO'
+                        ? <Film className="text-sud-turquoise" size={28} />
+                        : <AudioLines className="text-sud-orange" size={28} />
+                      }
+                      <p className="text-[10px] font-black text-center uppercase tracking-widest text-white">
+                        {form.file.name}
+                      </p>
+                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
+                        form.mediaType === 'VIDEO'
+                          ? 'bg-sud-turquoise/20 text-sud-turquoise'
+                          : 'bg-sud-orange/20 text-sud-orange'
+                      }`}>
+                        {form.fileFormat} • {form.mediaType}
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="text-slate-600" size={28} />
+                      <p className="text-[10px] font-black text-center uppercase tracking-widest text-slate-500">
+                        Haz clic para seleccionar<br />
+                        <span className="text-slate-600">MP3, WAV, MP4 o MOV</span>
+                      </p>
+                    </>
+                  )}
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept={ACCEPT_STRING}
+                    onChange={handleFileChange}
+                    className="hidden"
+                  />
+                </div>
+                <AnimatePresence>
+                  {fileError && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -4 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0 }}
+                      className="text-[10px] font-black text-red-400 uppercase tracking-widest px-1 flex items-center gap-1"
+                    >
+                      <X size={12} /> {fileError}
+                    </motion.p>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Title */}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                  Título de la Demo *
+                </label>
+                <input
                   type="text"
-                  value={newDemo.title}
-                  onChange={e => setNewDemo({...newDemo, title: e.target.value})}
+                  value={form.title}
+                  onChange={e => setForm({ ...form, title: e.target.value })}
                   className="sud-input w-full"
-                  placeholder="Ej: Personaje Anime - Combat"
+                  placeholder="Ej: Personaje Anime – Batalla"
                   required
                 />
               </div>
+
+              {/* Category */}
               <div className="space-y-2">
-                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Categoría</label>
-                <select 
-                  value={newDemo.category}
-                  onChange={e => setNewDemo({...newDemo, category: e.target.value as DemoCategory})}
-                  className="sud-input w-full appearance-none pr-10"
-                >
-                  <option value="Doblaje">Doblaje</option>
-                  <option value="Locución">Locución</option>
-                  <option value="Podcast">Podcast</option>
-                  <option value="Presentación">Presentación</option>
-                </select>
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                  Categoría Principal
+                </label>
+                <div className="relative">
+                  <select
+                    value={form.category}
+                    onChange={e => setForm({ ...form, category: e.target.value as DemoCategory })}
+                    className="sud-input w-full appearance-none pr-10"
+                  >
+                    {DEMO_CATEGORIES.map(c => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                </div>
               </div>
-              <button 
-                type="submit" 
-                disabled={isUploading || !newDemo.title}
+
+              {/* Visual Genre */}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                  Género Visual / Tipo de Escena
+                </label>
+                <div className="relative">
+                  <select
+                    value={form.visualGenre}
+                    onChange={e => setForm({ ...form, visualGenre: e.target.value as VisualGenre | '' })}
+                    className="sud-input w-full appearance-none pr-10"
+                  >
+                    <option value="">— Sin clasificar —</option>
+                    {VISUAL_GENRES.map(g => (
+                      <option key={g} value={g}>{g}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                </div>
+              </div>
+
+              {/* Description (optional) */}
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                  Descripción <span className="text-slate-700">(opcional)</span>
+                </label>
+                <textarea
+                  value={form.description}
+                  onChange={e => setForm({ ...form, description: e.target.value })}
+                  className="sud-input w-full h-20 py-3 resize-none"
+                  placeholder="Breve descripción de la demo..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={isUploading || !form.title || !form.file}
                 className="w-full sud-btn-primary py-5 text-sm shadow-xl shadow-sud-orange/10 transition-all hover:scale-[1.02]"
               >
                 {isUploading ? (
                   <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
                 ) : (
-                  'Confirmar Carga de Audio'
+                  <>
+                    <Upload size={16} />
+                    Confirmar Carga
+                  </>
                 )}
               </button>
             </form>
           </section>
         </div>
 
+        {/* ── Demo List ────────────────────────────────────────────── */}
         <div className="lg:col-span-8 space-y-6">
           <div className="flex items-center justify-between px-2">
-            <h3 className="text-xl font-black uppercase tracking-tighter text-white">Lista de Demos <span className="text-slate-700 ml-2 font-mono text-sm">({demos.length})</span></h3>
+            <h3 className="text-xl font-black uppercase tracking-tighter text-white">
+              Lista de Demos{' '}
+              <span className="text-slate-700 ml-2 font-mono text-sm">({demos.length})</span>
+            </h3>
           </div>
+
           {demos.length === 0 ? (
             <div className="p-16 text-center bg-white/[0.02] rounded-[3rem] border border-dashed border-white/10">
-              <div className="w-20 h-20 rounded-full bg-white/5 flex items-center justify-center mx-auto mb-6">
-                <AudioLines className="text-white/10" size={40} />
+              <div className="flex items-center justify-center gap-4 mb-6 mx-auto">
+                <AudioLines className="text-white/10" size={36} />
+                <Film className="text-white/10" size={36} />
               </div>
               <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Aún no has cargado demos</p>
-              <p className="text-[10px] text-slate-600 uppercase tracking-widest mt-2">Usa el panel lateral para subir tu primera muestra de voz</p>
+              <p className="text-[10px] text-slate-600 uppercase tracking-widest mt-2">
+                Usa el panel lateral para subir audio (MP3, WAV) o video (MP4, MOV)
+              </p>
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {demos.map(demo => (
-                <DemoItem key={demo.id} demo={demo} />
+                <motion.div
+                  key={demo.id}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                >
+                  <DemoItem demo={demo} onDelete={handleDelete} />
+                </motion.div>
               ))}
             </div>
           )}

@@ -5,7 +5,7 @@ import { UserProfile, WhitelistEntry, ProfileCategory } from '../../types';
 interface AdminStudentsProps {
   whitelist: WhitelistEntry[];
   users: UserProfile[];
-  onAdd: (phone: string, name: string, category: ProfileCategory) => void;
+  onAdd: (phone: string, name: string, category: ProfileCategory, email?: string) => void;
   onRemove: (phone: string) => void;
   onUpdate: (phone: string, updates: any) => void;
 }
@@ -13,6 +13,7 @@ interface AdminStudentsProps {
 export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: AdminStudentsProps) {
   const [newPhone, setNewPhone] = useState('');
   const [newName, setNewName] = useState('');
+  const [newEmail, setNewEmail] = useState('');
   const [newCategory, setNewCategory] = useState<ProfileCategory>('NONE');
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -21,13 +22,14 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
   const [editCategory, setEditCategory] = useState<ProfileCategory>('NONE');
 
   const displayUsers = [
-    ...whitelist.map(w => ({ ...w, type: 'WHITELIST' as const, category: w.category || 'NONE' })),
+    ...whitelist.map(w => ({ ...w, type: 'WHITELIST' as const, category: w.category || 'NONE', email: w.email })),
     ...users
       .filter(u => u.status === 'PENDING' || u.uid.startsWith('mock_'))
       .filter(u => !whitelist.some(w => w.phone === u.phone))
       .map(u => ({ 
         phone: u.phone, 
         name: u.name, 
+        email: u.email,
         addedAt: u.createdAt, 
         type: 'REGISTERED' as const,
         status: u.status,
@@ -38,19 +40,23 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
 
   const filteredList = displayUsers.filter(e => 
     e.name?.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    e.phone?.includes(searchTerm)
+    e.phone?.includes(searchTerm) ||
+    e.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const digitsOnly = newPhone.replace(/\D/g, '');
-    if (digitsOnly.length === 8 && newName.trim()) {
-      onAdd(digitsOnly, newName.trim(), newCategory);
+    if (digitsOnly.length >= 8 && newName.trim()) {
+      // ✅ Enviar solo los dígitos, sin prefijo +569
+      // Pasar email siempre (vacío si no ingresó)
+      onAdd(digitsOnly, newName.trim(), newCategory, newEmail.trim());
       setNewPhone('');
       setNewName('');
+      setNewEmail('');
       setNewCategory('NONE');
     } else {
-      alert('Por favor ingrese un nombre y un número de 8 dígitos.');
+      alert('Por favor ingrese un nombre y un número de al menos 8 dígitos.');
     }
   };
 
@@ -134,6 +140,16 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
                   <option value="BOTH">Ambos</option>
                 </select>
               </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Correo Electrónico <span className="text-slate-700">(opcional)</span></label>
+                <input 
+                  type="email" 
+                  value={newEmail}
+                  onChange={e => setNewEmail(e.target.value)}
+                  className="sud-input w-full"
+                  placeholder="alumno@ejemplo.cl"
+                />
+              </div>
               <button type="submit" className="w-full sud-btn-primary py-4 text-xs font-black uppercase tracking-widest">
                 Autorizar Alumno
               </button>
@@ -164,6 +180,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
                   <tr>
                     <th className="px-6 py-4">Alumno</th>
                     <th className="px-6 py-4">Teléfono</th>
+                    <th className="px-6 py-4">Correo</th>
                     <th className="px-6 py-4">Categoría</th>
                     <th className="px-6 py-4 text-right">Acciones</th>
                   </tr>
@@ -198,6 +215,11 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
                         </div>
                       </td>
                       <td className="px-6 py-4 font-mono text-sm text-slate-400">{entry.phone}</td>
+                      <td className="px-6 py-4">
+                        <span className={`text-xs font-bold ${entry.email ? 'text-slate-400' : 'text-slate-600 italic'}`}>
+                          {entry.email || 'Sin correo'}
+                        </span>
+                      </td>
                       <td className="px-6 py-4">
                         {editingEntry?.phone === entry.phone ? (
                           <select 

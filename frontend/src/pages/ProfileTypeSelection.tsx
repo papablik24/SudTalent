@@ -18,7 +18,12 @@ export function ProfileTypeSelection({ onSelect }: ProfileTypeSelectionProps) {
         animate={{ opacity: 1, y: 0 }}
         className="w-full max-w-4xl"
       >
-        <div className="text-center mb-12">
+        <div className="text-center mb-12 flex flex-col items-center">
+          <img 
+            src="/logos/SUD_ISO_1.png"
+            alt="Sudamerican Voices"
+            className="h-16 w-16 object-contain mb-6 drop-shadow-[0_0_20px_rgba(45,212,191,0.15)]"
+          />
           <h2 className="text-4xl font-black text-white uppercase tracking-tighter mb-4">Selecciona tu <span className="sud-vibrant-text-gradient">Perfil</span></h2>
           <p className="text-slate-400 font-medium text-xs uppercase tracking-widest">¿Cómo gestionarás tu carrera en SudTalent?</p>
         </div>

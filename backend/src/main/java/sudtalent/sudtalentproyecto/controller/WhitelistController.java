@@ -34,7 +34,7 @@ public class WhitelistController {
         return ResponseEntity.ok(whitelistService.getAllNumbers());
     }
 
-    // Agregar un número a la whitelist
+    // Agregar un número a la whitelist + crear usuario automáticamente
     @PostMapping
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WhitelistNumberDTO> addNumber(
@@ -45,8 +45,19 @@ public class WhitelistController {
             return ResponseEntity.badRequest().build();
         }
         
+        // ✅ Logs para debug
+        System.out.println("📱 Whitelist POST recibido:");
+        System.out.println("   phone: " + dto.getPhone());
+        System.out.println("   name: " + dto.getName());
+        System.out.println("   email: " + dto.getEmail());
+        System.out.println("   category: " + dto.getCategory());
+        
+        // ✅ Usar createNumberWithUser para crear usuario + whitelist
+        String name = dto.getName() != null ? dto.getName() : "";
+        String email = dto.getEmail() != null ? dto.getEmail() : "";
+        
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(whitelistService.createNumber(phoneToAdd));
+            .body(whitelistService.createNumberWithUser(phoneToAdd, name, email));
     }
 
     // Actualizar estado por ID

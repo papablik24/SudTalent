@@ -1,18 +1,27 @@
 import { useState, useEffect } from 'react';
-import { UserProfile, UserRole } from '../types';
+import { UserProfile, UserRole, ProfileStatus } from '../types';
 import { authService, AuthResponse } from '../services/backendService';
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const DEV_OTP = '000000';
+
 function mapAuthResponseToUser(res: AuthResponse): UserProfile {
+  // Validar que status sea un ProfileStatus válido
+  const validStatuses: ProfileStatus[] = ['PENDING', 'APPROVED', 'INACTIVE'];
+  const status = res.status && validStatuses.includes(res.status as ProfileStatus)
+    ? (res.status as ProfileStatus)
+    : 'PENDING';
+
   return {
     uid: String(res.id),
     phone: res.phone || '',
     role: res.role === 'ADMIN' ? 'ADMIN' : 'USER',
-    onboarded: res.onboarded,
+    onboarded: res.onboarded ?? false,
     profileType: res.profileType === 'PERSONAL' || res.profileType === 'PARENT' ? res.profileType : undefined,
     name: res.name || '',
     email: res.email || '',
     createdAt: new Date().toISOString(),
-    status: 'PENDING',
+    status,
   };
 }
 
@@ -22,94 +31,499 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // On mount, check if there's a valid token and restore session
+  // ═══ Restore session on mount ═══
   useEffect(() => {
     const restoreSession = async () => {
-      if (!authService.hasToken()) {
-        setLoading(false);
-        return;
+      const savedUser = localStorage.getItem('sud_current_user');
+      const token = localStorage.getItem('sud_jwt_token');
+
+      // Si hay usuario guardado, restaurarlo
+      if (savedUser && token) {
+        try {
+          const user = JSON.parse(savedUser);
+          
+          // ✅ PREVENT 403: Verify user is eligible
+          if (!isUserEligible(user)) {
+            console.warn('User not eligible for session:', user);
+            authService.clearLocalAuth();
+            localStorage.removeItem('sud_current_user');
+            setLoading(false);
+            return;
+          }
+
+          setCurrentUser(user);
+          setRole(user.role);
+        } catch (err) {
+          console.error('Error restoring session:', err);
+          authService.clearLocalAuth();
+          localStorage.removeItem('sud_current_user');
+        }
       }
 
-      try {
-        const res = await authService.me();
-        const user = mapAuthResponseToUser(res);
-        setCurrentUser(user);
-        setRole(user.role);
-        localStorage.setItem('sud_current_user', JSON.stringify(user));
-      } catch (err) {
-        console.warn('Token inválido o expirado, limpiando sesión:', err);
-        authService.clearLocalAuth();
-        localStorage.removeItem('sud_current_user');
-      } finally {
-        setLoading(false);
-      }
+      setLoading(false);
     };
 
     restoreSession();
   }, []);
 
-  const loginWithPhone = async (phone: string, _otp?: string) => {
+  // ═══════════════════════════════════════════════════════════════
+  // HELPER: Check if user is eligible (active + approved)
+  // ═══════════════════════════════════════════════════════════════
+  const isUserEligible = (user: UserProfile): boolean => {
+    // Admin solo necesita ser APPROVED
+    if (user.role === 'ADMIN') {
+      return user.status === 'APPROVED';
+    }
+    // Usuarios regulares pueden ser APPROVED o PENDING
+    return user.status === 'APPROVED' || user.status === 'PENDING';
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // LOGIN WITH EMAIL — email + password → JWT
+  // ═══════════════════════════════════════════════════════════════
+const loginWithEmail = async (email: string, password: string): Promise<UserProfile | false> => {
+  setLoading(true);
+  setError(null);
+
+  // Validate inputs
+  if (!email || !email.includes('@')) {
+    setError('Ingresa un correo electrónico válido.');
+    setLoading(false);
+    return false;
+  }
+  if (!password || password.length < 6) {
+    setError('La contraseña debe tener al menos 6 caracteres.');
+    setLoading(false);
+    return false;
+  }
+
+  try {
+    console.log('🔵 Intentando login con:', { email, password: '***' });
+    console.log('🔵 API_BASE:', API_BASE);
+
+    const res = await fetch(`${API_BASE}/api/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+
+    console.log('📡 Response status:', res.status);
+    console.log('📡 Response ok:', res.ok);
+    console.log('📡 Response headers:', {
+      'content-type': res.headers.get('content-type'),
+      'content-length': res.headers.get('content-length'),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => {
+        console.warn('⚠️ No se pudo parsear JSON del error');
+        return {};
+      });
+      
+      console.error('❌ Backend error response:', body);
+      
+      let errorMsg = 'Error al iniciar sesión.';
+      
+      if (res.status === 401) {
+        errorMsg = body.message || 'Correo o contraseña incorrectos.';
+      } else if (res.status === 403) {
+        errorMsg = body.message || 'Tu cuenta ha sido desactivada o no tienes permiso para acceder.';
+      } else {
+        errorMsg = body.message || errorMsg;
+      }
+
+      setError(errorMsg);
+      setLoading(false);
+      return false;
+    }
+
+    const data = await res.json();
+    console.log('✅ Login response received:', {
+      id: data.id,
+      email: data.email,
+      role: data.role,
+      token: data.token ? '✓ Token presente' : '❌ Token faltante',
+    });
+
+    const userData: UserProfile = {
+      uid: String(data.id),
+      phone: data.phone || '',
+      role: data.role as UserRole,
+      name: data.name || data.nombre || '',
+      email: data.email || '',
+      onboarded: data.onboarded ?? true,
+      createdAt: data.createdAt || new Date().toISOString(),
+      status: data.status || 'APPROVED',
+    };
+
+    console.log('👤 User data mapped:', userData);
+
+    if (!isUserEligible(userData)) {
+      console.warn('⚠️ User not eligible:', userData);
+      setError('Tu cuenta no está activa. Contacta con soporte.');
+      setLoading(false);
+      return false;
+    }
+
+    console.log('💾 Guardando token y usuario en localStorage...');
+    localStorage.setItem('sud_jwt_token', data.token);
+    localStorage.setItem('sud_current_user', JSON.stringify(userData));
+
+    // Verificación de lo guardado
+    console.log('🔍 Verificando localStorage después de guardar:');
+    console.log('  - Token guardado:', localStorage.getItem('sud_jwt_token') ? '✓ Presente' : '❌ No encontrado');
+    console.log('  - User guardado:', localStorage.getItem('sud_current_user'));
+    console.log('  - Role en user:', userData.role);
+
+    setCurrentUser(userData);
+    setRole(userData.role);
+    
+    console.log('✅ Login exitoso');
+    return userData;
+  } catch (err) {
+    console.error('🔴 FETCH ERROR - Backend unreachable or error:', err);
+    console.error('Stack:', (err as Error).stack);
+    return loginWithEmailLocal(email, password);
+  } finally {
+    setLoading(false);
+  }
+};
+
+  const loginWithEmailLocal = (email: string, password: string): UserProfile | false => {
+    const accounts: Record<string, { password: string; user: UserProfile }> = {
+      'admin@sudamericanvoices.com': {
+        password: 'admin123',
+        user: {
+          uid: 'admin_local',
+          phone: '+56900000000',
+          role: 'ADMIN',
+          name: 'Admin SudTalent',
+          email: 'admin@sudamericanvoices.com',
+          onboarded: true,
+          createdAt: new Date().toISOString(),
+          status: 'APPROVED',
+        },
+      },
+      'alumno@sudtalent.cl': {
+        password: 'alumno123',
+        user: {
+          uid: 'user_local_1',
+          phone: '+56912345678',
+          role: 'USER',
+          name: 'Alumno Demo',
+          email: 'alumno@sudtalent.cl',
+          onboarded: true,
+          createdAt: new Date().toISOString(),
+          status: 'APPROVED',
+        },
+      },
+      'nuevo@sudtalent.cl': {
+        password: 'nuevo123',
+        user: {
+          uid: 'user_local_new',
+          phone: '+56987654321',
+          role: 'USER',
+          name: '',
+          email: 'nuevo@sudtalent.cl',
+          onboarded: false,
+          createdAt: new Date().toISOString(),
+          status: 'PENDING',
+        },
+      },
+    };
+
+    // También verificar usuarios registrados
+    const regStr = localStorage.getItem('sud_registered_users');
+    const registered: Record<string, any> = regStr ? JSON.parse(regStr) : {};
+    const allAccounts = { ...accounts, ...registered };
+
+    const acc = allAccounts[email.toLowerCase()];
+    if (!acc || acc.password !== password) {
+      setError('Correo o contraseña incorrectos.');
+      return false;
+    }
+
+    // ✅ PREVENT 403: Check eligibility
+    if (!isUserEligible(acc.user)) {
+      setError('Tu cuenta no está activa.');
+      return false;
+    }
+
+    localStorage.setItem('sud_current_user', JSON.stringify(acc.user));
+    setCurrentUser(acc.user);
+    setRole(acc.user.role);
+    return acc.user;
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // REGISTER — create new USER account
+  // ═══════════════════════════════════════════════════════════════
+  const registerUser = async (email: string, password: string, name: string): Promise<UserProfile | false> => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await authService.phoneAuth(phone);
-      const user = mapAuthResponseToUser(res);
-      
-      setCurrentUser(user);
-      setRole(user.role);
-      localStorage.setItem('sud_current_user', JSON.stringify(user));
-      return user;
-    } catch (err: any) {
-      const msg = err?.message || 'Error al iniciar sesión.';
-      setError(msg);
-      console.error('Login error:', err);
+
+    // Validate inputs
+    if (!name.trim()) {
+      setError('Ingresa tu nombre.');
+      setLoading(false);
       return false;
+    }
+    if (!email || !email.includes('@')) {
+      setError('Ingresa un correo válido.');
+      setLoading(false);
+      return false;
+    }
+    if (!password || password.length < 6) {
+      setError('La contraseña debe tener al menos 6 caracteres.');
+      setLoading(false);
+      return false;
+    }
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.message || body.error || 'Error al crear la cuenta.');
+        setLoading(false);
+        return false;
+      }
+
+      const data = await res.json();
+      const userData: UserProfile = {
+        uid: String(data.id),
+        phone: data.phone || '',
+        role: 'USER',
+        name: data.name || name,
+        email: data.email || email,
+        onboarded: false,
+        createdAt: new Date().toISOString(),
+        status: 'PENDING',
+      };
+
+      if (data.token) localStorage.setItem('sud_jwt_token', data.token);
+      localStorage.setItem('sud_current_user', JSON.stringify(userData));
+      setCurrentUser(userData);
+      setRole('USER');
+      return userData;
+    } catch {
+      // Backend unreachable — create local account
+      return registerUserLocal(email, password, name);
     } finally {
       setLoading(false);
     }
   };
 
-  const loginAdmin = async (email?: string, password?: string) => {
+  const registerUserLocal = (email: string, _password: string, name: string): UserProfile | false => {
+    const existing = localStorage.getItem('sud_registered_users');
+    const registeredUsers: Record<string, any> = existing ? JSON.parse(existing) : {};
+
+    if (registeredUsers[email.toLowerCase()]) {
+      setError('Ya existe una cuenta con este correo.');
+      return false;
+    }
+
+    const uid = `user_reg_${Date.now()}`;
+    const userData: UserProfile = {
+      uid,
+      phone: '',
+      role: 'USER',
+      name,
+      email,
+      onboarded: false,
+      createdAt: new Date().toISOString(),
+      status: 'PENDING',
+    };
+
+    registeredUsers[email.toLowerCase()] = { password: _password, user: userData };
+    localStorage.setItem('sud_registered_users', JSON.stringify(registeredUsers));
+    localStorage.setItem('sud_current_user', JSON.stringify(userData));
+
+    setCurrentUser(userData);
+    setRole('USER');
+    return userData;
+  };
+
+  // ═══════════════════════════════════════════════════════════════
+  // PHONE LOGIN — (FUTURE) phone + whitelist + SMS code
+  // ═══════════════════════════════════════════════════════════════
+
+  /** Step 1: Request SMS code. Validates phone against whitelist. */
+  const requestPhoneCode = async (phone: string): Promise<{ success: boolean; message: string }> => {
     setLoading(true);
     setError(null);
-    try {
-      // Use provided credentials or default admin
-      const adminEmail = email || 'admin@sudamericanvoices.com';
-      const adminPassword = password || 'admin123';
-      
-      const res = await authService.adminLogin(adminEmail, adminPassword);
-      const user = mapAuthResponseToUser(res);
-      
-      setCurrentUser(user);
-      setRole(user.role);
-      localStorage.setItem('sud_current_user', JSON.stringify(user));
-      return user;
-    } catch (err: any) {
-      const msg = err?.message || 'Error al iniciar sesión como admin.';
-      setError(msg);
-      console.error('Admin login error:', err);
-      return false;
-    } finally {
+
+    const normalized = phone.replace(/\s/g, '');
+    if (!normalized || normalized.replace(/\D/g, '').length < 8) {
+      setError('Ingresa un número de teléfono válido.');
       setLoading(false);
+      return { success: false, message: 'Número inválido.' };
+    }
+
+    try {
+      // Try backend first
+      const res = await fetch(`${API_BASE}/api/auth/phone/request-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalized }),
+      });
+      const body = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        const msg = body.error || body.message || 'Número no autorizado por Sudamerican Voices.';
+        setError(msg);
+        setLoading(false);
+        return { success: false, message: msg };
+      }
+
+      setLoading(false);
+      return { success: true, message: body.message || 'Código enviado correctamente.' };
+    } catch {
+      // Backend unreachable — validate against local whitelist
+      return requestPhoneCodeLocal(normalized);
     }
   };
 
+  const requestPhoneCodeLocal = (phone: string): { success: boolean; message: string } => {
+    const digits = phone.replace(/\D/g, '');
+    const DEV_NUMBERS = ['56912345678', '12345678', '56987654321', '87654321'];
+    const isDevBypass = DEV_NUMBERS.some(d => digits.endsWith(d));
+
+    if (!isDevBypass) {
+      const whitelist = JSON.parse(localStorage.getItem('sud_whitelist') || '[]');
+      const last8 = digits.slice(-8);
+      const entry = whitelist.find((w: any) => {
+        const wDigits = w.phone.replace(/\D/g, '');
+        return wDigits.endsWith(last8);
+      });
+
+      if (!entry) {
+        const msg = 'Número no autorizado por Sudamerican Voices.';
+        setError(msg);
+        setLoading(false);
+        return { success: false, message: msg };
+      }
+    }
+
+    console.info(`[DEV SMS] Código de verificación para ${phone}: ${DEV_OTP}`);
+    setLoading(false);
+    return { success: true, message: 'Código enviado correctamente.' };
+  };
+
+  /** Step 2: Verify SMS code and create session. */
+  const verifyPhoneCode = async (phone: string, code: string): Promise<UserProfile | false> => {
+    setLoading(true);
+    setError(null);
+
+    const normalized = phone.replace(/\s/g, '');
+
+    try {
+      const res = await fetch(`${API_BASE}/api/auth/phone/verify-code`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: normalized, code }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setError(body.error || body.message || 'Código incorrecto o expirado.');
+        setLoading(false);
+        return false;
+      }
+
+      const data = await res.json();
+      const userData: UserProfile = {
+        uid: String(data.id),
+        phone: data.phone || normalized,
+        role: 'USER',
+        name: data.name || '',
+        email: data.email || '',
+        onboarded: true,
+        createdAt: data.createdAt || new Date().toISOString(),
+        status: data.status || 'APPROVED',
+      };
+
+      // ✅ PREVENT 403: Check eligibility
+      if (!isUserEligible(userData)) {
+        setError('Tu cuenta está pendiente de aprobación o ha sido desactivada.');
+        setLoading(false);
+        return false;
+      }
+
+      localStorage.setItem('sud_jwt_token', data.token);
+      localStorage.setItem('sud_current_user', JSON.stringify(userData));
+      setCurrentUser(userData);
+      setRole('USER');
+      return userData;
+    } catch {
+      return verifyPhoneCodeLocal(normalized, code);
+    }
+  };
+
+  const verifyPhoneCodeLocal = (phone: string, code: string): UserProfile | false => {
+    if (code !== DEV_OTP) {
+      setError('Código incorrecto o expirado.');
+      setLoading(false);
+      return false;
+    }
+
+    const whitelist = JSON.parse(localStorage.getItem('sud_whitelist') || '[]');
+    const entry = whitelist.find((w: any) => w.phone === phone);
+    const phoneId = phone.replace('+', '').replace(/\D/g, '');
+    const existingStr = localStorage.getItem(`user_${phoneId}`);
+
+    let userData: UserProfile;
+    if (existingStr) {
+      userData = JSON.parse(existingStr);
+    } else {
+      userData = {
+        uid: `local_${phoneId}`,
+        phone,
+        role: 'USER',
+        name: entry?.name || '',
+        email: entry?.email || '',
+        onboarded: !!entry?.name,
+        createdAt: new Date().toISOString(),
+        status: 'APPROVED',
+      };
+      localStorage.setItem(`user_${phoneId}`, JSON.stringify(userData));
+    }
+
+    localStorage.setItem('sud_current_user', JSON.stringify(userData));
+    setCurrentUser(userData);
+    setRole('USER');
+    setLoading(false);
+    return userData;
+  };
+
+  // ═══ Logout ═══
   const logout = async () => {
     await authService.logout();
     localStorage.removeItem('sud_current_user');
+    localStorage.removeItem('sud_jwt_token');
     setRole(null);
     setCurrentUser(null);
   };
+
+  const getToken = () => localStorage.getItem('sud_jwt_token') || null;
 
   return {
     currentUser,
     role,
     loading,
     error,
-    loginWithPhone,
-    loginAdmin,
+    loginWithEmail,
+    registerUser,
+    requestPhoneCode,
+    verifyPhoneCode,
     logout,
+    getToken,
     setCurrentUser,
-    setRole
+    setRole,
+    isUserEligible,
   };
 }

@@ -13,6 +13,8 @@ import {
   CheckCircle, 
   AlertCircle,
   FileAudio,
+  Film,
+  AudioLines,
   SlidersHorizontal,
   ArrowUpDown,
   ExternalLink,
@@ -22,7 +24,7 @@ import {
   Mail,
   MapPin
 } from 'lucide-react';
-import { UserProfile, TalentProfile, VoiceDemo, DemoCategory, ProfileStatus, ProfileType } from '../types';
+import { UserProfile, TalentProfile, VoiceDemo, DemoCategory, ProfileStatus, ProfileType, VisualGenre, MediaType, VISUAL_GENRES } from '../types';
 
 interface AdminTalentReviewProps {
   users: UserProfile[];
@@ -37,6 +39,8 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory | 'TODOS'>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<ProfileStatus | 'TODOS'>('TODOS');
   const [selectedProfileType, setSelectedProfileType] = useState<ProfileType | 'TODOS'>('TODOS');
+  const [selectedVisualGenre, setSelectedVisualGenre] = useState<VisualGenre | 'TODOS'>('TODOS');
+  const [selectedMediaType, setSelectedMediaType] = useState<MediaType | 'TODOS'>('TODOS');
   const [hasDemosOnly, setHasDemosOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'name' | 'recent'>('name');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -67,6 +71,24 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
       result = result.filter(u => u.profileType === selectedProfileType);
     }
 
+    // Filter by visual genre: keep users who have at least one demo with this genre
+    if (selectedVisualGenre !== 'TODOS') {
+      result = result.filter(u =>
+        (allDemos[u.uid] || []).some(d => d.visualGenre === selectedVisualGenre)
+      );
+    }
+
+    // Filter by media type: keep users who have at least one demo of this type
+    if (selectedMediaType !== 'TODOS') {
+      result = result.filter(u =>
+        (allDemos[u.uid] || []).some(d =>
+          selectedMediaType === 'AUDIO'
+            ? (!d.mediaType || d.mediaType === 'AUDIO')
+            : d.mediaType === 'VIDEO'
+        )
+      );
+    }
+
     if (hasDemosOnly) {
       result = result.filter(u => allDemos[u.uid]?.length > 0);
     }
@@ -82,7 +104,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
     }
 
     return result;
-  }, [users, searchTerm, selectedCategory, selectedStatus, selectedProfileType, hasDemosOnly, sortBy, allDemos]);
+  }, [users, searchTerm, selectedCategory, selectedStatus, selectedProfileType, selectedVisualGenre, selectedMediaType, hasDemosOnly, sortBy, allDemos]);
 
   const selectedUser = users.find(u => u.uid === selectedUserId);
   const selectedTalentProfile = selectedUserId ? talentProfiles[selectedUserId] : null;
@@ -186,6 +208,49 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                     {type === 'TODOS' ? 'Ambos' : type === 'PERSONAL' ? 'Adulto' : 'Menor'}
                   </button>
                 ))}
+              </div>
+            </div>
+
+            {/* Media Type Filter */}
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-500 tracking-[0.2em] ml-1">Tipo de Medio</label>
+              <div className="flex gap-2">
+                {(['TODOS', 'AUDIO', 'VIDEO'] as const).map(type => (
+                  <button
+                    key={type}
+                    onClick={() => setSelectedMediaType(type as any)}
+                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${
+                      selectedMediaType === type
+                        ? type === 'VIDEO'
+                          ? 'bg-sud-turquoise text-black'
+                          : type === 'AUDIO'
+                          ? 'bg-sud-orange text-black'
+                          : 'bg-white/10 text-white'
+                        : 'bg-white/[0.02] text-slate-500 hover:bg-white/[0.04]'
+                    }`}
+                  >
+                    {type === 'VIDEO' && <Film size={10} />}
+                    {type === 'AUDIO' && <AudioLines size={10} />}
+                    {type === 'TODOS' ? 'Ambos' : type}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Visual Genre Filter */}
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase font-black text-slate-500 tracking-[0.2em] ml-1">Género Visual / Escena</label>
+              <div className="relative">
+                <select
+                  value={selectedVisualGenre}
+                  onChange={e => setSelectedVisualGenre(e.target.value as any)}
+                  className="sud-input w-full text-[10px] font-black uppercase tracking-widest appearance-none"
+                >
+                  <option value="TODOS">Todos los géneros</option>
+                  {VISUAL_GENRES.map(g => (
+                    <option key={g} value={g}>{g}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -470,7 +535,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                    </div>
                 </section>
 
-                {/* Audio Playlist */}
+                {/* Demo Playlist */}
                 <section className="space-y-6">
                    <div className="flex items-center justify-between">
                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sud-turquoise">Playlist de Demos</h4>
@@ -492,16 +557,39 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                                     : 'bg-white/5 text-sud-turquoise group-hover:bg-white/10'
                                 } shadow-xl shadow-black/40`}
                               >
-                                {playingDemoId === demo.id ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
+                                {playingDemoId === demo.id
+                                  ? <Pause size={24} />
+                                  : demo.mediaType === 'VIDEO'
+                                    ? <Film size={22} className="ml-0.5" />
+                                    : <Play size={24} className="ml-1" />
+                                }
                               </button>
                               <div>
-                                <div className="flex items-center gap-3 mb-1">
-                                  <span className="px-2 py-0.5 rounded bg-sud-turquoise/10 text-sud-turquoise text-[7px] font-black uppercase tracking-widest">
+                                <div className="flex flex-wrap items-center gap-2 mb-1">
+                                  {/* Media type */}
+                                  <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${
+                                    demo.mediaType === 'VIDEO'
+                                      ? 'bg-sud-turquoise/10 text-sud-turquoise'
+                                      : 'bg-sud-orange/10 text-sud-orange'
+                                  }`}>
+                                    {demo.mediaType === 'VIDEO' ? '🎬 Video' : '🎙 Audio'}
+                                  </span>
+                                  {/* Category */}
+                                  <span className="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[7px] font-black uppercase tracking-widest">
                                     {demo.category}
                                   </span>
+                                  {/* Visual genre */}
+                                  {demo.visualGenre && (
+                                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 text-[7px] font-black uppercase tracking-widest border border-purple-500/20">
+                                      {demo.visualGenre}
+                                    </span>
+                                  )}
                                   <p className="text-sm font-black text-white uppercase tracking-tight">{demo.title}</p>
                                 </div>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Duración: {demo.duration}</p>
+                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                                  {demo.fileFormat && <span className="mr-3">{demo.fileFormat}</span>}
+                                  Duración: {demo.duration}
+                                </p>
                               </div>
                             </div>
                             <button className="p-4 rounded-xl bg-white/5 text-slate-500 hover:text-white transition-colors">

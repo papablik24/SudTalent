@@ -1,7 +1,6 @@
 package sudtalent.sudtalentproyecto.service;
 
 import sudtalent.sudtalentproyecto.model.Alumno;
-import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
 import lombok.RequiredArgsConstructor;

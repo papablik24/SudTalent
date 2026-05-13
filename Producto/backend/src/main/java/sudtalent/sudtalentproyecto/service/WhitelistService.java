@@ -4,6 +4,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import jakarta.transaction.Transactional;
@@ -25,6 +26,7 @@ import sudtalent.sudtalentproyecto.repository.WhitelistNumberRepository;
 public class WhitelistService {
     private final WhitelistNumberRepository repository;
     private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public WhitelistNumberDTO createNumber(String phone) {
         if(repository.findByPhone(phone).isPresent()) {
@@ -174,7 +176,7 @@ public class WhitelistService {
             user = User.builder()
                 .name(finalName != null ? finalName : "")
                 .email(syntheticEmail)
-                .password(syntheticPassword) // En producción, usar PasswordEncoder
+                .password(passwordEncoder.encode(syntheticPassword))
                 .phone(phone)
                 .role(User.Role.ALUMNO)
                 .onboarded(false)
@@ -266,6 +268,71 @@ public class WhitelistService {
         }
         
         System.out.println("ℹ️ No se encontró usuario para vincular con whitelist: " + whitelist.getPhone());
+    }
+
+    // ==================== FUNCIONALIDAD 4: Sincronizar whitelist con users existentes ====================
+
+    public int syncWhitelistWithUsers() {
+        List<WhitelistNumber> unlinked = repository.findAll().stream()
+            .filter(wl -> wl.getUser() == null)
+            .collect(Collectors.toList());
+
+        int count = 0;
+        for (WhitelistNumber wl : unlinked) {
+            boolean linked = false;
+
+            // Intentar vincular por teléfono
+            if (wl.getPhone() != null) {
+                var userByPhone = userRepository.findByPhone(wl.getPhone());
+                if (userByPhone.isPresent()) {
+                    wl.setUser(userByPhone.get());
+                    if (wl.getName() == null && userByPhone.get().getName() != null) {
+                        wl.setName(userByPhone.get().getName());
+                    }
+                    linked = true;
+                }
+            }
+
+            // Si no, intentar vincular por email
+            if (!linked && wl.getEmail() != null && !wl.getEmail().isEmpty()) {
+                var userByEmail = userRepository.findByEmail(wl.getEmail());
+                if (userByEmail.isPresent()) {
+                    wl.setUser(userByEmail.get());
+                    linked = true;
+                }
+            }
+
+            if (linked) {
+                wl.setUpdatedAt(java.time.LocalDateTime.now());
+                repository.save(wl);
+                count++;
+                System.out.println("✅ Sincronizado whitelist " + wl.getPhone() + " → user id " + wl.getUser().getId());
+            }
+        }
+
+        System.out.println("ℹ️ Sync completado: " + count + " de " + unlinked.size() + " entradas vinculadas.");
+        return count;
+    }
+
+    // ==================== FUNCIONALIDAD 5: Reparar passwords legacy sin BCrypt ====================
+
+    public int fixLegacyPasswords() {
+        List<User> allUsers = userRepository.findAll();
+        int fixed = 0;
+
+        for (User user : allUsers) {
+            // Los passwords BCrypt siempre empiezan con $2a$ o $2b$
+            if (user.getPassword() != null && !user.getPassword().startsWith("$2")) {
+                String raw = user.getPassword();
+                user.setPassword(passwordEncoder.encode(raw));
+                userRepository.save(user);
+                fixed++;
+                System.out.println("🔧 Password re-encodificado para: " + user.getEmail());
+            }
+        }
+
+        System.out.println("ℹ️ Fix legacy passwords: " + fixed + " usuario(s) reparado(s).");
+        return fixed;
     }
 
     private WhitelistNumberDTO toDTO(WhitelistNumber number) {

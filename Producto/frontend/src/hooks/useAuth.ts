@@ -5,21 +5,26 @@ import { authService, AuthResponse } from '../services/backendService';
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const DEV_OTP = '000000';
 
-function mapAuthResponseToUser(res: AuthResponse): UserProfile {
-  // Validar que status sea un ProfileStatus válido
+function mapAuthResponseToUser(res: any): UserProfile {
+  // Manejar tanto la estructura nueva (res.user) como la vieja (res.id)
+  const user = res.user || res;
+  
   const validStatuses: ProfileStatus[] = ['PENDING', 'APPROVED', 'INACTIVE'];
-  const status = res.status && validStatuses.includes(res.status as ProfileStatus)
-    ? (res.status as ProfileStatus)
+  const status = user.status && validStatuses.includes(user.status as ProfileStatus)
+    ? (user.status as ProfileStatus)
     : 'PENDING';
 
   return {
-    uid: String(res.id),
-    phone: res.phone || '',
-    role: res.role === 'ADMIN' ? 'ADMIN' : 'USER',
-    onboarded: res.onboarded ?? false,
-    profileType: res.profileType === 'PERSONAL' || res.profileType === 'PARENT' ? res.profileType : undefined,
-    name: res.name || '',
-    email: res.email || '',
+    uid: String(user.id),
+    phone: user.phone || '',
+    role: user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+    onboarded: user.onboarded ?? false,
+    active: user.active ?? true,
+    profileType: user.profileType === 'PERSONAL' || user.profileType === 'PARENT' ? user.profileType : undefined,
+    name: user.name || '',
+    email: user.email || '',
+    bio: user.bio || '',
+    age: user.age,
     createdAt: new Date().toISOString(),
     status,
   };
@@ -41,6 +46,11 @@ export function useAuth() {
       if (savedUser && token) {
         try {
           const user = JSON.parse(savedUser);
+
+          // ✅ Normalizar role: backend usa ALUMNO, frontend usa USER
+          if (user.role && user.role !== 'ADMIN' && user.role !== 'USER') {
+            user.role = 'USER';
+          }
           
           // ✅ PREVENT 403: Verify user is eligible
           if (!isUserEligible(user)) {
@@ -127,7 +137,16 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
       if (res.status === 401) {
         errorMsg = body.message || 'Correo o contraseña incorrectos.';
       } else if (res.status === 403) {
-        errorMsg = body.message || 'Tu cuenta ha sido desactivada o no tienes permiso para acceder.';
+        // Intentar usar el mensaje específico del backend
+        if (body.message) {
+          errorMsg = body.message;
+        } else if (body.error) {
+          errorMsg = body.error;
+        } else {
+          errorMsg = 'No tienes permiso para acceder. Verifica tus credenciales.';
+        }
+      } else if (res.status === 400) {
+        errorMsg = body.message || body.error || 'Datos de acceso inválidos.';
       } else {
         errorMsg = body.message || errorMsg;
       }
@@ -138,22 +157,34 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
     }
 
     const data = await res.json();
+    // Soportar estructura anidada (data.user) o plana (data)
+    const user = data.user || data;
+    
+    // El status puede estar en user.status (si es anidado) o data.status (si es plano)
+    const statusFromResponse = user.status || data.status;
+
     console.log('✅ Login response received:', {
-      id: data.id,
-      email: data.email,
-      role: data.role,
+      id: user.id,
+      email: user.email,
+      role: user.role,
+      status: statusFromResponse,
       token: data.token ? '✓ Token presente' : '❌ Token faltante',
+      requiresOnboarding: data.requiresOnboarding,
+      dataStructure: data.user ? 'nested (user)' : 'flat'
     });
 
     const userData: UserProfile = {
-      uid: String(data.id),
-      phone: data.phone || '',
-      role: data.role as UserRole,
-      name: data.name || data.nombre || '',
-      email: data.email || '',
-      onboarded: data.onboarded ?? true,
-      createdAt: data.createdAt || new Date().toISOString(),
-      status: data.status || 'APPROVED',
+      uid: String(user.id),
+      phone: user.phone || '',
+      role: (user.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole,
+      name: user.name || user.nombre || '',
+      email: user.email || '',
+      onboarded: user.onboarded ?? true,
+      active: user.active ?? true,
+      bio: user.bio || '',
+      age: user.age,
+      createdAt: user.createdAt || new Date().toISOString(),
+      status: statusFromResponse || 'PENDING',
     };
 
     console.log('👤 User data mapped:', userData);

@@ -2,6 +2,8 @@ package sudtalent.sudtalentproyecto.dto;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.annotation.JsonInclude;
 
 public class AuthDTOs {
 
@@ -38,14 +40,24 @@ public class AuthDTOs {
             String bio
     ) {}
 
-    public record AuthResponse(
+    public record UserData(
             Long id,
             String name,
             String email,
             String phone,
             String role,
+            boolean active,
             boolean onboarded,
             String profileType,
+            String status
+    ) {}
+
+    public record AuthResponse(
+            @JsonProperty("user")
+            UserData user,
+            @JsonProperty("requiresOnboarding")
+            boolean requiresOnboarding,
+            @JsonProperty("token")
             String token
     ) {}
 

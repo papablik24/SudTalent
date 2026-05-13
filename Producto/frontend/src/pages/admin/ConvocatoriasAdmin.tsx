@@ -1,160 +1,329 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Briefcase, Calendar, Trash2, Edit2, Users, X } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Briefcase, Calendar, Trash2, Edit2, Users, X, Search, Archive, Lock, Eye, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Convocation, Application } from '../../types';
+import { StatusBadge } from '../../components/ui/StatusBadge';
+import {
+  convocatoriaService,
+  Convocatoria,
+  CreateConvocatoriaDTO,
+  ConvocatoriaCategoria,
+  ConvocatoriaEstado,
+  GeneroVisual,
+  CONVOCATORIA_CATEGORIAS,
+  CONVOCATORIA_ESTADOS,
+  GENEROS_VISUALES,
+} from '../../services/convocatoriaService';
+import {
+  postulacionService,
+  Postulacion,
+  PostulacionEstado,
+} from '../../services/postulacionService';
+
+type FormData = CreateConvocatoriaDTO & { requisitosText: string };
+
+const EMPTY_FORM: FormData = {
+  titulo: '',
+  descripcion: '',
+  categoria: 'Doblaje',
+  generoVisual: undefined,
+  requisitos: [],
+  fechaLimite: '',
+  estado: 'BORRADOR',
+  requisitosText: '',
+};
 
 export function ConvocatoriasAdmin() {
-  const [convocatorias, setConvocatorias] = useState<Convocation[]>([]);
-  const [applications, setApplications] = useState<Record<string, Application[]>>({});
+  const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
+  const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filters
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterEstado, setFilterEstado] = useState<ConvocatoriaEstado | 'TODAS'>('TODAS');
+  const [filterCategoria, setFilterCategoria] = useState<ConvocatoriaCategoria | 'TODAS'>('TODAS');
+
+  // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [formData, setFormData] = useState<FormData>(EMPTY_FORM);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Postulantes modal
   const [viewingApplicantsId, setViewingApplicantsId] = useState<string | null>(null);
+  const [applicants, setApplicants] = useState<Postulacion[]>([]);
 
-  const [formData, setFormData] = useState<Partial<Convocation>>({
-    title: '',
-    description: '',
-    category: 'Doblaje',
-    status: 'BORRADOR',
-    requirements: []
-  });
-
+  // ── Load data ────────────────────────────────────────────────────────
   useEffect(() => {
-    const loadData = () => {
-      const savedConvs = localStorage.getItem('sud_convocatorias');
-      if (savedConvs) setConvocatorias(JSON.parse(savedConvs));
-      
-      const savedApps = localStorage.getItem('sud_applications');
-      if (savedApps) {
-        const apps: Application[] = JSON.parse(savedApps);
-        const appsMap: Record<string, Application[]> = {};
-        apps.forEach(app => {
-          if (!appsMap[app.convocationId]) appsMap[app.convocationId] = [];
-          appsMap[app.convocationId].push(app);
-        });
-        setApplications(appsMap);
-      }
-      setLoading(false);
-    };
     loadData();
   }, []);
 
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const [convs, posts] = await Promise.all([
+        convocatoriaService.getConvocatorias(),
+        postulacionService.getAllPostulaciones(),
+      ]);
+      setConvocatorias(convs);
+      setPostulaciones(posts);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar datos.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Postulaciones count per convocatoria ─────────────────────────────
+  const postCountMap = useMemo(() => {
+    const map: Record<string, number> = {};
+    postulaciones.forEach(p => {
+      map[p.convocatoriaId] = (map[p.convocatoriaId] || 0) + 1;
+    });
+    return map;
+  }, [postulaciones]);
+
+  // ── Filtered list ────────────────────────────────────────────────────
+  const filtered = useMemo(() => {
+    let result = [...convocatorias];
+    if (filterEstado !== 'TODAS') result = result.filter(c => c.estado === filterEstado);
+    if (filterCategoria !== 'TODAS') result = result.filter(c => c.categoria === filterCategoria);
+    if (searchTerm) {
+      const low = searchTerm.toLowerCase();
+      result = result.filter(c => c.titulo.toLowerCase().includes(low) || c.descripcion.toLowerCase().includes(low));
+    }
+    return result;
+  }, [convocatorias, filterEstado, filterCategoria, searchTerm]);
+
+  // ── CRUD handlers ────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newConv = {
-      ...formData,
-      id: editingId || `conv_${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
-      createdBy: 'admin'
-    } as Convocation;
+    setFormError(null);
 
-    let updated;
-    if (editingId) {
-      updated = convocatorias.map(c => c.id === editingId ? newConv : c);
-    } else {
-      updated = [newConv, ...convocatorias];
+    if (!formData.titulo.trim()) { setFormError('El título es requerido.'); return; }
+    if (!formData.descripcion.trim()) { setFormError('La descripción es requerida.'); return; }
+    if (!formData.fechaLimite) { setFormError('La fecha límite es requerida.'); return; }
+    if (new Date(formData.fechaLimite) < new Date(new Date().toDateString())) {
+      setFormError('La fecha límite no puede ser anterior a hoy.'); return;
     }
 
-    setConvocatorias(updated);
-    localStorage.setItem('sud_convocatorias', JSON.stringify(updated));
-    setIsModalOpen(false);
-    setEditingId(null);
-  };
+    const dto: CreateConvocatoriaDTO = {
+      titulo: formData.titulo.trim(),
+      descripcion: formData.descripcion.trim(),
+      categoria: formData.categoria,
+      generoVisual: formData.generoVisual || undefined,
+      requisitos: formData.requisitosText
+        .split('\n')
+        .map(r => r.trim())
+        .filter(Boolean),
+      fechaLimite: new Date(formData.fechaLimite).toISOString(),
+      estado: formData.estado,
+    };
 
-  const handleDelete = (id: string) => {
-    if (confirm('¿Estás seguro?')) {
-      const updated = convocatorias.filter(c => c.id !== id);
-      setConvocatorias(updated);
-      localStorage.setItem('sud_convocatorias', JSON.stringify(updated));
+    try {
+      if (editingId) {
+        await convocatoriaService.updateConvocatoria(editingId, dto);
+      } else {
+        await convocatoriaService.createConvocatoria(dto);
+      }
+      setIsModalOpen(false);
+      setEditingId(null);
+      setFormData(EMPTY_FORM);
+      await loadData();
+    } catch (err: any) {
+      setFormError(err.message || 'Error al guardar.');
     }
   };
 
-  const handleStatusChange = (appId: string, status: Application['status']) => {
-    const savedApps = localStorage.getItem('sud_applications');
-    if (!savedApps) return;
-    const apps: Application[] = JSON.parse(savedApps);
-    const updated = apps.map(a => a.id === appId ? { ...a, status } : a);
-    localStorage.setItem('sud_applications', JSON.stringify(updated));
-    
-    // Update local state
-    const appsMap: Record<string, Application[]> = {};
-    updated.forEach(app => {
-      if (!appsMap[app.convocationId]) appsMap[app.convocationId] = [];
-      appsMap[app.convocationId].push(app);
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta convocatoria?')) return;
+    await convocatoriaService.deleteConvocatoria(id);
+    await loadData();
+  };
+
+  const handleClose = async (id: string) => {
+    await convocatoriaService.closeConvocatoria(id);
+    await loadData();
+  };
+
+  const handleArchive = async (id: string) => {
+    await convocatoriaService.archiveConvocatoria(id);
+    await loadData();
+  };
+
+  const openEdit = (conv: Convocatoria) => {
+    setEditingId(conv.id);
+    setFormData({
+      titulo: conv.titulo,
+      descripcion: conv.descripcion,
+      categoria: conv.categoria,
+      generoVisual: conv.generoVisual,
+      requisitos: conv.requisitos,
+      fechaLimite: conv.fechaLimite ? new Date(conv.fechaLimite).toISOString().split('T')[0] : '',
+      estado: conv.estado,
+      requisitosText: conv.requisitos.join('\n'),
     });
-    setApplications(appsMap);
+    setFormError(null);
+    setIsModalOpen(true);
   };
+
+  const openNew = () => {
+    setEditingId(null);
+    setFormData(EMPTY_FORM);
+    setFormError(null);
+    setIsModalOpen(true);
+  };
+
+  // ── View Applicants ──────────────────────────────────────────────────
+  const openApplicants = async (convId: string) => {
+    const apps = await postulacionService.getPostulacionesByConvocatoria(convId);
+    setApplicants(apps);
+    setViewingApplicantsId(convId);
+  };
+
+  const handleStatusChange = async (postId: string, newStatus: PostulacionEstado) => {
+    await postulacionService.updatePostulacionStatus(postId, newStatus);
+    if (viewingApplicantsId) {
+      const apps = await postulacionService.getPostulacionesByConvocatoria(viewingApplicantsId);
+      setApplicants(apps);
+    }
+    await loadData();
+  };
+
+  // ── Render ───────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="w-10 h-10 border-4 border-sud-orange/20 border-t-sud-orange rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-12 text-center border border-red-500/20 rounded-[2rem] bg-red-500/5">
+        <p className="text-red-400 font-bold text-sm">{error}</p>
+        <button onClick={loadData} className="mt-4 text-[10px] text-red-400 underline uppercase tracking-widest font-bold">Reintentar</button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">
+      {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black tracking-tighter text-white">Gestión de <span className="sud-vibrant-text-gradient uppercase tracking-widest">Convocatorias</span></h2>
           <p className="text-slate-400 mt-1 font-medium text-[10px] tracking-widest uppercase">Publicación de castings y revisión de postulantes</p>
         </div>
-        <button 
-          onClick={() => {
-            setEditingId(null);
-            setFormData({ title: '', description: '', category: 'Doblaje', status: 'BORRADOR', requirements: [] });
-            setIsModalOpen(true);
-          }}
-          className="sud-btn-primary px-8 py-4"
-        >
+        <button onClick={openNew} className="sud-btn-primary px-8 py-4">
           <Plus size={18} />
           <span>Nueva Convocatoria</span>
         </button>
       </header>
 
+      {/* Filters */}
+      <div className="flex flex-col md:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Buscar por título..."
+            className="sud-input w-full pl-11"
+          />
+        </div>
+        <div className="relative">
+          <select
+            value={filterEstado}
+            onChange={e => setFilterEstado(e.target.value as any)}
+            className="sud-input appearance-none pr-10 min-w-[160px]"
+          >
+            <option value="TODAS">Todos los estados</option>
+            {CONVOCATORIA_ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        </div>
+        <div className="relative">
+          <select
+            value={filterCategoria}
+            onChange={e => setFilterCategoria(e.target.value as any)}
+            className="sud-input appearance-none pr-10 min-w-[160px]"
+          >
+            <option value="TODAS">Todas las categorías</option>
+            {CONVOCATORIA_CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        </div>
+      </div>
+
+      {/* List */}
       <div className="grid grid-cols-1 gap-6">
-        {convocatorias.map(conv => (
+        {filtered.map(conv => (
           <div key={conv.id} className="sud-glass-panel p-8 group relative overflow-hidden flex flex-col md:flex-row gap-8 items-start md:items-center">
-            <div className={`absolute top-0 left-0 w-1 h-full ${conv.status === 'ACTIVA' ? 'bg-sud-turquoise' : 'bg-slate-800'}`} />
+            <div className={`absolute top-0 left-0 w-1 h-full ${conv.estado === 'ACTIVA' ? 'bg-emerald-400' : conv.estado === 'BORRADOR' ? 'bg-slate-600' : conv.estado === 'CERRADA' ? 'bg-red-400' : 'bg-slate-800'}`} />
             
             <div className="flex-1 space-y-3">
-              <div className="flex items-center gap-3">
-                <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${conv.status === 'ACTIVA' ? 'bg-sud-turquoise/10 text-sud-turquoise' : 'bg-white/5 text-slate-500'}`}>
-                  {conv.status}
-                </span>
+              <div className="flex items-center gap-3 flex-wrap">
+                <StatusBadge status={conv.estado} />
                 <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-sud-orange/10 text-sud-orange border border-sud-orange/20">
-                  {conv.category}
+                  {conv.categoria}
                 </span>
+                {conv.generoVisual && (
+                  <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                    {conv.generoVisual}
+                  </span>
+                )}
               </div>
-              <h3 className="text-2xl font-black text-white uppercase tracking-tight group-hover:sud-vibrant-text-gradient transition-all">{conv.title}</h3>
-              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{conv.description}</p>
+              <h3 className="text-2xl font-black text-white uppercase tracking-tight group-hover:sud-vibrant-text-gradient transition-all">{conv.titulo}</h3>
+              <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{conv.descripcion}</p>
               
               <div className="flex items-center gap-6 pt-2">
                 <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
                   <Calendar size={14} />
-                  <span>Cierre: {new Date(conv.deadline).toLocaleDateString()}</span>
+                  <span>Cierre: {new Date(conv.fechaLimite).toLocaleDateString()}</span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-sud-turquoise font-bold uppercase tracking-widest">
                   <Users size={14} />
-                  <span>{applications[conv.id]?.length || 0} Postulantes</span>
+                  <span>{postCountMap[conv.id] || 0} Postulantes</span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-3 w-full md:w-auto">
+            <div className="flex items-center gap-3 w-full md:w-auto flex-wrap">
               <button 
-                onClick={() => setViewingApplicantsId(conv.id)}
-                className="flex-1 md:flex-none px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all text-white"
+                onClick={() => openApplicants(conv.id)}
+                className="flex-1 md:flex-none px-6 py-3 bg-white/5 border border-white/10 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-white/10 transition-all text-white flex items-center gap-2 justify-center"
               >
-                Ver Postulantes
+                <Eye size={14} /> Postulantes
               </button>
+              {conv.estado === 'ACTIVA' && (
+                <button 
+                  onClick={() => handleClose(conv.id)}
+                  className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-amber-400 transition-all" title="Cerrar"
+                >
+                  <Lock size={18} />
+                </button>
+              )}
+              {(conv.estado === 'CERRADA' || conv.estado === 'BORRADOR') && (
+                <button 
+                  onClick={() => handleArchive(conv.id)}
+                  className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-slate-300 transition-all" title="Archivar"
+                >
+                  <Archive size={18} />
+                </button>
+              )}
               <button 
-                onClick={() => {
-                   setEditingId(conv.id);
-                   setFormData(conv);
-                   setIsModalOpen(true);
-                }}
-                className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-sud-turquoise transition-all"
+                onClick={() => openEdit(conv)}
+                className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-sud-turquoise transition-all" title="Editar"
               >
                 <Edit2 size={18} />
               </button>
               <button 
                 onClick={() => handleDelete(conv.id)}
-                className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-red-400 transition-all"
+                className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-red-400 transition-all" title="Eliminar"
               >
                 <Trash2 size={18} />
               </button>
@@ -162,15 +331,17 @@ export function ConvocatoriasAdmin() {
           </div>
         ))}
 
-        {convocatorias.length === 0 && !loading && (
+        {filtered.length === 0 && (
           <div className="p-20 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
             <Briefcase size={40} className="mx-auto text-slate-800 mb-6" />
-            <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">No hay convocatorias creadas</p>
+            <p className="text-slate-500 font-black uppercase tracking-widest text-[10px]">
+              {convocatorias.length === 0 ? 'No hay convocatorias creadas' : 'No se encontraron convocatorias con los filtros aplicados'}
+            </p>
           </div>
         )}
       </div>
 
-      {/* Modal Nueva/Editar */}
+      {/* ── Modal Crear/Editar ────────────────────────────────────────── */}
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60">
@@ -178,61 +349,99 @@ export function ConvocatoriasAdmin() {
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="sud-glass-panel w-full max-w-2xl p-10 relative overflow-hidden"
+              className="sud-glass-panel w-full max-w-2xl p-10 relative overflow-hidden max-h-[90vh] overflow-y-auto"
             >
               <button onClick={() => setIsModalOpen(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X /></button>
               <h3 className="text-2xl font-black text-white mb-8 uppercase tracking-tight">{editingId ? 'Editar' : 'Nueva'} Convocatoria</h3>
               
+              {formError && (
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold">{formError}</div>
+              )}
+
               <form onSubmit={handleSave} className="space-y-6">
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Título del Casting</label>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Título del Casting *</label>
                   <input 
                     type="text" 
-                    value={formData.title}
-                    onChange={e => setFormData({...formData, title: e.target.value})}
+                    value={formData.titulo}
+                    onChange={e => setFormData({...formData, titulo: e.target.value})}
                     className="sud-input w-full"
                     placeholder="Ej: Casting Doblaje Personaje Secundario"
-                    required
                   />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Categoría</label>
-                    <select 
-                      value={formData.category}
-                      onChange={e => setFormData({...formData, category: e.target.value as any})}
-                      className="sud-input w-full"
-                    >
-                      <option value="Doblaje">Doblaje</option>
-                      <option value="Locución">Locución</option>
-                      <option value="Podcast">Podcast</option>
-                      <option value="Voice Acting">Voice Acting</option>
-                      <option value="Producción">Producción</option>
-                    </select>
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Categoría *</label>
+                    <div className="relative">
+                      <select 
+                        value={formData.categoria}
+                        onChange={e => setFormData({...formData, categoria: e.target.value as ConvocatoriaCategoria})}
+                        className="sud-input w-full appearance-none pr-10"
+                      >
+                        {CONVOCATORIA_CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    </div>
                   </div>
                   <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Género Visual</label>
+                    <div className="relative">
+                      <select 
+                        value={formData.generoVisual || ''}
+                        onChange={e => setFormData({...formData, generoVisual: (e.target.value || undefined) as GeneroVisual | undefined})}
+                        className="sud-input w-full appearance-none pr-10"
+                      >
+                        <option value="">— Sin clasificar —</option>
+                        {GENEROS_VISUALES.map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Estado</label>
-                    <select 
-                      value={formData.status}
-                      onChange={e => setFormData({...formData, status: e.target.value as any})}
+                    <div className="relative">
+                      <select 
+                        value={formData.estado}
+                        onChange={e => setFormData({...formData, estado: e.target.value as ConvocatoriaEstado})}
+                        className="sud-input w-full appearance-none pr-10"
+                      >
+                        {CONVOCATORIA_ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Fecha Límite *</label>
+                    <input 
+                      type="date" 
+                      value={formData.fechaLimite}
+                      onChange={e => setFormData({...formData, fechaLimite: e.target.value})}
                       className="sud-input w-full"
-                    >
-                      <option value="BORRADOR">Borrador</option>
-                      <option value="ACTIVA">Activa</option>
-                      <option value="CERRADA">Cerrada</option>
-                    </select>
+                    />
                   </div>
                 </div>
 
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Descripción</label>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Descripción *</label>
                   <textarea 
-                    value={formData.description}
-                    onChange={e => setFormData({...formData, description: e.target.value})}
-                    className="sud-input w-full h-32 py-4 resize-none"
+                    value={formData.descripcion}
+                    onChange={e => setFormData({...formData, descripcion: e.target.value})}
+                    className="sud-input w-full h-28 py-4 resize-none"
                     placeholder="Detalles del casting, tono de voz requerido, etc..."
-                    required
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Requisitos <span className="text-slate-700">(uno por línea)</span></label>
+                  <textarea 
+                    value={formData.requisitosText}
+                    onChange={e => setFormData({...formData, requisitosText: e.target.value})}
+                    className="sud-input w-full h-24 py-4 resize-none"
+                    placeholder="Experiencia en doblaje&#10;Rango vocal juvenil&#10;Disponibilidad inmediata"
                   />
                 </div>
 
@@ -244,7 +453,7 @@ export function ConvocatoriasAdmin() {
           </div>
         )}
 
-        {/* Modal Postulantes */}
+        {/* ── Modal Postulantes ─────────────────────────────────────── */}
         {viewingApplicantsId && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60">
             <motion.div 
@@ -256,13 +465,15 @@ export function ConvocatoriasAdmin() {
               <div className="p-8 border-b border-white/10 flex items-center justify-between">
                 <div>
                   <h3 className="text-xl font-black text-white uppercase tracking-tight">Revisión de Postulantes</h3>
-                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{convocatorias.find(c => c.id === viewingApplicantsId)?.title}</p>
+                  <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                    {convocatorias.find(c => c.id === viewingApplicantsId)?.titulo}
+                  </p>
                 </div>
                 <button onClick={() => setViewingApplicantsId(null)} className="p-2 text-slate-500 hover:text-white bg-white/5 rounded-full transition-all"><X size={20}/></button>
               </div>
 
               <div className="flex-1 overflow-y-auto p-8 space-y-4">
-                {applications[viewingApplicantsId]?.map(app => (
+                {applicants.map(app => (
                   <div key={app.id} className="p-6 bg-white/[0.02] border border-white/5 rounded-3xl flex items-center justify-between group hover:bg-white/[0.04] transition-all">
                     <div className="flex items-center gap-6">
                       <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px]">
@@ -272,31 +483,26 @@ export function ConvocatoriasAdmin() {
                       </div>
                       <div>
                         <p className="text-lg font-black text-white uppercase tracking-tight group-hover:text-sud-turquoise transition-colors">{app.userName}</p>
-                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{app.userPhone}</p>
+                        <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">{app.userPhone} • {app.userEmail}</p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-4">
+                      <StatusBadge status={app.estado} size="md" />
                       <select 
-                        value={app.status}
-                        onChange={(e) => handleStatusChange(app.id, e.target.value as any)}
-                        className={`text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-xl bg-black border border-white/10 outline-none ${
-                          app.status === 'SELECCIONADO' ? 'text-green-400 border-green-400/20' : 
-                          app.status === 'EN_REVISION' ? 'text-sud-orange border-sud-orange/20' : 'text-slate-500'
-                        }`}
+                        value={app.estado}
+                        onChange={(e) => handleStatusChange(app.id, e.target.value as PostulacionEstado)}
+                        className="text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-xl bg-black border border-white/10 outline-none text-slate-400"
                       >
                         <option value="PENDIENTE">Pendiente</option>
                         <option value="EN_REVISION">En Revisión</option>
-                        <option value="SELECCIONADO">Seleccionado</option>
-                        <option value="FINALIZADO">No Seleccionado</option>
+                        <option value="ACEPTADA">Aceptada</option>
+                        <option value="RECHAZADA">Rechazada</option>
                       </select>
-                      <button className="p-3 bg-sud-turquoise/10 text-sud-turquoise rounded-xl hover:bg-sud-turquoise hover:text-black transition-all">
-                        <Users size={18} />
-                      </button>
                     </div>
                   </div>
                 ))}
-                {(!applications[viewingApplicantsId] || applications[viewingApplicantsId].length === 0) && (
+                {applicants.length === 0 && (
                   <div className="py-20 text-center opacity-40">
                     <p className="text-[10px] font-black uppercase tracking-widest">No hay postulantes aún</p>
                   </div>

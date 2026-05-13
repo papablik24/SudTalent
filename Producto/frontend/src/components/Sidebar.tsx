@@ -8,7 +8,9 @@ import {
   AudioLines, 
   Sparkles, 
   LogOut,
-  Briefcase
+  Briefcase,
+  FileText,
+  ClipboardList
 } from 'lucide-react';
 import { NavItem } from './ui/NavItem';
 import { UserProfile, UserRole } from '../types';
@@ -70,6 +72,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               onClick={() => onNavigate('/admin/convocatorias')}
             />
             <NavItem 
+              icon={<ClipboardList size={20} />} 
+              label="Postulaciones" 
+              active={currentPath === '/admin/postulaciones'}
+              onClick={() => onNavigate('/admin/postulaciones')}
+            />
+            <NavItem 
               icon={<Settings size={20} />} 
               label="Ajustes" 
               active={currentPath === '/admin/settings'}
@@ -95,6 +103,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               label="Oportunidades" 
               active={currentPath === '/convocatorias'}
               onClick={() => onNavigate('/convocatorias')}
+            />
+            <NavItem 
+              icon={<FileText size={20} />} 
+              label="Mis Postulaciones" 
+              active={currentPath === '/mis-postulaciones'}
+              onClick={() => onNavigate('/mis-postulaciones')}
             />
           </>
         )}

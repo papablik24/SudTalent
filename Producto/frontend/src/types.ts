@@ -41,11 +41,14 @@ export interface UserProfile {
   phone: string;
   role: UserRole;
   onboarded: boolean;
+  active?: boolean;
   profileType?: ProfileType;
   category?: ProfileCategory;
   name?: string;
   email?: string;
   avatar?: string;
+  bio?: string;
+  age?: number;
   createdAt: any;
   status?: ProfileStatus;
   primaryCategory?: DemoCategory;

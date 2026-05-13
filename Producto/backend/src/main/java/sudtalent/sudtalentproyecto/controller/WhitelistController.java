@@ -126,4 +126,26 @@ public class WhitelistController {
     public ResponseEntity<WhitelistReportDTO> getWhitelistReport() {
         return ResponseEntity.ok(whitelistService.getWhitelistReport());
     }
+
+    // ==================== FUNCIONALIDAD 4: Sincronizar usuario_id NULL ====================
+    @PostMapping("/sync")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.Map<String, Object>> syncWhitelistUsers() {
+        int synced = whitelistService.syncWhitelistWithUsers();
+        return ResponseEntity.ok(java.util.Map.of(
+            "message", "Sincronización completada",
+            "registrosSincronizados", synced
+        ));
+    }
+
+    // ==================== FUNCIONALIDAD 5: Reparar passwords sin BCrypt ====================
+    @PostMapping("/fix-passwords")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<java.util.Map<String, Object>> fixLegacyPasswords() {
+        int fixed = whitelistService.fixLegacyPasswords();
+        return ResponseEntity.ok(java.util.Map.of(
+            "message", "Reparación de passwords completada",
+            "passwordsReparados", fixed
+        ));
+    }
 }

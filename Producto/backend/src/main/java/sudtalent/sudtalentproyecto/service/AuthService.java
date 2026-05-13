@@ -2,7 +2,9 @@ package sudtalent.sudtalentproyecto.service;
 
 import sudtalent.sudtalentproyecto.dto.AuthDTOs.*;
 import sudtalent.sudtalentproyecto.model.User;
+import sudtalent.sudtalentproyecto.model.WhitelistNumber;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.repository.WhitelistNumberRepository;
 import sudtalent.sudtalentproyecto.util.JwtUtils;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +21,7 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final WhitelistNumberRepository whitelistRepository;
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
@@ -48,6 +51,7 @@ public class AuthService {
         setJwtCookie(response, token);
 
         var user = userRepository.findByEmail(request.email()).orElseThrow();
+        autoFixOnboarding(user);
         return toResponse(user, token);
     }
 
@@ -81,11 +85,35 @@ public class AuthService {
     public AuthResponse loginOrRegisterByPhone(PhoneRegisterRequest request, HttpServletResponse response) {
         String phone = normalizePhone(request.phone());
         
+        // ✅ Verificar que el teléfono esté en whitelist
+        var whitelistEntry = whitelistRepository.findByPhone(phone);
+        if (whitelistEntry.isEmpty()) {
+            throw new IllegalArgumentException("Número no autorizado por Sudamerican Voices.");
+        }
+        
+        WhitelistNumber wl = whitelistEntry.get();
+        if (wl.getStatus() == WhitelistNumber.Status.INACTIVO) {
+            throw new IllegalArgumentException("Tu acceso ha sido desactivado. Contacta con soporte.");
+        }
+        
         var existingUser = userRepository.findByPhone(phone);
         
         if (existingUser.isPresent()) {
             // Login existing user
             User user = existingUser.get();
+            
+            if (!user.isActive()) {
+                throw new IllegalArgumentException("Tu cuenta ha sido desactivada. Contacta con soporte.");
+            }
+            
+            // ✅ Vincular whitelist si no estaba vinculado
+            if (wl.getUser() == null) {
+                wl.setUser(user);
+                whitelistRepository.save(wl);
+            }
+            
+            autoFixOnboarding(user);
+            
             var userDetails = userDetailsService.loadUserByUsername(user.getEmail());
             String token = jwtUtils.generateToken(userDetails);
             setJwtCookie(response, token);
@@ -100,7 +128,7 @@ public class AuthService {
             }
 
             var user = User.builder()
-                    .name(request.name() != null ? request.name() : "")
+                    .name(request.name() != null ? request.name() : (wl.getName() != null ? wl.getName() : ""))
                     .email(syntheticEmail)
                     .password(passwordEncoder.encode(syntheticPassword))
                     .phone(phone)
@@ -109,6 +137,13 @@ public class AuthService {
                     .build();
 
             userRepository.save(user);
+            
+            // ✅ Vincular whitelist con el nuevo usuario
+            wl.setUser(user);
+            if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
+                wl.setStatus(WhitelistNumber.Status.ACTIVO);
+            }
+            whitelistRepository.save(wl);
 
             var userDetails = userDetailsService.loadUserByUsername(syntheticEmail);
             String token = jwtUtils.generateToken(userDetails);
@@ -135,14 +170,11 @@ public class AuthService {
         if (request.name() != null && !request.name().isEmpty()) {
             user.setName(request.name());
         }
-        if (request.email() != null && !request.email().isEmpty() 
+        if (request.email() != null && !request.email().isEmpty()
                 && !request.email().equals(user.getEmail())) {
-            // Only update email if it's a real email (not synthetic)
-            if (!user.getEmail().endsWith("@sudtalent.app")) {
-                // Check uniqueness
-                if (userRepository.existsByEmail(request.email())) {
-                    throw new IllegalArgumentException("El email ya está registrado");
-                }
+            // Verificar unicidad del nuevo email
+            if (userRepository.existsByEmail(request.email())) {
+                throw new IllegalArgumentException("El email ya está registrado por otro usuario");
             }
             user.setEmail(request.email());
         }
@@ -168,6 +200,23 @@ public class AuthService {
         user.setStatus(User.ProfileStatus.PENDING);
         
         userRepository.save(user);
+
+        // ✅ Sincronizar whitelist si tiene entrada vinculada
+        if (user.getPhone() != null) {
+            var wlOpt = whitelistRepository.findByPhone(user.getPhone());
+            if (wlOpt.isPresent()) {
+                WhitelistNumber wl = wlOpt.get();
+                // Vincular si aún no estaba vinculado
+                if (wl.getUser() == null) {
+                    wl.setUser(user);
+                }
+                // Si completó onboarding, activar en whitelist
+                if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
+                    wl.setStatus(WhitelistNumber.Status.ACTIVO);
+                }
+                whitelistRepository.save(wl);
+            }
+        }
 
         // Generate fresh token with updated info
         var userDetails = userDetailsService.loadUserByUsername(user.getEmail());
@@ -197,16 +246,38 @@ public class AuthService {
     }
 
     private AuthResponse toResponse(User user, String token) {
-        return new AuthResponse(
+        UserData userData = new UserData(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),
                 user.getRole().name(),
+                user.isActive(),
                 user.isOnboarded(),
                 user.getProfileType() != null ? user.getProfileType().name() : null,
-                token
+                user.getStatus() != null ? user.getStatus().name() : "PENDING"
         );
+        return new AuthResponse(userData, !user.isOnboarded(), token);
+    }
+
+    /**
+     * Auto-fix onboarded flag: if user already has basic data (name + phone),
+     * mark them as onboarded so they skip the onboarding flow.
+     */
+    private void autoFixOnboarding(User user) {
+        if (!user.isOnboarded()) {
+            boolean hasName = user.getName() != null && !user.getName().isBlank();
+            boolean hasPhone = user.getPhone() != null && !user.getPhone().isBlank();
+
+            if (hasName && hasPhone && user.isActive()) {
+                user.setOnboarded(true);
+                if (user.getStatus() == null) {
+                    user.setStatus(User.ProfileStatus.PENDING);
+                }
+                userRepository.save(user);
+                System.out.println("✅ Auto-onboarded user: " + user.getEmail() + " (data already complete)");
+            }
+        }
     }
 
     private String normalizePhone(String phone) {

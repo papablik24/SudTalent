@@ -7,7 +7,9 @@ import { AdminStudents } from './pages/admin/AdminStudents';
 import { AdminTalentReview } from './components/AdminTalentReview';
 import { AdminSettings } from './pages/admin/AdminSettings';
 import { ConvocatoriasAdmin } from './pages/admin/ConvocatoriasAdmin';
+import { AdminPostulaciones } from './pages/admin/AdminPostulaciones';
 import { ConvocatoriasUser } from './pages/user/ConvocatoriasUser';
+import { UserPostulacionesView } from './pages/user/UserPostulacionesView';
 import { UserProfileView } from './pages/user/UserProfileView';
 import { UserDemosView } from './pages/user/UserDemosView';
 import { UserOnboarding } from './pages/UserOnboarding';
@@ -107,6 +109,9 @@ export default function App() {
                 onComplete={handleOnboardingComplete} 
                 userPhone={currentUser.phone || ''}
                 userEmail={currentUser.email || ''}
+                userName={currentUser.name}
+                initialBio={currentUser.bio}
+                initialAge={currentUser.age}
               />
             )
           } />
@@ -159,6 +164,14 @@ export default function App() {
             </ProtectedRoute>
           } />
 
+          <Route path="/admin/postulaciones" element={
+            <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
+              <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
+                <AdminPostulaciones />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+
           <Route path="/admin/settings" element={
             <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
               <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
@@ -200,6 +213,16 @@ export default function App() {
               <ProtectedRoute user={currentUser} role={role} allowedRoles={['USER']} loading={loading}>
                 <MainLayout user={currentUser} role="USER" onLogout={logout}>
                   <ConvocatoriasUser user={currentUser!} />
+                </MainLayout>
+              </ProtectedRoute>
+            )
+          } />
+
+          <Route path="/mis-postulaciones" element={
+            needsOnboarding ? <Navigate to="/onboarding" replace /> : (
+              <ProtectedRoute user={currentUser} role={role} allowedRoles={['USER']} loading={loading}>
+                <MainLayout user={currentUser} role="USER" onLogout={logout}>
+                  <UserPostulacionesView user={currentUser!} />
                 </MainLayout>
               </ProtectedRoute>
             )

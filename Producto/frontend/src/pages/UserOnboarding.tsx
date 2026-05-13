@@ -7,23 +7,38 @@ interface UserOnboardingProps {
   onComplete: (data: Partial<UserProfile>, profileData: Partial<TalentProfile>) => void | Promise<void>; 
   userPhone: string;
   userEmail?: string;
+  userName?: string;
+  initialBio?: string;
+  initialAge?: string | number;
 }
 
 const SPECIALTIES = ['Doblaje', 'Locución', 'Podcast', 'Presentación', 'Narración', 'Canto', 'Actuación Vocal', 'Producción Vocal'];
 
-export function UserOnboarding({ onComplete, userPhone, userEmail }: UserOnboardingProps) {
+export function UserOnboarding({ onComplete, userPhone, userEmail, userName, initialBio, initialAge }: UserOnboardingProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+
+  // Split name if provided
+  const splitName = (name?: string) => {
+    if (!name) return { first: '', last: '' };
+    const parts = name.trim().split(/\s+/);
+    if (parts.length === 1) return { first: parts[0], last: '' };
+    const first = parts[0];
+    const last = parts.slice(1).join(' ');
+    return { first, last };
+  };
+
+  const initialName = splitName(userName);
 
   // Step 1 — Profile type
   const [profileType, setProfileType] = useState<ProfileType | null>(null);
 
   // Step 2 — Personal data
-  const [firstName, setFirstName] = useState('');
-  const [lastName, setLastName] = useState('');
+  const [firstName, setFirstName] = useState(initialName.first);
+  const [lastName, setLastName] = useState(initialName.last);
   const [email, setEmail] = useState(userEmail || '');
-  const [age, setAge] = useState('');
+  const [age, setAge] = useState(initialAge?.toString() || '');
 
   // Guardian fields
   const [childName, setChildName] = useState('');
@@ -32,7 +47,7 @@ export function UserOnboarding({ onComplete, userPhone, userEmail }: UserOnboard
 
   // Step 3 — Talent
   const [specialties, setSpecialties] = useState<string[]>([]);
-  const [bio, setBio] = useState('');
+  const [bio, setBio] = useState(initialBio || '');
   const [experience, setExperience] = useState('');
   const [availability, setAvailability] = useState('');
 

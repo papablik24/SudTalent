@@ -7,11 +7,16 @@ import sudtalent.sudtalentproyecto.service.AuthService;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/auth")
@@ -22,9 +27,20 @@ public class AuthController {
     private final UserRepository userRepository;
 
     @PostMapping("/login")
-    public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request,
+    public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
                                                HttpServletResponse response) {
-        return ResponseEntity.ok(authService.login(request, response));
+        try {
+            return ResponseEntity.ok(authService.login(request, response));
+        } catch (BadCredentialsException e) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(Map.of("message", "Correo o contraseña incorrectos."));
+        } catch (DisabledException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Tu cuenta ha sido desactivada. Contacta con soporte."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "Error al iniciar sesión: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/register")
@@ -35,9 +51,20 @@ public class AuthController {
 
     // Phone-based login/register (for the mobile flow)
     @PostMapping("/phone")
-    public ResponseEntity<AuthResponse> phoneAuth(@Valid @RequestBody PhoneRegisterRequest request,
+    public ResponseEntity<?> phoneAuth(@Valid @RequestBody PhoneRegisterRequest request,
                                                    HttpServletResponse response) {
-        return ResponseEntity.ok(authService.loginOrRegisterByPhone(request, response));
+        try {
+            return ResponseEntity.ok(authService.loginOrRegisterByPhone(request, response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", e.getMessage()));
+        } catch (DisabledException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                .body(Map.of("message", "Tu cuenta ha sido desactivada. Contacta con soporte."));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "Error al iniciar sesión: " + e.getMessage()));
+        }
     }
 
     // Complete onboarding for authenticated user
@@ -68,15 +95,17 @@ public class AuthController {
         System.out.println("  Is Admin? " + userDetails.getAuthorities().stream()
             .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
     
-        return ResponseEntity.ok(new AuthResponse(
+        UserData userData = new UserData(
                 user.getId(),
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),
                 user.getRole().name(),
+                user.isActive(),
                 user.isOnboarded(),
                 user.getProfileType() != null ? user.getProfileType().name() : null,
-                null // No need to return token on /me
-        ));
+                user.getStatus() != null ? user.getStatus().name() : "PENDING"
+        );
+        return ResponseEntity.ok(new AuthResponse(userData, !user.isOnboarded(), null));
     }
 }

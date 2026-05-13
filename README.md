@@ -92,18 +92,19 @@ mvn spring-boot:run
 
 ## Estructura del Proyecto
 
-SudTalent/
-├── frontend/             # Aplicación React + Vite
-│   ├── src/
-│   │   ├── components/   # Componentes de UI
-│   │   ├── pages/        # Vistas (Perfil, Convocatorias)
-│   │   └── services/     # Conexión con Backend
-├── backend/              # Aplicación Spring Boot (Java)
-│   ├── src/main/java/
-│   │   ├── controller/   # Endpoints REST
-│   │   ├── service/      # Lógica de negocio
-│   │   └── model/        # Entidades de base de datos
-└── docs/                 # Documentación técnica y diagramas
+
+| SudTalent/
+| ├── frontend/             # Aplicación React + Vite
+| │   ├── src/
+| │   │   ├── components/   # Componentes de UI
+| │   │   ├── pages/        # Vistas (Perfil, Convocatorias)
+| │   │   └── services/     # Conexión con Backend
+| ├── backend/              # Aplicación Spring Boot (Java)
+| │   ├── src/main/java/
+| │   │   ├── controller/   # Endpoints REST
+| │   │   ├── service/      # Lógica de negocio
+| │   │   └── model/        # Entidades de base de datos
+| └── docs/                 # Documentación técnica y diagramas
 
 # Detalle de Endpoints y Planificación - SudTalent
 

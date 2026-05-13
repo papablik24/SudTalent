@@ -90,7 +90,7 @@ npm run dev
 # Backend (en carpeta backend)
 mvn spring-boot:run
 
-##Estructura del Proyecto
+## Estructura del Proyecto
 
 SudTalent/
 ├── frontend/             # Aplicación React + Vite

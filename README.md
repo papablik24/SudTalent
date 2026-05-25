@@ -1,173 +1,138 @@
-# SudTalent
-Este proyecto consiste en el desarrollo del "SudTalent", una plataforma integral de gestión de carrera y vinculación diseñada para Sudamerican Voices, una escuela y estudio de doblaje líder en Chile.
-**Asignatura:** Taller de programacion
-**Seccion:** 001D
-**Docente:** Arturo Alex Vargas Reyes
-**Fecha:** 13/04/2026
-**Sede:** Padre Alonso de Ovalle
+# SudTalent 🎙️
 
-## Introducción 
-El presente proyecto tiene como objetivo describir la propuesta de desarrollo de una plataforma web orientada a la gestion de convocatorias y talento vocal para Sudamerican Voices. El proyecto surge a partir de la necesidad de contar con una solucion digital que permita centralizar procesos que actualmente pueden realizarse de manera disperas, como las convocatorias, la recepcion de postulaciones, la organizacion de audiciones y la administracion de perfiles de talento.
+**Plataforma Integral de Gestión de Carrera y Vinculación para Doblaje**
 
-La propuesta busca apoyar al cliente mediante una herramienta que facilite la búsqueda, filtrado y seguimiento de postulantes en áreas relacionadas con doblaje, locución, podcasts y otros proyectos de voz. De esta manera, se pretende optimizar la gestión interna, reducir tiempos administrativos y mejorar la trazabilidad de la información asociada a cada convocatoria.
+> Solución digital para la centralización de convocatorias, gestión de talento vocal y automatización de procesos para Sudamerican Voices.
 
----
 
-## Contexto
+[![React](https://img.shields.io/badge/React-2024-blue.svg)](https://react.dev/) [![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.x-green.svg)](https://spring.io/projects/spring-boot) [![Java](https://img.shields.io/badge/Java-17-orange.svg)](https://www.oracle.com/java/) [![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ecf8e.svg)](https://supabase.com/) [![JWT](https://img.shields.io/badge/Auth-JWT-black.svg)](https://jwt.io/)
 
-Sudamerican Voices es una empresa que opera como escuela/estudio de doblaje, estudio de grabación, escuela de locución y productora audiovisual. Su origen se remonta al periodo de confinamiento provocado por la pandemia del COVID-19.
 
-Fundada por Cecilia Valenzuela y Raúl Valles, partieron con pequeños cursos de doblaje y ha evolucionado hacia una escuela/estudio que abarca diferentes disciplinas vocales y musicales.
+## Tabla de Contenidos
 
-### Modelo de negocio
+- [Descripción](#descripción)
+- [Características principales](#características-principales)
+- [Módulos del Sistema](#módulos-del-sistema)
+- [Stack Tecnológico](#stack-tecnológico)
+- [Requisitos del sistema](#requisitos-del-sistema)
+- [Instalación y ejecución](#instalación-y-ejecución)
+- [Estructura del proyecto](#estructura-del-proyecto)
+- [Endpoints API](#endpoints-api)
+- [Planificación](#planificación)
+- [Notas adicionales](#notas-adicionales)
 
-Hoy en día el modelo de negocio de Sudamerican Voices se centra en la comunidad de doblaje que ellos mismos han formado desde sus inicios, ofreciendo cursos y herramientas para formar nuevos actores de doblaje y apoyar distintos proyectos de los alumnos.
+------------
 
-### Análisis de mercado
+## Descripción
 
-Actualmente Chile es uno de los principales países que doblan series y películas en Latinoamérica. Sudamerican Voices no solo realiza clases, sino que también participa en grabaciones de doblaje para producciones audiovisuales de países como México o Argentina.
+SudTalent es una plataforma diseñada para **Sudamerican Voices**, una escuela y estudio de doblaje líder en Chile. El objetivo principal es optimizar la búsqueda, filtrado y seguimiento de talentos en áreas de doblaje, locución y podcasts, centralizando procesos que actualmente se encuentran dispersos.
 
----
+## Características principales
 
-## Definición del proyecto
+### Para Postulantes y Alumnos
+- **Perfil Personalizado:** Espacio diseñado según los gustos y necesidades en el desarrollo de la carrera de doblaje.
+- **Inscripciones Automatizadas:** Optimización del proceso para facilitar la elección de profesores y cursos.
+- **Portafolio:** Visualización de demos de doblaje y trabajos disponibles.
+- **Historial:** Consulta del historial de postulaciones del usuario.
 
-En Sudamerican Voices actualmente gran parte de sus clientes ya forma parte de su comunidad y/o de la industria del doblaje. La comunidad está mayoritariamente en su grupo de WhatsApp, y la inscripción de cursos y certificaciones se realiza a través de su página web.
+### Para Administradores (Sudamerican Voices)
+- **Gestión de Convocatorias:** Publicación y administración de castings y oportunidades de voz.
+- **Motor de Búsqueda:** Filtrado avanzado de talentos con previsualización de demos.
+- **Gestión de Audiciones:** Organización y evaluación de las pruebas de talento.
+- **Panel de Control:** Administración general del sistema y comunidad básica.
 
-### Objetivo general
+------------
 
-Crear un espacio para alumnos y/o nuevos clientes, personalizado según sus gustos y necesidades en el desarrollo de su carrera de doblaje, musical, locución o podcast.
+## Stack Tecnológico
 
-### Objetivos específicos
+| Componente       | Tecnología                         |
+|------------------|------------------------------------|
+| **Frontend**     | React + Vite             |
+| **Backend**      | Java Spring Boot         |
+| **Base de Datos**| PostgreSQL (Supabase)    |
+| **Autenticación**| Spring Security + JWT    |
+| **Almacenamiento**| Amazon S3 (Demos audio/video)|
+| **Despliegue**   | AWS Elastic Beanstalk    |
 
-1. Personalizar la experiencia de usuario de los alumnos, automatizando las inscripciones para facilitar la elección de profesores, cursos y capacitaciones.
-2. Implementar un motor de búsqueda y filtrado de talento que permita previsualizar demos de doblaje y trabajos disponibles.
+## Requisitos del sistema
 
----
+#### Entorno de Usuario
+- Interfaz simple e intuitiva compatible con navegadores actuales.
+- Conectividad a internet para acceso a la plataforma web.
 
-## Alcance
+#### Requisitos de Desarrollo
+- Entorno de ejecución Node.js para el frontend.
+- Java para el desarrollo del backend en Spring Boot.
+- Acceso a servicios de almacenamiento en la nube (AWS).
 
-### Límites
-El proyecto se centrará en una plataforma web (Frontend y Backend) y no incluirá el desarrollo de una aplicación móvil.
+------------
 
-### Entregables
-- Repositorio del código
-- Documentación técnica
-- Diagrama de clases
-- Diagrama de casos de uso
-- Producto Mínimo Viable (MVP)
+## Instalación y ejecución
 
-### Restricciones
-El sistema debe integrarse con los servicios de almacenamiento existentes y cumplir con las normas de protección de datos personales.
+### Prerrequisitos
+# Instalar dependencias globales (Node.js debe estar instalado)
+npm install -g vite
 
----
+git clone (https://github.com/papablik24/SudTalent.git)
+cd SudTalent
 
-## Planificación
+# Instalar dependencias del Frontend
+cd frontend
+npm install
 
-La planificación del proyecto se estructurará en tres etapas:
+# Instalar dependencias del Backend (Maven)
+cd ../backend
+mvn install
 
-1. Inicio
-2. Desarrollo
-3. Cierre
+# Frontend (en carpeta frontend)
+npm run dev
 
-Durante la etapa de inicio se realizará el levantamiento de requerimientos, definición del alcance y análisis general del sistema.
+# Backend (en carpeta backend)
+mvn spring-boot:run
 
-En la etapa de desarrollo se llevará a cabo el diseño técnico y la implementación progresiva de los módulos priorizados.
+## Estructura del Proyecto
 
-En la etapa de cierre se desarrollarán pruebas, correcciones, documentación y entrega del producto mínimo viable.
 
----
+| SudTalent/
+| ├── frontend/             # Aplicación React + Vite
+| │   ├── src/
+| │   │   ├── components/   # Componentes de UI
+| │   │   ├── pages/        # Vistas (Perfil, Convocatorias)
+| │   │   └── services/     # Conexión con Backend
+| ├── backend/              # Aplicación Spring Boot (Java)
+| │   ├── src/main/java/
+| │   │   ├── controller/   # Endpoints REST
+| │   │   ├── service/      # Lógica de negocio
+| │   │   └── model/        # Entidades de base de datos
+| └── docs/                 # Documentación técnica y diagramas
 
-## Definición tecnológica
+# Detalle de Endpoints y Planificación - SudTalent
 
-### Stack propuesto
-- **Frontend:** React + Vite
-- **Entorno de ejecución:** Node.js
-- **Backend:** Spring Boot
-- **Base de datos:** MySQL
-- **Autenticación:** Spring Security + JWT
+## Endpoints API (Previstos)
 
-### Servicios cloud
-- **PaaS:** AWS Elastic Beanstalk
-- **SaaS:** Amazon S3 para almacenamiento de demos de audio y video
-
----
-
-## Metodología
-
-Para el desarrollo del proyecto se utilizará una metodología híbrida, combinando una etapa inicial estructurada para análisis y diseño, con una etapa de desarrollo iterativo por módulos.
-
----
-
-## Módulos del sistema
-
-1. Registro y perfil de talento
-2. Convocatorias
-3. Postulaciones
-4. Gestión de audiciones
-5. Búsqueda y filtrado de talentos
-6. Administración
-7. Notificaciones
-8. Historial del postulante
-9. Comunidad básica
-
----
-
-## Requisitos funcionales
-
-- RF1. Registro e inicio de sesión de usuarios.
-- RF2. Gestión de perfiles de talento.
-- RF3. Publicación y visualización de convocatorias.
-- RF4. Postulación a oportunidades.
-- RF5. Gestión y evaluación de audiciones.
-- RF6. Búsqueda y filtrado de talentos.
-- RF7. Envío de notificaciones.
-- RF8. Consulta de historial del postulante.
-- RF9. Comunidad básica.
-- RF10. Administración general del sistema.
+| Endpoint | Método | Descripción |
+| :--- | :--- | :--- |
+| `/api/auth/login` | **POST** | Autenticación mediante JWT |
+| `/api/talentos` | **GET** | Búsqueda y filtrado de talentos |
+| `/api/convocatorias` | **POST** | Publicación de nuevos castings |
+| `/api/postulaciones` | **POST** | Registro de postulaciones |
 
 ---
 
-## Requisitos no funcionales
+## Planificación (Ciclo de Vida)
 
-- RNF1. Interfaz simple e intuitiva.
-- RNF2. Seguridad y control de acceso.
-- RNF3. Protección de datos personales.
-- RNF4. Buen rendimiento.
-- RNF5. Compatibilidad con navegadores actuales.
-- RNF6. Estructura modular y mantenible.
-- RNF7. Plataforma web escalable.
-- RNF8. Respaldo básico de información.
+El proyecto se estructura en tres etapas principales:
+
+1.  **Inicio:** Levantamiento de requerimientos y diseño de la solución.
+2.  **Desarrollo:** Implementación modular del sistema (Frontend y Backend).
+3.  **Cierre:** Ejecución de pruebas, correcciones y entrega del Producto Mínimo Viable (MVP).
 
 ---
 
-## Casos de uso
+## Notas adicionales
 
-| ID | Descripción | Actores involucrados |
-|----|------------|----------------------|
-| CU1 | Ingresar al sistema iniciando sesión | Administrador, Postulante, Profesor |
-| CU2 | Crear usuario dentro de la plataforma | Postulante |
-| CU3 | Crear y actualizar perfil de talento | Postulante |
-| CU4 | Publicar convocatorias de voz o casting | Administrador |
-| CU5 | Visualizar convocatorias activas | Postulante, Profesor |
-
----
-
-## Ciclo de vida del proyecto
-
-1. Levantamiento de requerimientos
-2. Análisis del sistema
-3. Diseño de la solución
-4. Desarrollo e implementación
-5. Pruebas y validación
-6. Correcciones y ajustes
-7. Entrega final
-
----
-
-## Diagramas
-
-### Diagrama de Ishikawa
-![Diagrama de Ishikawa](imagenes/ishikawa.png) <-----(por poner)
-
-### Diagrama de Casos de Uso
-![Diagrama de Casos de Uso](imagenes/casos_de_uso.png) <-----(por poner)
+* **Estudiantes:** Pablo Novoa - Ricardo Frias (Analista Programador Duoc UC).
+* **Asignatura:** Taller de Programación (Sección 001D).
+* **Docente:** Arturo Alex Vargas Reyes.
+* **Sede:** Padre Alonso de Ovalle.
+* **Fecha:** 13/05/2026.

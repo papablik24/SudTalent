@@ -16,6 +16,8 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.UUID;
+
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -50,7 +52,7 @@ public class AuthService {
         String token = jwtUtils.generateToken(userDetails);
         setJwtCookie(response, token);
 
-        var user = userRepository.findByEmail(request.email()).orElseThrow();
+        var user = userRepository.findByEmailActive(request.email()).orElseThrow();
         autoFixOnboarding(user);
         return toResponse(user, token);
     }
@@ -96,7 +98,7 @@ public class AuthService {
             throw new IllegalArgumentException("Tu acceso ha sido desactivado. Contacta con soporte.");
         }
         
-        var existingUser = userRepository.findByPhone(phone);
+        var existingUser = userRepository.findByPhoneActive(phone);
         
         if (existingUser.isPresent()) {
             // Login existing user
@@ -163,7 +165,7 @@ public class AuthService {
     /**
      * Complete onboarding for authenticated user.
      */
-    public AuthResponse onboard(Long userId, OnboardRequest request) {
+    public AuthResponse onboard(UUID userId, OnboardRequest request) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 

@@ -6,6 +6,7 @@ import java.util.stream.Collectors;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import java.util.UUID;
 
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -60,7 +61,7 @@ public class WhitelistService {
             .collect(Collectors.toList());
     }
 
-    public WhitelistNumberDTO updateStatus(Long id, String newStatus) {
+    public WhitelistNumberDTO updateStatus(UUID id, String newStatus) {
         WhitelistNumber number = repository.findById(id)
             .orElseThrow(() -> new RuntimeException("Número no encontrado"));
         number.setStatus(WhitelistNumber.Status.valueOf(newStatus));
@@ -92,7 +93,7 @@ public class WhitelistService {
         return toDTO(repository.save(number));
     }
 
-    public void deleteNumber(Long id) {
+    public void deleteNumber(UUID id) {
         repository.deleteById(id);
     }
 
@@ -110,7 +111,7 @@ public class WhitelistService {
         
         return allUsers.stream()
             .map(user -> {
-                var whitelist = repository.findByPhone(user.getPhone());
+                var whitelist = repository.findByPhone(user.getPhone()); // WhitelistNumber query is fine
                 
                 StudentWhitelistDTO dto = StudentWhitelistDTO.builder()
                     .userId(user.getId())
@@ -165,7 +166,7 @@ public class WhitelistService {
         System.out.println("   email (input): " + email + " → (final): " + finalEmail);
         
         // Verificar si el usuario ya existe
-        var existingUser = userRepository.findByPhone(phone);
+        var existingUser = userRepository.findByPhoneActive(phone);
         User user = null;
         
         if(existingUser.isEmpty()) {
@@ -243,7 +244,7 @@ public class WhitelistService {
     private void linkUserToWhitelist(WhitelistNumber whitelist) {
         // Buscar usuario por teléfono
         if(whitelist.getPhone() != null) {
-            var userByPhone = userRepository.findByPhone(whitelist.getPhone());
+            var userByPhone = userRepository.findByPhoneActive(whitelist.getPhone());
             if(userByPhone.isPresent()) {
                 whitelist.setUser(userByPhone.get());
                 if(whitelist.getName() == null) {
@@ -257,12 +258,12 @@ public class WhitelistService {
             }
         }
         
-        // Buscar usuario por nombre y email
-        if(whitelist.getName() != null && whitelist.getEmail() != null) {
-            var userByNameEmail = userRepository.findByNameAndEmail(whitelist.getName(), whitelist.getEmail());
-            if(userByNameEmail.isPresent()) {
-                whitelist.setUser(userByNameEmail.get());
-                System.out.println("✅ Whitelist vinculada a usuario por nombre y email: " + whitelist.getName());
+        // Buscar usuario por email (si no se encontró por teléfono)
+        if(whitelist.getEmail() != null && !whitelist.getEmail().isEmpty()) {
+            var userByEmail = userRepository.findByEmailActive(whitelist.getEmail());
+            if(userByEmail.isPresent()) {
+                whitelist.setUser(userByEmail.get());
+                System.out.println("✅ Whitelist vinculada a usuario por email: " + whitelist.getEmail());
                 return;
             }
         }
@@ -283,7 +284,7 @@ public class WhitelistService {
 
             // Intentar vincular por teléfono
             if (wl.getPhone() != null) {
-                var userByPhone = userRepository.findByPhone(wl.getPhone());
+                var userByPhone = userRepository.findByPhoneActive(wl.getPhone());
                 if (userByPhone.isPresent()) {
                     wl.setUser(userByPhone.get());
                     if (wl.getName() == null && userByPhone.get().getName() != null) {
@@ -295,7 +296,7 @@ public class WhitelistService {
 
             // Si no, intentar vincular por email
             if (!linked && wl.getEmail() != null && !wl.getEmail().isEmpty()) {
-                var userByEmail = userRepository.findByEmail(wl.getEmail());
+                var userByEmail = userRepository.findByEmailActive(wl.getEmail());
                 if (userByEmail.isPresent()) {
                     wl.setUser(userByEmail.get());
                     linked = true;

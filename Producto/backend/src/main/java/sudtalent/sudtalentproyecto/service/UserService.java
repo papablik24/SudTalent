@@ -7,6 +7,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -28,12 +29,12 @@ public class UserService {
         return userRepository.findAll();
     }
     
-    public User getUserById(Long id) {
+    public User getUserById(UUID id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
     }
     
-    public User updateUser(Long id, User userUpdate) {
+    public User updateUser(UUID id, User userUpdate) {
         User user = getUserById(id);
         if(userUpdate.getName() != null) user.setName(userUpdate.getName());
         if(userUpdate.getEmail() != null && !userUpdate.getEmail().equals(user.getEmail())) {
@@ -50,14 +51,14 @@ public class UserService {
         return userRepository.save(user);
     }
     
-    public void deleteUser(Long id) {
+    public void deleteUser(UUID id) {
         if(!userRepository.existsById(id)) {
             throw new RuntimeException("Usuario no encontrado");
         }
         userRepository.deleteById(id);
     }
     
-    public User deactivateUser(Long id) {
+    public User deactivateUser(UUID id) {
         User user = getUserById(id);
         user.setActive(false);
         return userRepository.save(user);

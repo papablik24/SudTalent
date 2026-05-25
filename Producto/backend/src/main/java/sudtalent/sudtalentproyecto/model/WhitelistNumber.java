@@ -8,7 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
-
+import java.util.UUID;
 
 @Entity
 @Table(name = "whitelist_numbers")
@@ -17,9 +17,11 @@ import java.time.LocalDateTime;
 @AllArgsConstructor
 @Builder
 public class WhitelistNumber {
+    
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
     @NotBlank
     @Pattern(regexp = "^[0-9]{8,15}$")
@@ -34,12 +36,12 @@ public class WhitelistNumber {
 
     @Column(length = 50)
     @Builder.Default
-    private String category = "NONE"; // ADULT, MINOR, BOTH, NONE
+    private String category = "NONE";
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private Status status = Status.PENDIENTE; // ACTIVO, INACTIVO, PENDIENTE
+    private Status status = Status.PENDIENTE;
 
     @Column(nullable = false, updatable = false)
     @Builder.Default
@@ -49,7 +51,9 @@ public class WhitelistNumber {
     @Builder.Default
     private LocalDateTime updatedAt = LocalDateTime.now();
 
-    // Relación con User (alumnos)
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "usuario_id", referencedColumnName = "id")
     private User user;

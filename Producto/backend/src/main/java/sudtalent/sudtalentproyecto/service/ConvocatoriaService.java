@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -24,22 +25,20 @@ public class ConvocatoriaService {
         return convocatoriaRepository.findAll();
     }
     
-    public Convocatoria getConvocatoriaById(Long id) {
+    public Convocatoria getConvocatoriaById(UUID id) {
         return convocatoriaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Convocatoria no encontrada"));
     }
     
-    public List<Convocatoria> getConvocatoriasByProfesor(Long profesorId) {
-        Profesor profesor = profesorRepository.findById(profesorId)
-                .orElseThrow(() -> new RuntimeException("Profesor no encontrado"));
-        return convocatoriaRepository.findByProfesor(profesor);
+    public List<Convocatoria> getConvocatoriasByProfesor(UUID profesorId) {
+        return convocatoriaRepository.findByProfesorId(profesorId);
     }
     
     public List<Convocatoria> getConvocatoriasByEstado(String estado) {
         return convocatoriaRepository.findByEstado(estado);
     }
     
-    public Convocatoria updateConvocatoria(Long id, Convocatoria convocatoriaUpdate) {
+    public Convocatoria updateConvocatoria(UUID id, Convocatoria convocatoriaUpdate) {
         Convocatoria convocatoria = getConvocatoriaById(id);
         if(convocatoriaUpdate.getTipo() != null) {
             convocatoria.setTipo(convocatoriaUpdate.getTipo());
@@ -53,7 +52,7 @@ public class ConvocatoriaService {
         return convocatoriaRepository.save(convocatoria);
     }
     
-    public void deleteConvocatoria(Long id) {
+    public void deleteConvocatoria(UUID id) {
         convocatoriaRepository.deleteById(id);
     }
 }

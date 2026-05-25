@@ -1,19 +1,9 @@
 package sudtalent.sudtalentproyecto.model;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Inheritance;
-import jakarta.persistence.InheritanceType;
-import jakarta.persistence.JoinColumn;
-import jakarta.persistence.ManyToOne;
-import jakarta.persistence.Table;
+import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
@@ -25,13 +15,15 @@ import lombok.*;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-
 @Builder
 @Inheritance(strategy = InheritanceType.JOINED) 
 public class User {
+    
+    // ✅ CAMBIO 1: UUID en lugar de IDENTITY
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    @GeneratedValue(strategy = GenerationType.UUID)
+    @Column(columnDefinition = "uuid")
+    private UUID id;
 
     @Column(nullable = false, length = 100)
     @Builder.Default
@@ -56,11 +48,19 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     @Builder.Default
-    private Role role = Role.ALUMNO; // Valor por defecto
+    private Role role = Role.ALUMNO;
 
     @Column(nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(nullable = false)
+    @Builder.Default
+    private LocalDateTime updatedAt = LocalDateTime.now();
+
+    // ✅ CAMBIO 2: Agregar soft delete
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
 
     @Column(nullable = false)
     @Builder.Default
@@ -97,26 +97,29 @@ public class User {
     private Profile profile;
 
     public enum Role {
-        ALUMNO,
-        ADMIN
+        ALUMNO, ADMIN, PROFESOR
     }
 
     public enum Specialization {
-        LOCUCION,
-        PODCASTING,
-        DOBLAJE,
-        KIDS,
-        OTRO
+        LOCUCION, PODCASTING, DOBLAJE, KIDS, OTRO
     }
 
     public enum ProfileType {
-        PERSONAL,
-        PARENT
+        PERSONAL, PARENT
     }
 
     public enum ProfileStatus {
-        PENDING,
-        APPROVED,
-        INACTIVE
+        PENDING, APPROVED, INACTIVE
+    }
+
+    // ✅ MÉTODO: Marcar como eliminado (soft delete)
+    public void softDelete() {
+        this.deletedAt = LocalDateTime.now();
+        this.active = false;
+    }
+
+    // ✅ MÉTODO: Verificar si está eliminado
+    public boolean isDeleted() {
+        return deletedAt != null;
     }
 }

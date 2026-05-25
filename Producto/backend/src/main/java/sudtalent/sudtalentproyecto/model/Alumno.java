@@ -15,12 +15,12 @@ import lombok.Setter;
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
-@PrimaryKeyJoinColumn(name = "usuario_id")  // ← AGREGAR ESTO
-public class Alumno extends User {  // ← CAMBIAR: extends User
+@PrimaryKeyJoinColumn(name = "usuario_id")
+public class Alumno extends User {
     
     @Column(name = "fecha_nacimiento")
     private LocalDate fechaNacimiento;
     
-    @OneToMany(mappedBy = "alumno")
+    @OneToMany(mappedBy = "alumno", cascade = CascadeType.ALL)
     private Set<Postulacion> postulaciones;
 }

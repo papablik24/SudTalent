@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/administradores")
@@ -24,7 +25,7 @@ public class AdministradorController {
     
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Administrador> getAdministradorById(@PathVariable Long id) {
+    public ResponseEntity<Administrador> getAdministradorById(@PathVariable UUID id) {
         return ResponseEntity.ok(administradorService.getAdministradorById(id));
     }
     
@@ -36,13 +37,13 @@ public class AdministradorController {
     
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Administrador> updateAdministrador(@PathVariable Long id, @Valid @RequestBody Administrador administradorUpdate) {
+    public ResponseEntity<Administrador> updateAdministrador(@PathVariable UUID id, @Valid @RequestBody Administrador administradorUpdate) {
         return ResponseEntity.ok(administradorService.updateAdministrador(id, administradorUpdate));
     }
     
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteAdministrador(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteAdministrador(@PathVariable UUID id) {
         administradorService.deleteAdministrador(id);
         return ResponseEntity.noContent().build();
     }

@@ -3,7 +3,7 @@ package sudtalent.sudtalentproyecto.dto;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.UUID;
 
 public class AuthDTOs {
 
@@ -18,7 +18,6 @@ public class AuthDTOs {
             @NotBlank String password
     ) {}
 
-    // Phone-based authentication for the mobile flow
     public record PhoneLoginRequest(
             @NotBlank String phone
     ) {}
@@ -40,8 +39,9 @@ public class AuthDTOs {
             String bio
     ) {}
 
+    // ✅ CAMBIO: UUID en lugar de Long
     public record UserData(
-            Long id,
+            UUID id,  // ← CAMBIO
             String name,
             String email,
             String phone,

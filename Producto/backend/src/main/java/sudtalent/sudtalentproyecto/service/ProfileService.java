@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,12 +22,12 @@ public class ProfileService {
         return profileRepository.findAll();
     }
     
-    public Profile getProfileById(Long id) {
+    public Profile getProfileById(UUID id) {
         return profileRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Perfil no encontrado"));
     }
     
-    public Profile updateProfile(Long id, Profile profileUpdate) {
+    public Profile updateProfile(UUID id, Profile profileUpdate) {
         Profile profile = getProfileById(id);
         if(profileUpdate.getDescripcion() != null) {
             profile.setDescripcion(profileUpdate.getDescripcion());
@@ -34,7 +35,7 @@ public class ProfileService {
         return profileRepository.save(profile);
     }
     
-    public void deleteProfile(Long id) {
+    public void deleteProfile(UUID id) {
         profileRepository.deleteById(id);
     }
 }

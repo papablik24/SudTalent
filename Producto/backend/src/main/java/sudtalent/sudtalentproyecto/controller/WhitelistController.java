@@ -9,6 +9,7 @@ import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
 
 import java.util.List;
+import java.util.UUID;
 
 import sudtalent.sudtalentproyecto.dto.StudentWhitelistDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistNumberDTO;
@@ -64,7 +65,7 @@ public class WhitelistController {
     @PutMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<WhitelistNumberDTO> updateStatus(
-        @PathVariable Long id,
+        @PathVariable UUID id,
         @RequestParam String status) {
         return ResponseEntity.ok(whitelistService.updateStatus(id, status));
     }
@@ -81,7 +82,7 @@ public class WhitelistController {
     // Eliminar por ID
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteNumber(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteNumber(@PathVariable UUID id) {
         whitelistService.deleteNumber(id);
         return ResponseEntity.noContent().build();
     }

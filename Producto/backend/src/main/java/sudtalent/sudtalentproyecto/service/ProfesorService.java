@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,17 +22,17 @@ public class ProfesorService {
         return profesorRepository.findAll();
     }
     
-    public Profesor getProfesorById(Long id) {
+    public Profesor getProfesorById(UUID id) {
         return profesorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Profesor no encontrado"));
     }
     
-    public Profesor getProfesorByUsuarioId(Long usuarioId) {
-    return profesorRepository.findById(usuarioId)  // ← Cambiar de findByUsuarioId
-            .orElseThrow(() -> new RuntimeException("Profesor no encontrado para el usuario especificado"));
-}
+    public Profesor getProfesorByUsuarioId(UUID usuarioId) {
+        return profesorRepository.findById(usuarioId)
+                .orElseThrow(() -> new RuntimeException("Profesor no encontrado para el usuario especificado"));
+    }
     
-    public Profesor updateProfesor(Long id, Profesor profesorUpdate) {
+    public Profesor updateProfesor(UUID id, Profesor profesorUpdate) {
         Profesor profesor = getProfesorById(id);
         if(profesorUpdate.getEspecialidad() != null) {
             profesor.setEspecialidad(profesorUpdate.getEspecialidad());
@@ -39,7 +40,7 @@ public class ProfesorService {
         return profesorRepository.save(profesor);
     }
     
-    public void deleteProfesor(Long id) {
+    public void deleteProfesor(UUID id) {
         profesorRepository.deleteById(id);
     }
 }

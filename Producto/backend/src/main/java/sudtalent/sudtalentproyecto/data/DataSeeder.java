@@ -1,4 +1,4 @@
-package sudtalent.sudtalentproyecto.config;
+package sudtalent.sudtalentproyecto.data;
 
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
@@ -19,7 +19,7 @@ public class DataSeeder {
     public CommandLineRunner seedAdminUser() {
         return args -> {
             String adminEmail = "admin@sudamericanvoices.com";
-            var existingAdmin = userRepository.findByEmail(adminEmail);
+            var existingAdmin = userRepository.findByEmailActive(adminEmail);
             
             if (existingAdmin.isPresent()) {
                 // Asegurar que el usuario existente tenga el rol ADMIN

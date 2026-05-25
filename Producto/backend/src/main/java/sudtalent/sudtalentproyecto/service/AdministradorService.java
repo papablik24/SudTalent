@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,13 +22,13 @@ public class AdministradorService {
         return administradorRepository.findAll();
     }
     
-    public Administrador getAdministradorById(Long id) {
+    public Administrador getAdministradorById(UUID id) {
         return administradorRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Administrador no encontrado"));
     }
     
 
-    public Administrador updateAdministrador(Long id, Administrador administradorUpdate) {
+    public Administrador updateAdministrador(UUID id, Administrador administradorUpdate) {
         Administrador administrador = getAdministradorById(id);
         if(administradorUpdate.getName() != null) {
             administrador.setName(administradorUpdate.getName());
@@ -41,7 +42,7 @@ public class AdministradorService {
         return administradorRepository.save(administrador);
     }
     
-    public void deleteAdministrador(Long id) {
+    public void deleteAdministrador(UUID id) {
         administradorRepository.deleteById(id);
     }
 }

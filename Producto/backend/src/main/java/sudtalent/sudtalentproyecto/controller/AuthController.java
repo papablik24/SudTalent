@@ -18,6 +18,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.Map;
 
+
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -28,7 +29,7 @@ public class AuthController {
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@Valid @RequestBody LoginRequest request,
-                                               HttpServletResponse response) {
+                                   HttpServletResponse response) {
         try {
             return ResponseEntity.ok(authService.login(request, response));
         } catch (BadCredentialsException e) {
@@ -49,10 +50,9 @@ public class AuthController {
         return ResponseEntity.ok(authService.register(request, response));
     }
 
-    // Phone-based login/register (for the mobile flow)
     @PostMapping("/phone")
     public ResponseEntity<?> phoneAuth(@Valid @RequestBody PhoneRegisterRequest request,
-                                                   HttpServletResponse response) {
+                                       HttpServletResponse response) {
         try {
             return ResponseEntity.ok(authService.loginOrRegisterByPhone(request, response));
         } catch (IllegalArgumentException e) {
@@ -67,12 +67,11 @@ public class AuthController {
         }
     }
 
-    // Complete onboarding for authenticated user
     @PostMapping("/onboard")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AuthResponse> onboard(@AuthenticationPrincipal UserDetails userDetails,
                                                  @Valid @RequestBody OnboardRequest request) {
-        User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow();
+        User user = userRepository.findByEmailActive(userDetails.getUsername()).orElseThrow();
         return ResponseEntity.ok(authService.onboard(user.getId(), request));
     }
 
@@ -82,21 +81,13 @@ public class AuthController {
         return ResponseEntity.ok(new MessageResponse("Sesión cerrada correctamente"));
     }
 
-    // Endpoint to verify token and get current user info
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<AuthResponse> me(@AuthenticationPrincipal UserDetails userDetails) {
-        User user = userRepository.findByEmail(userDetails.getUsername()).orElseThrow();
-        // AGREGAR ESTOS LOGS
-        System.out.println("🔍 DEBUG /me endpoint:");
-        System.out.println("  Email: " + user.getEmail());
-        System.out.println("  Role en BD: " + user.getRole());
-        System.out.println("  Authorities en UserDetails: " + userDetails.getAuthorities());
-        System.out.println("  Is Admin? " + userDetails.getAuthorities().stream()
-            .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN")));
-    
+        User user = userRepository.findByEmailActive(userDetails.getUsername()).orElseThrow();
+        
         UserData userData = new UserData(
-                user.getId(),
+                user.getId(),  // ← Ahora es UUID
                 user.getName(),
                 user.getEmail(),
                 user.getPhone(),

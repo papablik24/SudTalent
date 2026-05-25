@@ -2,38 +2,36 @@ package sudtalent.sudtalentproyecto.service;
 
 import sudtalent.sudtalentproyecto.model.Alumno;
 import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
-import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.service.SoftDeleteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Transactional
 public class AlumnoService {
     private final AlumnoRepository alumnoRepository;
-    private final UserRepository userRepository;
+    private final SoftDeleteService softDeleteService;
     
     public Alumno createAlumno(Alumno alumno) {
         return alumnoRepository.save(alumno);
     }
     
     public List<Alumno> getAllAlumnos() {
-        return alumnoRepository.findAll();
+        return alumnoRepository.findAllActive();  // ← Soft delete
     }
     
-    public Alumno getAlumnoById(Long id) {
-        return alumnoRepository.findById(id)
+    // ✅ CAMBIO: UUID
+    public Alumno getAlumnoById(UUID id) {
+        return alumnoRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Alumno no encontrado"));
     }
     
-    public Alumno getAlumnoByUsuarioId(Long usuarioId) {
-    return alumnoRepository.findById(usuarioId)  // ← Cambiar de findByUsuarioId
-            .orElseThrow(() -> new RuntimeException("Alumno no encontrado para el usuario especificado"));
-}
-    
-    public Alumno updateAlumno(Long id, Alumno alumnoUpdate) {
+    // ✅ CAMBIO: UUID
+    public Alumno updateAlumno(UUID id, Alumno alumnoUpdate) {
         Alumno alumno = getAlumnoById(id);
         if(alumnoUpdate.getFechaNacimiento() != null) {
             alumno.setFechaNacimiento(alumnoUpdate.getFechaNacimiento());
@@ -41,9 +39,8 @@ public class AlumnoService {
         return alumnoRepository.save(alumno);
     }
     
-    public void deleteAlumno(Long id) {
-        alumnoRepository.deleteById(id);
+    // ✅ CAMBIO: Soft delete
+    public void deleteAlumno(UUID id) {
+        softDeleteService.softDeleteAlumno(id);
     }
 }
-
-

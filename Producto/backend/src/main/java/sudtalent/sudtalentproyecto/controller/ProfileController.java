@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/profiles")
@@ -24,7 +25,7 @@ public class ProfileController {
     
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profile> getProfileById(@PathVariable Long id) {
+    public ResponseEntity<Profile> getProfileById(@PathVariable UUID id) {
         return ResponseEntity.ok(profileService.getProfileById(id));
     }
     
@@ -36,13 +37,13 @@ public class ProfileController {
     
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Profile> updateProfile(@PathVariable Long id, @Valid @RequestBody Profile profileUpdate) {
+    public ResponseEntity<Profile> updateProfile(@PathVariable UUID id, @Valid @RequestBody Profile profileUpdate) {
         return ResponseEntity.ok(profileService.updateProfile(id, profileUpdate));
     }
     
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteProfile(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteProfile(@PathVariable UUID id) {
         profileService.deleteProfile(id);
         return ResponseEntity.noContent().build();
     }

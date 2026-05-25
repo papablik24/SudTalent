@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/convocatorias")
@@ -24,13 +25,13 @@ public class ConvocatoriaController {
     
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Convocatoria> getConvocatoriaById(@PathVariable Long id) {
+    public ResponseEntity<Convocatoria> getConvocatoriaById(@PathVariable UUID id) {
         return ResponseEntity.ok(convocatoriaService.getConvocatoriaById(id));
     }
     
     @GetMapping("/profesor/{profesorId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Convocatoria>> getConvocatoriasByProfesor(@PathVariable Long profesorId) {
+    public ResponseEntity<List<Convocatoria>> getConvocatoriasByProfesor(@PathVariable UUID profesorId) {
         return ResponseEntity.ok(convocatoriaService.getConvocatoriasByProfesor(profesorId));
     }
     
@@ -48,13 +49,13 @@ public class ConvocatoriaController {
     
     @PutMapping("/{id}")
     @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<Convocatoria> updateConvocatoria(@PathVariable Long id, @Valid @RequestBody Convocatoria convocatoriaUpdate) {
+    public ResponseEntity<Convocatoria> updateConvocatoria(@PathVariable UUID id, @Valid @RequestBody Convocatoria convocatoriaUpdate) {
         return ResponseEntity.ok(convocatoriaService.updateConvocatoria(id, convocatoriaUpdate));
     }
     
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('PROFESOR')")
-    public ResponseEntity<Void> deleteConvocatoria(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteConvocatoria(@PathVariable UUID id) {
         convocatoriaService.deleteConvocatoria(id);
         return ResponseEntity.noContent().build();
     }

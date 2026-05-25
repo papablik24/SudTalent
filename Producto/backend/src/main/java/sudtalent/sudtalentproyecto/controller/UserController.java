@@ -1,77 +1,56 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import sudtalent.sudtalentproyecto.model.User;
-import sudtalent.sudtalentproyecto.service.UserService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
-import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
+import sudtalent.sudtalentproyecto.model.User;
+import sudtalent.sudtalentproyecto.service.SoftDeleteService;
+import sudtalent.sudtalentproyecto.repository.UserRepository;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
-@RequiredArgsConstructor
 public class UserController {
-    private final UserService userService;
     
-    @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<List<Map<String, Object>>> getAllUsers() {
-        List<Map<String, Object>> users = userService.getAllUsers().stream()
-            .map(this::toSafeMap)
-            .collect(Collectors.toList());
-        return ResponseEntity.ok(users);
-    }
+    @Autowired
+    private UserRepository userRepository;
+    
+    @Autowired
+    private SoftDeleteService softDeleteService;
     
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()") 
-    public ResponseEntity<Map<String, Object>> getUserById(@PathVariable Long id) {
-        return ResponseEntity.ok(toSafeMap(userService.getUserById(id)));
+    public ResponseEntity<User> getUser(@PathVariable UUID id) {
+        // Solo retorna si no está eliminado
+        return userRepository.findByIdActive(id)
+            .map(ResponseEntity::ok)
+            .orElse(ResponseEntity.notFound().build());
     }
     
-    @PostMapping
-    public ResponseEntity<User> createUser(@Valid @RequestBody User user) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(userService.createUser(user));
+    @GetMapping
+    public ResponseEntity<?> getAllUsers() {
+        // Solo retorna usuarios no eliminados
+        return ResponseEntity.ok(userRepository.findAllActive());
     }
     
-    @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<User> updateUser(@PathVariable Long id, @Valid @RequestBody User userUpdate) {
-        return ResponseEntity.ok(userService.updateUser(id, userUpdate));
-    }
-    
+    // ✅ Cambiar DELETE por SOFT DELETE
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
-        userService.deleteUser(id);
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<?> deleteUser(@PathVariable UUID id) {
+        try {
+            User deletedUser = softDeleteService.softDeleteUser(id);
+            return ResponseEntity.ok(deletedUser);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
     
-    @PostMapping("/{id}/deactivate")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<User> deactivateUser(@PathVariable Long id) {
-        return ResponseEntity.ok(userService.deactivateUser(id));
-    }
-
-    // Don't expose password in responses
-    private Map<String, Object> toSafeMap(User u) {
-        return Map.ofEntries(
-            Map.entry("id", u.getId()),
-            Map.entry("name", u.getName() != null ? u.getName() : ""),
-            Map.entry("email", u.getEmail() != null ? u.getEmail() : ""),
-            Map.entry("phone", u.getPhone() != null ? u.getPhone() : ""),
-            Map.entry("role", u.getRole().name()),
-            Map.entry("active", u.isActive()),
-            Map.entry("onboarded", u.isOnboarded()),
-            Map.entry("profileType", u.getProfileType() != null ? u.getProfileType().name() : ""),
-            Map.entry("status", u.getStatus() != null ? u.getStatus().name() : "PENDING"),
-            Map.entry("specialties", u.getSpecialties() != null ? u.getSpecialties() : ""),
-            Map.entry("bio", u.getBio() != null ? u.getBio() : ""),
-            Map.entry("createdAt", u.getCreatedAt().toString())
-        );
+    // ✅ Nuevo endpoint: Restaurar usuario
+    @PutMapping("/{id}/restore")
+    public ResponseEntity<?> restoreUser(@PathVariable UUID id) {
+        try {
+            User restoredUser = softDeleteService.restoreUser(id);
+            return ResponseEntity.ok(restoredUser);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.notFound().build();
+        }
     }
 }

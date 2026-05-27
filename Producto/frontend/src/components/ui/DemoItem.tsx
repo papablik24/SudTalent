@@ -1,6 +1,7 @@
-import React from 'react';
-import { Play, AudioLines, Video, Film, Trash2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { AudioLines, Video, Film, Trash2, ChevronDown } from 'lucide-react';
 import { VoiceDemo } from '../../types';
+import { AudioPlayer } from './AudioPlayer';
 /** Color map for visual genre badges */
 const GENRE_COLORS: Record<string, string> = {
   Acción:    'bg-red-500/15 text-red-400 border-red-500/20',
@@ -22,6 +23,7 @@ interface DemoItemProps {
 }
 
 export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
+  const [isExpanded, setIsExpanded] = useState(false);
   const isVideo = demo.mediaType === 'VIDEO';
   const genreColor = demo.visualGenre ? (GENRE_COLORS[demo.visualGenre] ?? GENRE_COLORS['Otro']) : null;
 
@@ -32,53 +34,99 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
     return isNaN(d.getTime()) ? 'Procesando...' : d.toLocaleDateString('es-CL');
   };
 
+  const handleDownload = async () => {
+    try {
+      const response = await fetch(demo.fileUrl);
+      if (!response.ok) throw new Error('Error al descargar');
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${demo.title}${demo.fileFormat ? '.' + demo.fileFormat.toLowerCase() : ''}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Error descargando:', error);
+    }
+  };
+
   return (
-    <div className="bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-[2rem] p-6 transition-all group flex items-center gap-6 cursor-pointer shadow-xl relative overflow-hidden">
-      {/* Left accent bar — orange for audio, turquoise for video */}
-      <div className={`absolute top-0 left-0 w-1 h-full transition-all ${isVideo ? 'bg-white/5 group-hover:bg-sud-turquoise' : 'bg-white/5 group-hover:bg-sud-orange'}`} />
-
-      {/* Media icon */}
-      <div className={`w-16 h-16 rounded-3xl bg-black border border-white/10 flex items-center justify-center transition-all shadow-lg relative overflow-hidden shrink-0 ${isVideo ? 'group-hover:bg-sud-turquoise/10' : 'group-hover:bg-sud-orange/10'}`}>
-        {isVideo
-          ? <Film className="text-slate-700 group-hover:text-sud-turquoise relative z-10 transition-colors" size={28} />
-          : <AudioLines className="text-slate-700 group-hover:text-sud-orange relative z-10 transition-colors" size={28} />
-        }
-      </div>
-
-      {/* Content */}
-      <div className="flex-1 space-y-2 min-w-0">
-        <div className="flex items-center justify-between gap-4">
-          <h4 className="font-bold text-lg text-slate-200 group-hover:text-white transition-colors uppercase tracking-tight truncate">
-            {demo.title}
-          </h4>
-          <div className="flex items-center gap-2 shrink-0">
-            {demo.duration && (
-              <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest bg-black/40 px-2 py-1 rounded-md">
-                {demo.duration}
-              </span>
+    <div className="bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-[2rem] overflow-hidden shadow-xl relative">
+      {/* Header - always visible */}
+      <div
+        className="p-6 transition-all group cursor-pointer"
+        onClick={() => !isVideo && setIsExpanded(!isExpanded)}
+      >
+        {/* Icon + Title + Actions */}
+        <div className="flex items-start gap-4 mb-4">
+          {/* Media icon */}
+          <div
+            className={`w-16 h-16 rounded-3xl bg-black border border-white/10 flex items-center justify-center transition-all shadow-lg relative overflow-hidden shrink-0 flex-shrink-0 ${
+              isVideo ? 'group-hover:bg-sud-turquoise/10' : 'group-hover:bg-sud-orange/10'
+            }`}
+          >
+            {isVideo ? (
+              <Film className="text-slate-700 group-hover:text-sud-turquoise relative z-10 transition-colors" size={28} />
+            ) : (
+              <AudioLines className="text-slate-700 group-hover:text-sud-orange relative z-10 transition-colors" size={28} />
             )}
-            <button className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-sud-orange hover:text-white transition-all">
-              <Play size={14} fill="currentColor" />
-            </button>
-            {onDelete && (
-              <button
-                onClick={(e) => { e.stopPropagation(); onDelete(demo.id); }}
-                className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition-all"
-              >
-                <Trash2 size={13} />
-              </button>
-            )}
+          </div>
+
+          {/* Title + Actions */}
+          <div className="flex-1 flex items-center justify-between gap-4 min-w-0">
+            <h4 className="font-bold text-lg text-slate-200 group-hover:text-white transition-colors uppercase tracking-tight truncate">
+              {demo.title}
+            </h4>
+            
+            {/* Action buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {demo.duration && (
+                <span className="text-[10px] text-slate-600 font-black uppercase tracking-widest bg-black/40 px-2 py-1 rounded-md whitespace-nowrap">
+                  {demo.duration}
+                </span>
+              )}
+              {!isVideo && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setIsExpanded(!isExpanded);
+                  }}
+                  className={`w-8 h-8 rounded-full bg-white/5 flex items-center justify-center transition-all ${
+                    isExpanded ? 'bg-sud-orange/20 text-sud-orange' : 'hover:bg-sud-orange/20 hover:text-sud-orange'
+                  }`}
+                  title="Expandir reproductor"
+                >
+                  <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDelete(demo.id);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-red-500/20 hover:text-red-400 transition-all"
+                  title="Eliminar demo"
+                >
+                  <Trash2 size={13} />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
         {/* Badges row */}
         <div className="flex flex-wrap gap-2 items-center">
           {/* Media type badge */}
-          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border ${
-            isVideo
-              ? 'bg-sud-turquoise/10 text-sud-turquoise border-sud-turquoise/20'
-              : 'bg-sud-orange/10 text-sud-orange border-sud-orange/20'
-          }`}>
+          <span
+            className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border ${
+              isVideo
+                ? 'bg-sud-turquoise/10 text-sud-turquoise border-sud-turquoise/20'
+                : 'bg-sud-orange/10 text-sud-orange border-sud-orange/20'
+            }`}
+          >
             {isVideo ? '🎬 Video' : '🎙 Audio'}
           </span>
 
@@ -94,24 +142,29 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
             </span>
           )}
 
-          {/* Visual genre badge */}
-          {demo.visualGenre && genreColor && (
+          {/* Genre badge */}
+          {genreColor && (
             <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border ${genreColor}`}>
               {demo.visualGenre}
             </span>
           )}
 
-          <div className="flex-1" />
-          <span className="text-[10px] font-black text-slate-600 uppercase tracking-widest opacity-60">
-            {formatDate(demo.createdAt)}
-          </span>
+          {/* Date */}
+          <span className="text-[9px] text-slate-500 font-mono ml-auto">{formatDate(demo.createdAt)}</span>
         </div>
 
-        {/* Optional description */}
+        {/* Description */}
         {demo.description && (
-          <p className="text-[10px] text-slate-500 italic truncate pt-1">{demo.description}</p>
+          <p className="text-[10px] text-slate-500 italic mt-2 line-clamp-2">{demo.description}</p>
         )}
       </div>
+
+      {/* Player - expanded view for audio only */}
+      {isExpanded && !isVideo && (
+        <div className="px-6 pb-6 border-t border-white/5 pt-4">
+          <AudioPlayer src={demo.fileUrl} title={demo.title} onDownload={handleDownload} />
+        </div>
+      )}
     </div>
   );
 };

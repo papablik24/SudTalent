@@ -1,6 +1,8 @@
 package sudtalent.sudtalentproyecto.model;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 import jakarta.persistence.*;
@@ -16,9 +18,9 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-@Inheritance(strategy = InheritanceType.JOINED) 
+@Inheritance(strategy = InheritanceType.JOINED)
 public class User {
-    
+
     // ✅ CAMBIO 1: UUID en lugar de IDENTITY
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -37,7 +39,7 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Pattern(regexp = "^[0-9]{8,15}$", message = "El teléfono debe contener entre 8 y 15 dígitos") 
+    @Pattern(regexp = "^[0-9]{8,15}$", message = "El teléfono debe contener entre 8 y 15 dígitos")
     @Column(unique = true, length = 20)
     private String phone;
 
@@ -95,6 +97,12 @@ public class User {
     @ManyToOne
     @JoinColumn(name = "perfil_id")
     private Profile profile;
+
+    @Column(length = 1000)
+    private String profileAudioUrl; // URL del audio de perfil principal
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<VoiceAudio> voiceAudios = new ArrayList<>();
 
     public enum Role {
         ALUMNO, ADMIN, PROFESOR

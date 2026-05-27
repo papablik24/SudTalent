@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Upload, AudioLines, Film, FileAudio, Video, X, ChevronDown } from 'lucide-react';
+import { Plus, Upload, AudioLines, Film, FileAudio, Video, X, ChevronDown, Loader } from 'lucide-react';
 import { UserProfile, VoiceDemo, DemoCategory, VisualGenre, MediaType, FileFormat, VISUAL_GENRES, DEMO_CATEGORIES } from '../../types';
 import { DemoItem } from '../../components/ui/DemoItem';
+import { demoService, DemoDTO } from '../../services/demoService';
 
 // ─── Allowed formats ────────────────────────────────────────────────
 const AUDIO_FORMATS = ['MP3', 'WAV'] as const;
@@ -43,19 +44,49 @@ const DEFAULT_FORM: DemoForm = {
 export function UserDemosView({ user }: { user: UserProfile }) {
   const [demos, setDemos] = useState<VoiceDemo[]>([]);
   const [isUploading, setIsUploading] = useState(false);
+  const [isLoadingDemos, setIsLoadingDemos] = useState(true);
   const [form, setForm] = useState<DemoForm>(DEFAULT_FORM);
   const [fileError, setFileError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // ── Load from localStorage ──────────────────────────────────────────
+  // ── Cargar demos desde backend ──────────────────────────────────────
   useEffect(() => {
-    const load = () => {
-      const localDemos = localStorage.getItem(`demos_${user.uid}`);
-      if (localDemos) setDemos(JSON.parse(localDemos));
+    const loadDemos = async () => {
+      try {
+        setIsLoadingDemos(true);
+        const token = localStorage.getItem('sud_jwt_token');
+
+        if (!token) {
+          console.warn('No hay token para cargar demos');
+          setIsLoadingDemos(false);
+          return;
+        }
+
+        const demoData = await demoService.getUserDemos(token);
+        
+        // Convertir DemoDTO a VoiceDemo para compatibilidad con DemoItem
+        const mappedDemos = demoData.map((demo: DemoDTO) => ({
+          id: demo.id,
+          userId: user.uid,
+          title: demo.title,
+          category: demo.category as DemoCategory || 'Doblaje',
+          fileUrl: demo.fileUrl,
+          duration: demo.durationSeconds ? `${Math.floor(demo.durationSeconds / 60)}:${String(demo.durationSeconds % 60).padStart(2, '0')}` : '—',
+          createdAt: demo.createdAt,
+          mediaType: demo.mediaType as MediaType,
+          fileFormat: demo.fileFormat as FileFormat | undefined,
+        }));
+
+        setDemos(mappedDemos);
+        console.log('✅ Demos cargadas:', mappedDemos.length);
+      } catch (error) {
+        console.error('❌ Error cargando demos:', error);
+      } finally {
+        setIsLoadingDemos(false);
+      }
     };
-    load();
-    window.addEventListener('storage', load);
-    return () => window.removeEventListener('storage', load);
+
+    loadDemos();
   }, [user.uid]);
 
   // ── File picker handler ─────────────────────────────────────────────
@@ -76,45 +107,81 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   };
 
   // ── Submit ──────────────────────────────────────────────────────────
-  const handleUploadDemo = (e: React.FormEvent) => {
+  const handleUploadDemo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.file) return;
 
-    setIsUploading(true);
+    try {
+      setIsUploading(true);
+      setFileError(null);
 
-    // Simulate file URL (in production this would be a real upload)
-    const ext = form.fileFormat?.toLowerCase() ?? 'mp3';
-    const simulatedUrl = `https://cdn.sudtalent.com/demos/${user.uid}/${Date.now()}.${ext}`;
+      const token = localStorage.getItem('sud_jwt_token');
+      if (!token) {
+        throw new Error('No hay sesión activa. Inicia sesión de nuevo');
+      }
 
-    const newDemoData: VoiceDemo = {
-      id: `demo_${Date.now()}`,
-      userId: user.uid,
-      title: form.title,
-      category: form.category,
-      fileUrl: simulatedUrl,
-      duration: '—',
-      createdAt: new Date().toISOString(),
-      mediaType: form.mediaType ?? 'AUDIO',
-      fileFormat: form.fileFormat ?? 'MP3',
-      visualGenre: form.visualGenre || undefined,
-      description: form.description || undefined,
-    };
+      console.log('📤 Subiendo demo:', form.file.name);
 
-    const updated = [newDemoData, ...demos];
-    setDemos(updated);
-    localStorage.setItem(`demos_${user.uid}`, JSON.stringify(updated));
+      // Subir mediante backend
+      const result = await demoService.uploadDemo(
+        form.file,
+        form.category,
+        form.title,
+        token
+      );
 
-    // Reset
-    setForm(DEFAULT_FORM);
-    if (fileRef.current) fileRef.current.value = '';
-    setIsUploading(false);
+      // Añadir a la lista
+      const newDemo: VoiceDemo = {
+        id: result.id,
+        userId: user.uid,
+        title: result.title,
+        category: form.category,
+        fileUrl: result.fileUrl,
+        duration: result.durationSeconds ? `${Math.floor(result.durationSeconds / 60)}:${String(result.durationSeconds % 60).padStart(2, '0')}` : '—',
+        createdAt: result.createdAt,
+        mediaType: result.mediaType as MediaType,
+        fileFormat: result.fileFormat as FileFormat | undefined,
+        visualGenre: form.visualGenre || undefined,
+        description: form.description || undefined,
+      };
+
+      setDemos(prev => [newDemo, ...prev]);
+      console.log('✅ Demo subida exitosamente');
+
+      // Reset form
+      setForm(DEFAULT_FORM);
+      if (fileRef.current) fileRef.current.value = '';
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error desconocido al subir demo';
+      setFileError(errorMessage);
+      console.error('❌ Error:', errorMessage);
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   // ── Delete demo ─────────────────────────────────────────────────────
-  const handleDelete = (id: string) => {
-    const updated = demos.filter(d => d.id !== id);
-    setDemos(updated);
-    localStorage.setItem(`demos_${user.uid}`, JSON.stringify(updated));
+  const handleDelete = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar esta demo?')) {
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('sud_jwt_token');
+      if (!token) {
+        throw new Error('No hay sesión activa');
+      }
+
+      console.log('🗑️ Eliminando demo:', id);
+      await demoService.deleteDemo(id, token);
+
+      setDemos(prev => prev.filter(d => d.id !== id));
+      console.log('✅ Demo eliminada exitosamente');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Error al eliminar demo';
+      setFileError(errorMessage);
+      console.error('❌ Error:', errorMessage);
+    }
   };
 
   // ── Derived stats ────────────────────────────────────────────────────
@@ -310,7 +377,10 @@ export function UserDemosView({ user }: { user: UserProfile }) {
                 className="w-full sud-btn-primary py-5 text-sm shadow-xl shadow-sud-orange/10 transition-all hover:scale-[1.02]"
               >
                 {isUploading ? (
-                  <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader size={16} className="animate-spin" />
+                    <span>Subiendo...</span>
+                  </div>
                 ) : (
                   <>
                     <Upload size={16} />
@@ -331,7 +401,12 @@ export function UserDemosView({ user }: { user: UserProfile }) {
             </h3>
           </div>
 
-          {demos.length === 0 ? (
+          {isLoadingDemos ? (
+            <div className="p-16 text-center bg-white/[0.02] rounded-[3rem] border border-dashed border-white/10">
+              <Loader className="w-8 h-8 animate-spin mx-auto text-sud-orange mb-4" />
+              <p className="text-slate-500 text-sm font-bold uppercase tracking-widest">Cargando demos...</p>
+            </div>
+          ) : demos.length === 0 ? (
             <div className="p-16 text-center bg-white/[0.02] rounded-[3rem] border border-dashed border-white/10">
               <div className="flex items-center justify-center gap-4 mb-6 mx-auto">
                 <AudioLines className="text-white/10" size={36} />

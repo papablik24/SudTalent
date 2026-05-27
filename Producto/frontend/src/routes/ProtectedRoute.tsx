@@ -33,8 +33,9 @@ export function ProtectedRoute({
     return <Navigate to="/" replace />;
   }
 
-  if (!user.onboarded && window.location.pathname !== '/onboarding' && window.location.pathname !== '/profile-selection') {
-    return <Navigate to="/profile-selection" replace />;
+  // Solo forzar onboarding para usuarios USER, nunca para ADMIN
+  if (role !== 'ADMIN' && !user.onboarded && window.location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <>{children}</>;

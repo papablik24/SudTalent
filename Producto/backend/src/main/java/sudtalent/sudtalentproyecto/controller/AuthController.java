@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.DisabledException;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -69,9 +70,10 @@ public class AuthController {
 
     @PostMapping("/onboard")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<AuthResponse> onboard(@AuthenticationPrincipal UserDetails userDetails,
+    public ResponseEntity<AuthResponse> onboard(Authentication authentication,
                                                  @Valid @RequestBody OnboardRequest request) {
-        User user = userRepository.findByEmailActive(userDetails.getUsername()).orElseThrow();
+        String email = authentication.getName();
+        User user = userRepository.findByEmailActive(email).orElseThrow();
         return ResponseEntity.ok(authService.onboard(user.getId(), request));
     }
 
@@ -83,8 +85,8 @@ public class AuthController {
 
     @GetMapping("/me")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<AuthResponse> me(@AuthenticationPrincipal UserDetails userDetails) {
-        User user = userRepository.findByEmailActive(userDetails.getUsername()).orElseThrow();
+    public ResponseEntity<AuthResponse> me(Authentication authentication) {
+        User user = userRepository.findByEmailActive(authentication.getName()).orElseThrow();
         
         UserData userData = new UserData(
                 user.getId(),  // ← Ahora es UUID

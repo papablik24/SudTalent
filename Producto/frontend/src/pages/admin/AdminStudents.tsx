@@ -22,10 +22,12 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
   const [editCategory, setEditCategory] = useState<ProfileCategory>('NONE');
 
   const displayUsers = [
+    // Todos los entries de la whitelist
     ...whitelist.map(w => ({ ...w, type: 'WHITELIST' as const, category: w.category || 'NONE', email: w.email })),
+    // Usuarios registrados que NO están ya en la whitelist (por teléfono o email)
     ...users
-      .filter(u => u.status === 'PENDING' || u.uid.startsWith('mock_'))
-      .filter(u => !whitelist.some(w => w.phone === u.phone))
+      .filter(u => u.role !== 'ADMIN')
+      .filter(u => !whitelist.some(w => w.phone === u.phone || (u.email && w.email === u.email)))
       .map(u => ({ 
         phone: u.phone, 
         name: u.name, 
@@ -33,7 +35,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate }: A
         addedAt: u.createdAt, 
         type: 'REGISTERED' as const,
         status: u.status,
-        category: u.category || 'NONE',
+        category: (u as any).category || 'NONE',
         uid: u.uid
       }))
   ];

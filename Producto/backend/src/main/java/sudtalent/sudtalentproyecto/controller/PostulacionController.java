@@ -1,12 +1,14 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import sudtalent.sudtalentproyecto.model.Postulacion;
+import sudtalent.sudtalentproyecto.dto.PostulacionDTO;
+import sudtalent.sudtalentproyecto.dto.PostulacionRequestDTO;
 import sudtalent.sudtalentproyecto.service.PostulacionService;
 import sudtalent.sudtalentproyecto.service.SoftDeleteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -22,47 +24,50 @@ public class PostulacionController {
     
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Postulacion>> getAllPostulaciones() {
+    public ResponseEntity<List<PostulacionDTO>> getAllPostulaciones() {
         return ResponseEntity.ok(postulacionService.getAllPostulaciones());
     }
     
-    // ✅ CAMBIO: UUID
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Postulacion> getPostulacionById(@PathVariable UUID id) {
+    public ResponseEntity<PostulacionDTO> getPostulacionById(@PathVariable UUID id) {
         return ResponseEntity.ok(postulacionService.getPostulacionById(id));
     }
     
-    // ✅ CAMBIO: UUID
     @GetMapping("/alumno/{alumnoId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Postulacion>> getPostulacionesByAlumno(@PathVariable UUID alumnoId) {
+    public ResponseEntity<List<PostulacionDTO>> getPostulacionesByAlumno(@PathVariable UUID alumnoId) {
         return ResponseEntity.ok(postulacionService.getPostulacionesByAlumno(alumnoId));
     }
     
-    // ✅ CAMBIO: UUID
     @GetMapping("/convocatoria/{convocatoriaId}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Postulacion>> getPostulacionesByConvocatoria(@PathVariable UUID convocatoriaId) {
+    public ResponseEntity<List<PostulacionDTO>> getPostulacionesByConvocatoria(@PathVariable UUID convocatoriaId) {
         return ResponseEntity.ok(postulacionService.getPostulacionesByConvocatoria(convocatoriaId));
     }
-    
+
+    /** Crear postulación usando DTO — acepta alumnoId o lo extrae del JWT */
     @PostMapping
-    @PreAuthorize("hasRole('ALUMNO')")
-    public ResponseEntity<Postulacion> createPostulacion(@Valid @RequestBody Postulacion postulacion) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(postulacionService.createPostulacion(postulacion));
+    @PreAuthorize("hasAnyAuthority('ROLE_ALUMNO', 'ROLE_ADMIN')")
+    public ResponseEntity<PostulacionDTO> createPostulacion(
+            @Valid @RequestBody PostulacionRequestDTO request,
+            Authentication authentication) {
+        PostulacionDTO created = postulacionService.createPostulacion(request, authentication);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     
-    // ✅ CAMBIO: UUID
+    /** Actualizar estado de postulación (admin/profesor) */
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ALUMNO')")
-    public ResponseEntity<Postulacion> updatePostulacion(@PathVariable UUID id, @Valid @RequestBody Postulacion postulacionUpdate) {
-        return ResponseEntity.ok(postulacionService.updatePostulacion(id, postulacionUpdate));
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PROFESOR')")
+    public ResponseEntity<PostulacionDTO> updatePostulacion(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body) {
+        String estado = body.get("estado");
+        return ResponseEntity.ok(postulacionService.updateEstado(id, estado));
     }
     
-    // ✅ CAMBIO: Soft delete
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<?> deletePostulacion(@PathVariable UUID id) {
         try {
             softDeleteService.softDeletePostulacion(id);

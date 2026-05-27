@@ -70,6 +70,9 @@ public class AuthService {
 
         userRepository.save(user);
 
+        // Crear entrada en whitelist con estado PENDIENTE para que aparezca en el panel admin
+        createWhitelistEntryForUser(user);
+
         var userDetails = userDetailsService.loadUserByUsername(request.email());
         String token = jwtUtils.generateToken(userDetails);
         setJwtCookie(response, token);
@@ -138,9 +141,9 @@ public class AuthService {
                     .onboarded(false)
                     .build();
 
-            userRepository.save(user);
+            user = userRepository.save(user);
             
-            // ✅ Vincular whitelist con el nuevo usuario
+            // Vincular whitelist con el nuevo usuario
             wl.setUser(user);
             if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
                 wl.setStatus(WhitelistNumber.Status.ACTIVO);
@@ -203,21 +206,42 @@ public class AuthService {
         
         userRepository.save(user);
 
-        // ✅ Sincronizar whitelist si tiene entrada vinculada
+        // Sincronizar whitelist si tiene entrada vinculada
         if (user.getPhone() != null) {
             var wlOpt = whitelistRepository.findByPhone(user.getPhone());
             if (wlOpt.isPresent()) {
                 WhitelistNumber wl = wlOpt.get();
-                // Vincular si aún no estaba vinculado
                 if (wl.getUser() == null) {
                     wl.setUser(user);
                 }
-                // Si completó onboarding, activar en whitelist
                 if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
                     wl.setStatus(WhitelistNumber.Status.ACTIVO);
                 }
                 whitelistRepository.save(wl);
+            } else {
+                // Buscar si hay una entrada placeholder vinculada a este usuario (creada al registrarse)
+                // y actualizarla con el teléfono real
+                whitelistRepository.findAll().stream()
+                        .filter(w -> user.equals(w.getUser()))
+                        .findFirst()
+                        .ifPresent(w -> {
+                            w.setPhone(user.getPhone());
+                            if (user.getName() != null) w.setName(user.getName());
+                            if (user.getEmail() != null) w.setEmail(user.getEmail());
+                            whitelistRepository.save(w);
+                            System.out.println("✅ Whitelist placeholder actualizado con teléfono real: " + user.getPhone());
+                        });
             }
+        } else {
+            // Sin teléfono: actualizar nombre/email en la entrada placeholder existente
+            whitelistRepository.findAll().stream()
+                    .filter(w -> user.equals(w.getUser()))
+                    .findFirst()
+                    .ifPresent(w -> {
+                        if (user.getName() != null) w.setName(user.getName());
+                        if (user.getEmail() != null) w.setEmail(user.getEmail());
+                        whitelistRepository.save(w);
+                    });
         }
 
         // Generate fresh token with updated info
@@ -285,5 +309,33 @@ public class AuthService {
     private String normalizePhone(String phone) {
         // Remove + and spaces, keep only digits
         return phone.replaceAll("[^0-9]", "");
+    }
+
+    /**
+     * Crea una entrada en whitelist_numbers para un usuario registrado por email/password.
+     * Usa el email como identificador y deja el teléfono vacío (se completa en el onboarding).
+     * Estado inicial: PENDIENTE — el admin debe aprobarlo.
+     */
+    private void createWhitelistEntryForUser(User user) {
+        // Solo crear si no existe ya una entrada para este email
+        boolean alreadyExists = whitelistRepository.findAll().stream()
+                .anyMatch(w -> user.getEmail() != null && user.getEmail().equals(w.getEmail()));
+        if (alreadyExists) return;
+
+        // phone en whitelist es NOT NULL UNIQUE y solo acepta dígitos (8-15).
+        // Usamos los últimos 12 dígitos del timestamp como placeholder único.
+        // Se actualizará cuando el usuario complete su perfil con un teléfono real.
+        String placeholderPhone = String.valueOf(System.currentTimeMillis()).substring(1, 13);
+
+        WhitelistNumber entry = WhitelistNumber.builder()
+                .phone(placeholderPhone)
+                .name(user.getName() != null ? user.getName() : "")
+                .email(user.getEmail())
+                .status(WhitelistNumber.Status.PENDIENTE)
+                .user(user)
+                .build();
+
+        whitelistRepository.save(entry);
+        System.out.println("✅ Entrada whitelist creada para usuario email: " + user.getEmail());
     }
 }

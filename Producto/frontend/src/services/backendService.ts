@@ -44,7 +44,7 @@ export interface OnboardRequest {
 
 // ==================== HTTP SERVICE ====================
 
-async function fetchAPI<T>(
+export async function fetchAPI<T>(
   endpoint: string,
   options: RequestInit = {},
   requireAuth: boolean = true

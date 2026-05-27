@@ -30,6 +30,15 @@ public class Postulacion {
     @Column(name = "fecha_postulacion")
     private LocalDate fechaPostulacion;
 
+    /** Estado del proceso: PENDIENTE, EN_REVISION, ACEPTADA, RECHAZADA */
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private String estado = "PENDIENTE";
+
+    /** Mensaje opcional del alumno al postular */
+    @Column(columnDefinition = "TEXT")
+    private String mensaje;
+
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

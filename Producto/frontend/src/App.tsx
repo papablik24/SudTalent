@@ -16,6 +16,7 @@ import { UserOnboarding } from './pages/UserOnboarding';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { useAdminData } from './hooks/useAdminData';
+import { authService } from './services/backendService';
 import { UserProfile, TalentProfile } from './types';
 
 export default function App() {
@@ -45,29 +46,38 @@ export default function App() {
   const handleOnboardingComplete = async (data: Partial<UserProfile>, profileData: Partial<TalentProfile>) => {
     if (!currentUser) return;
 
+    // 1. Llamar al backend para marcar onboarded en la BD
+    try {
+      const response = await authService.onboard({
+        name: data.name || currentUser.name,
+        email: data.email || currentUser.email,
+        profileType: data.profileType || 'PERSONAL',
+        bio: data.bio,
+        age: data.age,
+        // specialties llega como string[] del onboarding — se une con coma para el backend
+        specialties: Array.isArray((profileData as any)?.specialties)
+          ? ((profileData as any).specialties as string[]).join(',')
+          : (profileData as any)?.specialties,
+        childName: data.profileType === 'PARENT' ? (profileData as any).childName ?? (data as any).childName : undefined,
+        childAge: data.profileType === 'PARENT' ? (profileData as any).childAge ?? (data as any).childAge : undefined,
+      });
+      // Actualizar el user con lo que devolvió el backend (incluye onboarded: true)
+      if (response?.onboarded !== undefined) {
+        data.onboarded = response.onboarded;
+      }
+    } catch (err) {
+      console.error('Error al completar onboarding en backend:', err);
+      // No bloqueamos el flujo — marcamos onboarded: true localmente igual
+    }
+
     const updatedUser: UserProfile = {
       ...currentUser,
       ...data,
       onboarded: true,
     };
 
-    const newProfile = {
-      userId: currentUser.uid,
-      ...profileData,
-      createdAt: new Date().toISOString()
-    };
-
-    // Persist
-    localStorage.setItem(`user_${currentUser.uid}`, JSON.stringify(updatedUser));
-    localStorage.setItem(`profile_${currentUser.uid}`, JSON.stringify(newProfile));
+    // 2. Persistir localmente
     localStorage.setItem('sud_current_user', JSON.stringify(updatedUser));
-
-    // Add to global users list for admin panel
-    const savedUsers = localStorage.getItem('sud_all_users');
-    const users = savedUsers ? JSON.parse(savedUsers) : [];
-    const idx = users.findIndex((u: any) => u.uid === currentUser.uid);
-    if (idx >= 0) users[idx] = updatedUser; else users.push(updatedUser);
-    localStorage.setItem('sud_all_users', JSON.stringify(users));
 
     setCurrentUser(updatedUser);
   };

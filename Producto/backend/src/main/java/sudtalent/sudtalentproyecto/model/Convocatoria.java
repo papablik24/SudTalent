@@ -25,15 +25,41 @@ public class Convocatoria {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(columnDefinition = "uuid")
     private UUID id;
-    
-    @Column(nullable = false)
+
+    /** Título descriptivo de la convocatoria */
+    @Column(nullable = false, length = 200)
+    private String titulo;
+
+    /** Descripción detallada */
+    @Column(columnDefinition = "TEXT")
+    private String descripcion;
+
+    /** Categoría: Doblaje, Podcast, Locución, etc. */
+    @Column(length = 50)
+    private String categoria;
+
+    /** Género visual: Acción, Drama, etc. (opcional) */
+    @Column(name = "genero_visual", length = 50)
+    private String generoVisual;
+
+    /** Requisitos como lista serializada separada por '|' */
+    @Column(columnDefinition = "TEXT")
+    private String requisitos;
+
+    /** Fecha límite de postulación */
+    @Column(name = "fecha_limite")
+    private LocalDate fechaLimite;
+
+    // Campos legacy mantenidos por compatibilidad
+    @Column
     private LocalDate fecha;
     
-    @Column(nullable = false)
+    @Column(length = 100)
     private String tipo;
     
     @Column(nullable = false)
-    private String estado;
+    @Builder.Default
+    private String estado = "ACTIVA";
 
     @Column(nullable = false)
     @Builder.Default
@@ -47,7 +73,7 @@ public class Convocatoria {
     private LocalDateTime deletedAt;
     
     @ManyToOne
-    @JoinColumn(name = "profesor_id", nullable = false)
+    @JoinColumn(name = "profesor_id", nullable = true)
     private Profesor profesor;
     
     @OneToMany(mappedBy = "convocatoria", cascade = CascadeType.ALL)

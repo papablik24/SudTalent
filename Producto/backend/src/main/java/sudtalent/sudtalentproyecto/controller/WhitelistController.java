@@ -24,20 +24,20 @@ public class WhitelistController {
     private final WhitelistService whitelistService;
 
     @GetMapping("/stats")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<WhitelistStatsDTO> getStats() {
         return ResponseEntity.ok(whitelistService.getStats());
     }
 
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<WhitelistNumberDTO>> getAllNumbers() {
         return ResponseEntity.ok(whitelistService.getAllNumbers());
     }
 
     // Agregar un número a la whitelist + crear usuario automáticamente
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<WhitelistNumberDTO> addNumber(
         @RequestBody WhitelistNumberDTO dto) {
         
@@ -63,7 +63,7 @@ public class WhitelistController {
 
     // Actualizar estado por ID
     @PutMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<WhitelistNumberDTO> updateStatus(
         @PathVariable UUID id,
         @RequestParam String status) {
@@ -72,7 +72,7 @@ public class WhitelistController {
 
     // Actualizar por teléfono (nuevo endpoint para el frontend)
     @PutMapping("/{phone}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<WhitelistNumberDTO> updateByPhone(
         @PathVariable String phone,
         @RequestBody WhitelistNumberDTO updates) {
@@ -81,7 +81,7 @@ public class WhitelistController {
 
     // Eliminar por ID
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteNumber(@PathVariable UUID id) {
         whitelistService.deleteNumber(id);
         return ResponseEntity.noContent().build();
@@ -89,7 +89,7 @@ public class WhitelistController {
 
     // Eliminar por teléfono (nuevo endpoint para el frontend)
     @DeleteMapping("/phone/{phone}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<Void> deleteByPhone(@PathVariable String phone) {
         whitelistService.deleteByPhone(phone);
         return ResponseEntity.noContent().build();
@@ -97,14 +97,14 @@ public class WhitelistController {
 
     // ==================== FUNCIONALIDAD 1: Obtener todos los alumnos con estado en whitelist ====================
     @GetMapping("/students/status")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<List<StudentWhitelistDTO>> getAllStudentsWithWhitelistStatus() {
         return ResponseEntity.ok(whitelistService.getAllStudentsWithWhitelistStatus());
     }
 
     // ==================== FUNCIONALIDAD 2: Crear usuario cuando se agrega a whitelist ====================
     @PostMapping("/with-user")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<WhitelistNumberDTO> addNumberWithUser(
         @RequestBody WhitelistNumberDTO dto) {
         
@@ -123,14 +123,14 @@ public class WhitelistController {
 
     // ==================== FUNCIONALIDAD 3: Reportes de alumnos autorizados vs pendientes ====================
     @GetMapping("/report")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<WhitelistReportDTO> getWhitelistReport() {
         return ResponseEntity.ok(whitelistService.getWhitelistReport());
     }
 
     // ==================== FUNCIONALIDAD 4: Sincronizar usuario_id NULL ====================
     @PostMapping("/sync")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<java.util.Map<String, Object>> syncWhitelistUsers() {
         int synced = whitelistService.syncWhitelistWithUsers();
         return ResponseEntity.ok(java.util.Map.of(
@@ -141,7 +141,7 @@ public class WhitelistController {
 
     // ==================== FUNCIONALIDAD 5: Reparar passwords sin BCrypt ====================
     @PostMapping("/fix-passwords")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
     public ResponseEntity<java.util.Map<String, Object>> fixLegacyPasswords() {
         int fixed = whitelistService.fixLegacyPasswords();
         return ResponseEntity.ok(java.util.Map.of(

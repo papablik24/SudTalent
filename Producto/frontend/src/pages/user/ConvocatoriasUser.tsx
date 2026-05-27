@@ -78,12 +78,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       await new Promise(r => setTimeout(r, 500)); // small UX delay
       const post = await postulacionService.createPostulacion({
         convocatoriaId: conv.id,
-        convocatoriaTitulo: conv.titulo,
-        convocatoriaCategoria: conv.categoria,
-        userId: user.uid,
-        userName: user.name || '',
-        userEmail: user.email || '',
-        userPhone: user.phone || '',
+        alumnoId: user.uid,
       });
       setMyPostulaciones(prev => ({ ...prev, [conv.id]: post }));
       setApplySuccess(conv.id);

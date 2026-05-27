@@ -1,8 +1,9 @@
 /**
  * Servicio de Postulaciones
- * Capa de abstracción para gestión de postulaciones.
- * TODO: reemplazar localStorage por llamada a API cuando backend esté listo
+ * Conecta con la API del backend para gestión de postulaciones
  */
+
+import { fetchAPI } from './backendService';
 
 export type PostulacionEstado = 'PENDIENTE' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA';
 
@@ -10,162 +11,146 @@ export const POSTULACION_ESTADOS: PostulacionEstado[] = [
   'PENDIENTE', 'EN_REVISION', 'ACEPTADA', 'RECHAZADA'
 ];
 
+/**
+ * Tipo de Postulación desde el backend (con UUIDs)
+ */
 export interface Postulacion {
-  id: string;
-  convocatoriaId: string;
+  id: string; // UUID
+  alumnoId?: string; // UUID del alumno
+  convocatoriaId: string; // UUID
   convocatoriaTitulo?: string;
   convocatoriaCategoria?: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  userPhone: string;
-  estado: PostulacionEstado;
+  userName?: string;
+  userEmail?: string;
+  userPhone?: string;
+  estado?: PostulacionEstado;
   mensaje?: string;
   createdAt: string;
   updatedAt: string;
+  deletedAt?: string | null;
 }
 
 export interface CreatePostulacionDTO {
-  convocatoriaId: string;
-  convocatoriaTitulo?: string;
-  convocatoriaCategoria?: string;
-  userId: string;
-  userName: string;
-  userEmail: string;
-  userPhone: string;
+  convocatoriaId: string;   // UUID de la convocatoria
+  alumnoId?: string;        // UUID del alumno (opcional, si no lo extrae el backend del JWT)
   mensaje?: string;
-}
-
-const STORAGE_KEY = 'sud_postulaciones_v2';
-
-// ── Mock data inicial ──────────────────────────────────────────────────
-const MOCK_DATA: Postulacion[] = [
-  {
-    id: 'post_mock_1',
-    convocatoriaId: 'conv_mock_1',
-    convocatoriaTitulo: 'Voz juvenil para personaje animado',
-    convocatoriaCategoria: 'Doblaje',
-    userId: '2',
-    userName: 'Lewis Hamilton',
-    userEmail: 'sirlewis@sudtalent.cl',
-    userPhone: '55888555',
-    estado: 'PENDIENTE',
-    createdAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'post_mock_2',
-    convocatoriaId: 'conv_mock_2',
-    convocatoriaTitulo: 'Narrador para podcast educativo',
-    convocatoriaCategoria: 'Podcast',
-    userId: '2',
-    userName: 'Lewis Hamilton',
-    userEmail: 'sirlewis@sudtalent.cl',
-    userPhone: '55888555',
-    estado: 'EN_REVISION',
-    createdAt: new Date(Date.now() - 4 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-  {
-    id: 'post_mock_3',
-    convocatoriaId: 'conv_mock_3',
-    convocatoriaTitulo: 'Voz comercial para presentación institucional',
-    convocatoriaCategoria: 'Presentación',
-    userId: '3',
-    userName: 'Talento Demo',
-    userEmail: 'demo@sudtalent.cl',
-    userPhone: '99887766',
-    estado: 'ACEPTADA',
-    createdAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
-  },
-];
-
-function getAll(): Postulacion[] {
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if (!raw) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(MOCK_DATA));
-    return [...MOCK_DATA];
-  }
-  return JSON.parse(raw);
-}
-
-function saveAll(items: Postulacion[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
 }
 
 // ── Public API ─────────────────────────────────────────────────────────
 
-/** Obtener postulaciones de un usuario */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
-export async function getPostulacionesByUser(userId: string): Promise<Postulacion[]> {
-  return getAll().filter(p => p.userId === userId);
-}
-
-/** Obtener postulaciones de una convocatoria */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
-export async function getPostulacionesByConvocatoria(convocatoriaId: string): Promise<Postulacion[]> {
-  return getAll().filter(p => p.convocatoriaId === convocatoriaId);
-}
-
-/** Obtener todas las postulaciones (admin) */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
+/**
+ * Obtener todas las postulaciones (solo admin)
+ */
 export async function getAllPostulaciones(): Promise<Postulacion[]> {
-  return getAll();
-}
-
-/** Verificar si un usuario ya postuló a una convocatoria */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
-export async function hasUserApplied(userId: string, convocatoriaId: string): Promise<boolean> {
-  return getAll().some(p => p.userId === userId && p.convocatoriaId === convocatoriaId);
-}
-
-/** Crear nueva postulación */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
-export async function createPostulacion(data: CreatePostulacionDTO): Promise<Postulacion> {
-  const all = getAll();
-
-  // Verificar duplicados
-  const exists = all.some(p => p.userId === data.userId && p.convocatoriaId === data.convocatoriaId);
-  if (exists) {
-    throw new Error('Ya has postulado a esta convocatoria.');
+  try {
+    const data = await fetchAPI<Postulacion[]>('/postulaciones');
+    return data || [];
+  } catch (error) {
+    console.error('Error al obtener postulaciones:', error);
+    throw error;
   }
-
-  const now = new Date().toISOString();
-  const newPost: Postulacion = {
-    ...data,
-    id: `post_${Date.now()}`,
-    estado: 'PENDIENTE',
-    createdAt: now,
-    updatedAt: now,
-  };
-  all.unshift(newPost);
-  saveAll(all);
-  return newPost;
 }
 
-/** Actualizar estado de postulación (admin) */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
-export async function updatePostulacionStatus(id: string, estado: PostulacionEstado): Promise<Postulacion | null> {
-  const all = getAll();
-  const idx = all.findIndex(p => p.id === id);
-  if (idx === -1) return null;
-  all[idx] = { ...all[idx], estado, updatedAt: new Date().toISOString() };
-  saveAll(all);
-  return all[idx];
+/**
+ * Obtener postulación por ID
+ */
+export async function getPostulacionById(id: string): Promise<Postulacion> {
+  return fetchAPI<Postulacion>(`/postulaciones/${id}`);
 }
 
-/** Eliminar postulación */
-// TODO: reemplazar localStorage por llamada a API cuando backend esté listo
+/**
+ * Obtener postulaciones de un usuario (alumno)
+ */
+export async function getPostulacionesByUser(userId: string): Promise<Postulacion[]> {
+  try {
+    const data = await fetchAPI<Postulacion[]>(`/postulaciones/alumno/${userId}`);
+    return data || [];
+  } catch (error) {
+    console.error(`Error al obtener postulaciones del usuario ${userId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Obtener postulaciones de una convocatoria
+ */
+export async function getPostulacionesByConvocatoria(convocatoriaId: string): Promise<Postulacion[]> {
+  try {
+    const data = await fetchAPI<Postulacion[]>(`/postulaciones/convocatoria/${convocatoriaId}`);
+    return data || [];
+  } catch (error) {
+    console.error(`Error al obtener postulaciones de la convocatoria ${convocatoriaId}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Verificar si un usuario ya postuló a una convocatoria
+ */
+export async function hasUserApplied(userId: string, convocatoriaId: string): Promise<boolean> {
+  try {
+    const postulaciones = await getPostulacionesByUser(userId);
+    return postulaciones.some(p => p.convocatoriaId === convocatoriaId && !p.deletedAt);
+  } catch (error) {
+    console.error('Error al verificar postulación:', error);
+    return false;
+  }
+}
+
+/**
+ * Crear nueva postulación
+ */
+export async function createPostulacion(data: CreatePostulacionDTO): Promise<Postulacion> {
+  try {
+    const response = await fetchAPI<Postulacion>('/postulaciones', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+    console.log('✅ Postulación creada:', response);
+    return response;
+  } catch (error) {
+    console.error('Error al crear postulación:', error);
+    throw error;
+  }
+}
+
+/**
+ * Actualizar estado de postulación (admin)
+ */
+export async function updatePostulacionStatus(id: string, estado: PostulacionEstado): Promise<Postulacion> {
+  try {
+    const response = await fetchAPI<Postulacion>(`/postulaciones/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ estado }),
+    });
+    console.log('✅ Postulación actualizada:', response);
+    return response;
+  } catch (error) {
+    console.error(`Error al actualizar postulación ${id}:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Eliminar postulación (soft delete)
+ */
 export async function deletePostulacion(id: string): Promise<void> {
-  const all = getAll().filter(p => p.id !== id);
-  saveAll(all);
+  try {
+    await fetchAPI(`/postulaciones/${id}`, {
+      method: 'DELETE',
+    }, true); // Requiere autenticación y rol ADMIN
+    console.log('✅ Postulación eliminada');
+  } catch (error) {
+    console.error(`Error al eliminar postulación ${id}:`, error);
+    throw error;
+  }
 }
 
 export const postulacionService = {
+  getAllPostulaciones,
+  getPostulacionById,
   getPostulacionesByUser,
   getPostulacionesByConvocatoria,
-  getAllPostulaciones,
   hasUserApplied,
   createPostulacion,
   updatePostulacionStatus,

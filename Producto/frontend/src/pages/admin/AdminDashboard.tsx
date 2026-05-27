@@ -10,21 +10,16 @@ interface AdminDashboardProps {
 }
 
 export function AdminDashboard({ whitelist, users, onNavigate }: AdminDashboardProps) {
-  // Combine whitelist and pending users
-  const displayUsers = [
-    ...whitelist.map(w => ({ ...w, type: 'WHITELIST' as const })),
-    ...users
-      .filter(u => u.status === 'PENDING' || u.uid.startsWith('mock_'))
-      .filter(u => !whitelist.some(w => w.phone === u.phone))
-      .map(u => ({ 
-        phone: u.phone, 
-        name: u.name, 
-        addedAt: u.createdAt, 
-        type: 'REGISTERED' as const,
-        status: u.status,
-        uid: u.uid
-      }))
-  ];
+  // Use whitelist as primary source (automatically includes both admin-created and self-registered users)
+  // Whitelist naturally excludes admins since they're not added to whitelist_numbers
+  const displayUsers = whitelist.map(w => ({
+    phone: w.phone,
+    name: w.name,
+    addedAt: w.addedAt,
+    type: 'WHITELIST' as const,
+    status: w.status || 'PENDIENTE',
+    uid: w.phone  // Use phone as unique identifier
+  }));
 
   return (
     <div className="space-y-8">
@@ -87,7 +82,7 @@ export function AdminDashboard({ whitelist, users, onNavigate }: AdminDashboardP
                 <div>
                   <p className="text-lg font-black text-white uppercase tracking-tight group-hover:sud-vibrant-text-gradient transition-all">{entry.name || 'Alumno Sin Nombre'}</p>
                   <p className="text-[10px] text-slate-600 font-black uppercase tracking-[0.2em] mt-1">
-                    {entry.type === 'REGISTERED' ? 'En Revisión Casting' : 'Autorizado en Plataforma'}
+                    {entry.status === 'ACTIVO' ? 'Autorizado en Plataforma' : 'En Revisión'}
                   </p>
                 </div>
               </div>

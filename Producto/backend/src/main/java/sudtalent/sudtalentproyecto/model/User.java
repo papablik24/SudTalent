@@ -101,6 +101,9 @@ public class User {
     @Column(length = 1000)
     private String profileAudioUrl; // URL del audio de perfil principal
 
+    @Column(length = 1000)
+    private String profileImageUrl; // URL de la foto de perfil
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<VoiceAudio> voiceAudios = new ArrayList<>();
 

@@ -4,6 +4,7 @@ target/
 !**/src/main/**/target/
 !**/src/test/**/target/
 
+
 ### STS ###
 .apt_generated
 .classpath
@@ -37,3 +38,6 @@ build/
 node_modules/
 target/
 .env
+
+## Kiro IDE
+.kiro/

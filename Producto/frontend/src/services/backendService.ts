@@ -76,6 +76,7 @@ export async function fetchAPI<T>(
 
   if (!response.ok) {
     let errorMessage = `HTTP Error: ${response.status}`;
+    let errorExtra: Record<string, any> = {};
     
     // Provide more specific error messages
     if (response.status === 401) {
@@ -87,11 +88,13 @@ export async function fetchAPI<T>(
     try {
       const error = await response.json();
       errorMessage = error.message || error.error || errorMessage;
+      if (error.cooldown) errorExtra = { cooldown: true, secondsRemaining: error.secondsRemaining };
     } catch {
       // Response body is not JSON
     }
     console.error(`❌ Error ${response.status}:`, errorMessage);
-    throw new Error(errorMessage);
+    const err = Object.assign(new Error(errorMessage), errorExtra);
+    throw err;
   }
 
   // Handle 204 No Content
@@ -167,7 +170,23 @@ export const authService = {
   // Clear local auth state
   clearLocalAuth(): void {
     clearToken();
-  }
+  },
+
+  // Request password reset OTP
+  async forgotPassword(email: string): Promise<{ message: string }> {
+    return fetchAPI<{ message: string }>('/auth/forgot-password', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }, false);
+  },
+
+  // Verify OTP and reset password
+  async resetPassword(email: string, otp: string, newPassword: string): Promise<{ message: string }> {
+    return fetchAPI<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ email, otp, newPassword }),
+    }, false);
+  },
 };
 
 // ==================== USERS ====================

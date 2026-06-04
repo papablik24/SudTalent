@@ -97,7 +97,8 @@ public class AuthController {
                 user.isActive(),
                 user.isOnboarded(),
                 user.getProfileType() != null ? user.getProfileType().name() : null,
-                user.getStatus() != null ? user.getStatus().name() : "PENDING"
+                user.getStatus() != null ? user.getStatus().name() : "PENDING",
+                user.getProfileImageUrl()
         );
         return ResponseEntity.ok(new AuthResponse(userData, !user.isOnboarded(), null));
     }

@@ -51,6 +51,15 @@ export function useAuth() {
           if (user.role && user.role !== 'ADMIN' && user.role !== 'USER') {
             user.role = 'USER';
           }
+
+          // ✅ Limpiar sesión si el uid es inválido (undefined, null, string corto)
+          if (!user.uid || user.uid === 'undefined' || user.uid === 'null' || user.uid.length < 8) {
+            console.warn('Session with invalid uid detected, clearing localStorage');
+            authService.clearLocalAuth();
+            localStorage.removeItem('sud_current_user');
+            setLoading(false);
+            return;
+          }
           
           // ✅ PREVENT 403: Verify user is eligible
           if (!isUserEligible(user)) {
@@ -183,6 +192,7 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
       active: user.active ?? true,
       bio: user.bio || '',
       age: user.age,
+      avatar: user.profileImageUrl || undefined,
       createdAt: user.createdAt || new Date().toISOString(),
       status: statusFromResponse || 'PENDING',
     };

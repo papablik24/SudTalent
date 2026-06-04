@@ -42,6 +42,14 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const loadData = async () => {
     setLoading(true);
     setError(null);
+
+    // Guard: no hacer la llamada si el uid no es un UUID válido
+    if (!user.uid || user.uid === 'undefined' || user.uid.length < 10) {
+      setLoading(false);
+      setError('No se pudo identificar al usuario. Por favor, cierra sesión y vuelve a ingresar.');
+      return;
+    }
+
     try {
       const [convs, posts] = await Promise.all([
         convocatoriaService.getConvocatoriasActivas(),
@@ -72,6 +80,10 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
 
   // ── Apply handler ────────────────────────────────────────────────────
   const handleApply = async (conv: Convocatoria) => {
+    if (!user.uid || user.uid === 'undefined') {
+      setError('No se pudo identificar al usuario. Por favor, cierra sesión y vuelve a ingresar.');
+      return;
+    }
     setApplyingId(conv.id);
     setApplySuccess(null);
     try {

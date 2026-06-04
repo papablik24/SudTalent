@@ -19,6 +19,8 @@ public class UserController {
     
     @Autowired
     private SoftDeleteService softDeleteService;
+
+    // ─── Admin endpoints ──────────────────────────────────────────
     
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")

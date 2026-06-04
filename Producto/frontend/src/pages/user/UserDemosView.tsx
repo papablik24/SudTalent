@@ -1,22 +1,20 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Upload, AudioLines, Film, FileAudio, Video, X, ChevronDown, Loader } from 'lucide-react';
+import { Plus, Upload, AudioLines, Film, X, ChevronDown, Loader } from 'lucide-react';
 import { UserProfile, VoiceDemo, DemoCategory, VisualGenre, MediaType, FileFormat, VISUAL_GENRES, DEMO_CATEGORIES } from '../../types';
 import { DemoItem } from '../../components/ui/DemoItem';
+import { AudioDropZone } from '../../components/ui/AudioDropZone';
 import { demoService, DemoDTO } from '../../services/demoService';
 
 // ─── Allowed formats ────────────────────────────────────────────────
 const AUDIO_FORMATS = ['MP3', 'WAV'] as const;
-const VIDEO_FORMATS = ['MP4', 'MOV'] as const;
-const ACCEPT_STRING = '.mp3,.wav,.mp4,.mov,audio/mpeg,audio/wav,video/mp4,video/quicktime';
+const ACCEPT_STRING = '.mp3,.wav,audio/mpeg,audio/wav';
 
 function detectFormat(file: File): { mediaType: MediaType; fileFormat: FileFormat } | null {
   const name = file.name.toLowerCase();
   const mime = file.type.toLowerCase();
   if (name.endsWith('.mp3') || mime.includes('mpeg')) return { mediaType: 'AUDIO', fileFormat: 'MP3' };
   if (name.endsWith('.wav') || mime.includes('wav'))  return { mediaType: 'AUDIO', fileFormat: 'WAV' };
-  if (name.endsWith('.mp4') || mime.includes('mp4'))  return { mediaType: 'VIDEO', fileFormat: 'MP4' };
-  if (name.endsWith('.mov') || mime.includes('quicktime')) return { mediaType: 'VIDEO', fileFormat: 'MOV' };
   return null;
 }
 
@@ -47,7 +45,6 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   const [isLoadingDemos, setIsLoadingDemos] = useState(true);
   const [form, setForm] = useState<DemoForm>(DEFAULT_FORM);
   const [fileError, setFileError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
 
   // ── Cargar demos desde backend ──────────────────────────────────────
   useEffect(() => {
@@ -90,16 +87,12 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   }, [user.uid]);
 
   // ── File picker handler ─────────────────────────────────────────────
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0] ?? null;
+  // ── File selected via AudioDropZone ────────────────────────────────
+  const handleFileSelected = (file: File) => {
     setFileError(null);
-    if (!file) {
-      setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }));
-      return;
-    }
     const detected = detectFormat(file);
     if (!detected) {
-      setFileError('Formato no permitido. Usa MP3, WAV, MP4 o MOV.');
+      setFileError('Formato no permitido. Usa MP3 o WAV.');
       setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }));
       return;
     }
@@ -150,7 +143,6 @@ export function UserDemosView({ user }: { user: UserProfile }) {
 
       // Reset form
       setForm(DEFAULT_FORM);
-      if (fileRef.current) fileRef.current.value = '';
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido al subir demo';
       setFileError(errorMessage);
@@ -241,67 +233,19 @@ export function UserDemosView({ user }: { user: UserProfile }) {
             </div>
 
             <form onSubmit={handleUploadDemo} className="space-y-5">
-              {/* File picker */}
+              {/* File dropzone */}
               <div className="space-y-2">
                 <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
                   Archivo de Demo *
                 </label>
-                <div
-                  onClick={() => fileRef.current?.click()}
-                  className={`relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed cursor-pointer transition-all ${
-                    form.file
-                      ? form.mediaType === 'VIDEO'
-                        ? 'border-sud-turquoise/40 bg-sud-turquoise/5'
-                        : 'border-sud-orange/40 bg-sud-orange/5'
-                      : 'border-white/10 hover:border-white/20 bg-black/20'
-                  }`}
-                >
-                  {form.file ? (
-                    <>
-                      {form.mediaType === 'VIDEO'
-                        ? <Film className="text-sud-turquoise" size={28} />
-                        : <AudioLines className="text-sud-orange" size={28} />
-                      }
-                      <p className="text-[10px] font-black text-center uppercase tracking-widest text-white">
-                        {form.file.name}
-                      </p>
-                      <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded-full ${
-                        form.mediaType === 'VIDEO'
-                          ? 'bg-sud-turquoise/20 text-sud-turquoise'
-                          : 'bg-sud-orange/20 text-sud-orange'
-                      }`}>
-                        {form.fileFormat} • {form.mediaType}
-                      </span>
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="text-slate-600" size={28} />
-                      <p className="text-[10px] font-black text-center uppercase tracking-widest text-slate-500">
-                        Haz clic para seleccionar<br />
-                        <span className="text-slate-600">MP3, WAV, MP4 o MOV</span>
-                      </p>
-                    </>
-                  )}
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept={ACCEPT_STRING}
-                    onChange={handleFileChange}
-                    className="hidden"
-                  />
-                </div>
-                <AnimatePresence>
-                  {fileError && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -4 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0 }}
-                      className="text-[10px] font-black text-red-400 uppercase tracking-widest px-1 flex items-center gap-1"
-                    >
-                      <X size={12} /> {fileError}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
+                <AudioDropZone
+                  file={form.file}
+                  isUploading={isUploading}
+                  error={fileError}
+                  onFileSelected={handleFileSelected}
+                  onClear={() => setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }))}
+                  hint="MP3 o WAV · Máximo 10MB"
+                />
               </div>
 
               {/* Title */}

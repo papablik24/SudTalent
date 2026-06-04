@@ -49,7 +49,8 @@ public class AuthDTOs {
             boolean active,
             boolean onboarded,
             String profileType,
-            String status
+            String status,
+            String profileImageUrl
     ) {}
 
     public record AuthResponse(

@@ -25,7 +25,7 @@ interface SidebarProps {
 
 export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: SidebarProps) {
   return (
-    <aside className="w-full md:w-72 sud-glass-sidebar flex flex-col p-8 space-y-10 backdrop-blur-3xl relative z-20">
+    <aside className="w-72 sud-glass-sidebar flex flex-col p-6 md:p-8 space-y-10 backdrop-blur-3xl relative z-20 h-full overflow-y-auto">
       <div className="flex flex-col">
         <button 
           onClick={() => onNavigate('/')}
@@ -116,7 +116,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
 
       <div className="pt-8 border-t border-white/5 space-y-6">
         <div className="flex items-center space-x-4 p-4 rounded-3xl bg-white/[0.02] border border-white/5">
-          <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] flex items-center justify-center shadow-lg shadow-sud-turquoise/10">
+          <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] flex items-center justify-center shadow-lg shadow-sud-turquoise/10 shrink-0">
             <div className="w-full h-full rounded-[0.9rem] bg-black flex items-center justify-center overflow-hidden">
               {user?.avatar ? (
                 <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
@@ -125,9 +125,23 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               )}
             </div>
           </div>
-          <div className="truncate flex-1">
-            <p className="text-sm font-black truncate text-white uppercase tracking-tight">{user?.name || (role === 'ADMIN' ? 'Admin' : 'Alumno')}</p>
-            <p className="text-[10px] text-slate-500 truncate uppercase tracking-widest font-bold">{role === 'ADMIN' ? 'Acceso Total' : user?.phone}</p>
+          <div className="truncate flex-1 min-w-0 space-y-0.5">
+            <p className="text-sm font-black truncate text-white uppercase tracking-tight">
+              {user?.name || (role === 'ADMIN' ? 'Admin' : 'Alumno')}
+            </p>
+            {user?.phone && (
+              <p className="text-[12px] text-slate-500 truncate font-mono">
+                {(() => {
+                  const d = user.phone.replace(/[^0-9]/g, '');
+                  const local = d.startsWith('56') ? d.slice(2) : d;
+                  const n = local.startsWith('9') ? local.slice(1) : local;
+                  return `+56 9 ${n.slice(0, 4)} ${n.slice(4)}`.trim();
+                })()}
+              </p>
+            )}
+            {user?.email && (
+              <p className="text-[10px] text-slate-600 truncate">{user.email}</p>
+            )}
           </div>
         </div>
         <button 

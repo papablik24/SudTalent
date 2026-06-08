@@ -14,8 +14,10 @@
 }
 
 @layer base {
-  body {
+  html, body {
     @apply bg-sud-black text-slate-100 antialiased font-sans;
+    overflow-x: hidden;
+    max-width: 100vw;
   }
 }
 

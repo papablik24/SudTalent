@@ -42,17 +42,14 @@ export function useAuth() {
       const savedUser = localStorage.getItem('sud_current_user');
       const token = localStorage.getItem('sud_jwt_token');
 
-      // Si hay usuario guardado, restaurarlo
       if (savedUser && token) {
         try {
           const user = JSON.parse(savedUser);
 
-          // ✅ Normalizar role: backend usa ALUMNO, frontend usa USER
           if (user.role && user.role !== 'ADMIN' && user.role !== 'USER') {
             user.role = 'USER';
           }
 
-          // ✅ Limpiar sesión si el uid es inválido (undefined, null, string corto)
           if (!user.uid || user.uid === 'undefined' || user.uid === 'null' || user.uid.length < 8) {
             console.warn('Session with invalid uid detected, clearing localStorage');
             authService.clearLocalAuth();
@@ -60,8 +57,7 @@ export function useAuth() {
             setLoading(false);
             return;
           }
-          
-          // ✅ PREVENT 403: Verify user is eligible
+
           if (!isUserEligible(user)) {
             console.warn('User not eligible for session:', user);
             authService.clearLocalAuth();
@@ -70,8 +66,28 @@ export function useAuth() {
             return;
           }
 
+          // Restaurar sesión local inmediatamente para no bloquear la UI
           setCurrentUser(user);
           setRole(user.role);
+
+          // Refrescar status desde el backend en segundo plano
+          try {
+            const fresh = await authService.me() as any;
+            const freshUser = fresh?.user ?? fresh;
+            const validStatuses: ProfileStatus[] = ['PENDING', 'APPROVED', 'INACTIVE'];
+            const refreshedStatus = freshUser?.status && validStatuses.includes(freshUser.status as ProfileStatus)
+              ? (freshUser.status as ProfileStatus)
+              : user.status;
+
+            if (refreshedStatus !== user.status) {
+              const updated = { ...user, status: refreshedStatus };
+              localStorage.setItem('sud_current_user', JSON.stringify(updated));
+              setCurrentUser(updated);
+            }
+          } catch {
+            // Si falla el refresco, mantener la sesión local (fallback offline)
+          }
+
         } catch (err) {
           console.error('Error restoring session:', err);
           authService.clearLocalAuth();

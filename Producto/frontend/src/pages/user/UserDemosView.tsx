@@ -62,17 +62,25 @@ export function UserDemosView({ user }: { user: UserProfile }) {
         const demoData = await demoService.getUserDemos(token);
         
         // Convertir DemoDTO a VoiceDemo para compatibilidad con DemoItem
-        const mappedDemos = demoData.map((demo: DemoDTO) => ({
-          id: demo.id,
-          userId: user.uid,
-          title: demo.title,
-          category: demo.category as DemoCategory || 'Doblaje',
-          fileUrl: demo.fileUrl,
-          duration: demo.durationSeconds ? `${Math.floor(demo.durationSeconds / 60)}:${String(demo.durationSeconds % 60).padStart(2, '0')}` : '—',
-          createdAt: demo.createdAt,
-          mediaType: demo.mediaType as MediaType,
-          fileFormat: demo.fileFormat as FileFormat | undefined,
-        }));
+        const mappedDemos = demoData.map((demo: DemoDTO) => {
+          // Normalizar mediaType: el backend puede devolver 'audio/mpeg', 'video/mp4', etc.
+          const rawType = (demo.mediaType || '').toLowerCase();
+          const normalizedType: MediaType = rawType.includes('video') ? 'VIDEO' : 'AUDIO';
+
+          return {
+            id: demo.id,
+            userId: user.uid,
+            title: demo.title,
+            category: demo.category as DemoCategory || 'Doblaje',
+            fileUrl: demo.fileUrl,
+            duration: demo.durationSeconds
+              ? `${Math.floor(demo.durationSeconds / 60)}:${String(demo.durationSeconds % 60).padStart(2, '0')}`
+              : '—',
+            createdAt: demo.createdAt,
+            mediaType: normalizedType,
+            fileFormat: demo.fileFormat as FileFormat | undefined,
+          };
+        });
 
         setDemos(mappedDemos);
         console.log('✅ Demos cargadas:', mappedDemos.length);
@@ -177,8 +185,17 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   };
 
   // ── Derived stats ────────────────────────────────────────────────────
-  const audioCount = demos.filter(d => !d.mediaType || d.mediaType === 'AUDIO').length;
-  const videoCount = demos.filter(d => d.mediaType === 'VIDEO').length;
+  const isAudioDemo = (d: VoiceDemo) =>
+    !d.mediaType ||
+    d.mediaType === 'AUDIO' ||
+    (d.mediaType as string).toLowerCase().includes('audio');
+
+  const isVideoDemo = (d: VoiceDemo) =>
+    d.mediaType === 'VIDEO' ||
+    (d.mediaType as string).toLowerCase().includes('video');
+
+  const audioCount = demos.filter(isAudioDemo).length;
+  const videoCount = demos.filter(isVideoDemo).length;
 
   // ── Render ───────────────────────────────────────────────────────────
   return (

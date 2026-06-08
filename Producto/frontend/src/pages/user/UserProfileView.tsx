@@ -30,11 +30,14 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Audio de perfil
+  // Audio de perfil — estados del flujo
   const [profileAudio, setProfileAudio] = useState<string | null>(null);
+  const [pendingAudio, setPendingAudio] = useState<string | null>(null); // audio subido pero sin confirmar
   const [isUploadingAudio, setIsUploadingAudio] = useState(false);
   const [audioError, setAudioError] = useState<string | null>(null);
   const [isLoadingAudio, setIsLoadingAudio] = useState(true);
+  const [showAudioManager, setShowAudioManager] = useState(false); // panel de gestión
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Sincronizar editData cuando cambia el usuario
@@ -193,7 +196,8 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
       const token = localStorage.getItem('sud_jwt_token');
       if (!token) throw new Error('No hay sesión activa');
       const result = await audioService.uploadAudio(file, 'profile', token);
-      setProfileAudio(result.fileUrl);
+      // Guardar como pendiente — esperar confirmación del usuario
+      setPendingAudio(result.fileUrl);
       localStorage.setItem(`profileAudio_${user.uid}`, result.fileUrl);
     } catch (err: any) {
       setAudioError(err instanceof Error ? err.message : 'Error desconocido');
@@ -203,8 +207,33 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
     }
   };
 
+  const handleConfirmAudio = () => {
+    if (!pendingAudio) return;
+    setProfileAudio(pendingAudio);
+    setPendingAudio(null);
+    setShowAudioManager(false);
+  };
+
+  const handleCancelPendingAudio = async () => {
+    // Eliminar el audio recién subido si el usuario cancela
+    if (pendingAudio) {
+      try {
+        const token = localStorage.getItem('sud_jwt_token');
+        if (token) {
+          const audios = await audioService.getUserAudios(token, 'profile');
+          // Eliminar solo el que coincide con pendingAudio
+          const match = audios?.find((a: any) => a.fileUrl === pendingAudio);
+          if (match) await audioService.deleteAudio(match.id, token);
+        }
+      } catch { /* silencioso */ }
+    }
+    setPendingAudio(null);
+    setAudioError(null);
+  };
+
   const handleDeleteAudio = async () => {
-    if (!profileAudio || !confirm('¿Eliminar tu audio de perfil?')) return;
+    if (!profileAudio) return;
+    setConfirmingDelete(false);
     setIsUploadingAudio(true);
     try {
       const token = localStorage.getItem('sud_jwt_token');
@@ -213,6 +242,7 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
       if (audios?.length > 0) {
         await audioService.deleteAudio(audios[0].id, token);
         setProfileAudio(null);
+        setShowAudioManager(false);
         localStorage.removeItem(`profileAudio_${user.uid}`);
       }
     } catch { setAudioError('Error al eliminar el audio'); }
@@ -223,39 +253,163 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
     <div className="space-y-10">
 
       {/* ── Audio de Perfil ── */}
-      <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+      <section className="relative bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
         <div className="flex items-center gap-3">
           <AudioLines className="text-sud-orange" size={24} />
           <h3 className="text-xl font-black uppercase tracking-tighter text-white">Audio de Perfil</h3>
         </div>
+
+        {/* Botón de gestión — esquina superior derecha de la sección, solo cuando hay audio */}
+        {profileAudio && !isLoadingAudio && (
+          <button
+            onClick={() => { setShowAudioManager(v => !v); setAudioError(null); setConfirmingDelete(false); }}
+            className={`absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showAudioManager ? 'bg-white/20 text-white' : 'bg-white/5 hover:bg-white/15 text-slate-500 hover:text-slate-300'}`}
+            title="Gestionar audio"
+          >
+            <Settings size={14} />
+          </button>
+        )}
+
         {isLoadingAudio ? (
+          /* ── Cargando ── */
           <div className="flex items-center justify-center py-8">
             <div className="w-8 h-8 border-2 border-sud-orange/30 border-t-sud-orange rounded-full animate-spin" />
           </div>
-        ) : profileAudio ? (
+
+        ) : pendingAudio ? (
+          /* ── Estado 2: Audio subido, esperando confirmación ── */
           <div className="space-y-4">
-            <AudioPlayer src={profileAudio} title="Mi audio de perfil" onDownload={() => audioService.downloadAudio(profileAudio, 'mi-audio.mp3')} />
-            <AudioDropZone file={null} isUploading={isUploadingAudio} error={audioError}
-              onFileSelected={(file) => { const dt = new DataTransfer(); dt.items.add(file); handleAudioUpload({ target: { files: dt.files } } as any); }}
-              hint="Arrastra un nuevo archivo para reemplazar el audio actual" />
-            <button onClick={handleDeleteAudio} disabled={isUploadingAudio}
-              className="flex items-center gap-2 px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-lg transition-all">
-              {isUploadingAudio ? <Loader size={14} className="animate-spin" /> : <Trash2 size={14} />}
-              Eliminar Audio
-            </button>
+            <div className="p-4 rounded-2xl bg-sud-orange/10 border border-sud-orange/20">
+              <p className="text-[10px] font-black uppercase tracking-widest text-sud-orange mb-3 flex items-center gap-2">
+                <span className="w-2 h-2 bg-sud-orange rounded-full animate-pulse" />
+                Previsualiza tu audio antes de confirmar
+              </p>
+              <AudioPlayer src={pendingAudio} title="Audio nuevo" showVolume />
+            </div>
+
+            {audioError && (
+              <p className="text-red-400 text-xs font-bold px-1">{audioError}</p>
+            )}
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleConfirmAudio}
+                disabled={isUploadingAudio}
+                className="flex-1 py-3 bg-sud-orange hover:bg-sud-orange/80 disabled:opacity-50 text-black font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all"
+              >
+                ✓ Confirmar Audio
+              </button>
+              <button
+                onClick={handleCancelPendingAudio}
+                disabled={isUploadingAudio}
+                className="flex-1 py-3 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all"
+              >
+                Cancelar
+              </button>
+            </div>
           </div>
+
+        ) : profileAudio ? (
+          /* ── Estado 3: Audio confirmado ── */
+          <div className="space-y-4">
+          {/* Player principal */}
+            <div className="relative">
+              <AudioPlayer
+                src={profileAudio}
+                title="Mi audio de perfil"
+                showVolume
+                onDownload={() => audioService.downloadAudio(profileAudio, 'mi-audio.mp3')}
+              />
+            </div>
+
+            {/* Panel de gestión */}
+            {showAudioManager && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
+
+                {audioError && (
+                  <p className="text-red-400 text-xs font-bold">{audioError}</p>
+                )}
+
+                {/* Cambiar audio */}
+                <div>
+                  <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2">Reemplazar audio</p>
+                  <AudioDropZone
+                    file={null}
+                    isUploading={isUploadingAudio}
+                    error={null}
+                    onFileSelected={(file) => {
+                      const dt = new DataTransfer(); dt.items.add(file);
+                      handleAudioUpload({ target: { files: dt.files } } as any);
+                    }}
+                    hint="Sube un nuevo archivo para reemplazar el actual"
+                  />
+                </div>
+
+                {/* Eliminar */}
+                <div className="pt-2 border-t border-white/5">
+                  {!confirmingDelete ? (
+                    <button
+                      onClick={() => setConfirmingDelete(true)}
+                      disabled={isUploadingAudio}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 disabled:opacity-50 text-red-400 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all"
+                    >
+                      <Trash2 size={13} /> Eliminar audio
+                    </button>
+                  ) : (
+                    <div className="space-y-2">
+                      <p className="text-[10px] text-red-400 font-black uppercase tracking-widest">
+                        ¿Seguro que quieres eliminar tu audio de perfil?
+                      </p>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleDeleteAudio}
+                          disabled={isUploadingAudio}
+                          className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
+                        >
+                          {isUploadingAudio ? <Loader size={12} className="animate-spin" /> : <Trash2 size={12} />}
+                          Sí, eliminar
+                        </button>
+                        <button
+                          onClick={() => setConfirmingDelete(false)}
+                          className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all"
+                        >
+                          Cancelar
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
         ) : (
-          <AudioDropZone file={null} isUploading={isUploadingAudio} error={audioError}
-            onFileSelected={(file) => { const dt = new DataTransfer(); dt.items.add(file); handleAudioUpload({ target: { files: dt.files } } as any); }}
-            hint="MP3 o WAV · Máximo 10MB" />
+          /* ── Estado 1: Sin audio ── */
+          <div className="space-y-3">
+            <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest">
+              Sube tu audio de presentación
+            </p>
+            <AudioDropZone
+              file={null}
+              isUploading={isUploadingAudio}
+              error={audioError}
+              onFileSelected={(file) => {
+                const dt = new DataTransfer(); dt.items.add(file);
+                handleAudioUpload({ target: { files: dt.files } } as any);
+              }}
+              hint="MP3 o WAV · Máximo 10MB"
+            />
+          </div>
         )}
-        <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/wav,.mp3,.wav" onChange={handleAudioUpload} disabled={isUploadingAudio} className="hidden" />
+
+        <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/wav,.mp3,.wav"
+          onChange={handleAudioUpload} disabled={isUploadingAudio} className="hidden" />
       </section>
 
       {/* ── Header con foto de perfil ── */}
       <section className="relative rounded-[3rem] overflow-hidden bg-black border border-white/10 shadow-2xl">
         <div className="h-48 sud-vibrant-gradient opacity-10 blur-3xl absolute -top-24 w-full" />
-        <div className="p-10 relative flex flex-col md:flex-row items-center md:items-end gap-8">
+        <div className="p-6 md:p-10 relative flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8">
 
           {/* Avatar */}
           <div className="relative flex-shrink-0 group">
@@ -292,7 +446,7 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
 
           <div className="flex-1 text-center md:text-left space-y-2">
             <div className="flex flex-wrap items-center justify-center md:justify-start gap-4">
-              <h2 className="text-4xl font-black tracking-tighter text-white">
+              <h2 className="text-2xl md:text-4xl font-black tracking-tighter text-white break-words">
                 {user.profileType === 'PARENT' ? profile?.childName : user.name}
               </h2>
               <span className="px-3 py-1.5 rounded-full bg-sud-turquoise/10 text-sud-turquoise text-[10px] font-black uppercase tracking-widest border border-sud-turquoise/20">
@@ -308,13 +462,13 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
             )}
           </div>
 
-          <div className="flex gap-4">
-            <button onClick={onNavigateToDemos} className="sud-btn-secondary px-10 py-5 rounded-3xl shadow-2xl">
+          <div className="flex gap-3 md:gap-4 shrink-0">
+            <button onClick={onNavigateToDemos} className="sud-btn-secondary px-6 md:px-10 py-4 md:py-5 rounded-3xl shadow-2xl text-sm">
               Mis Demos
             </button>
             <button onClick={() => { setIsEditing(!isEditing); setSaveError(null); }}
-              className={`p-5 rounded-3xl border transition-all ${isEditing ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-white/10 text-white/40 hover:text-white'}`}>
-              <Settings size={20} />
+              className={`p-4 md:p-5 rounded-3xl border transition-all ${isEditing ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-white/10 text-white/40 hover:text-white'}`}>
+              <Settings size={18} />
             </button>
           </div>
         </div>
@@ -432,18 +586,48 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
         {/* Estado del Perfil */}
         <div className="md:col-span-4 space-y-6">
           <h3 className="text-xl font-black uppercase tracking-tighter text-white px-2">Estado del Perfil</h3>
-          <div className="bg-white/5 border border-white/10 rounded-[2.5rem] p-8 space-y-6 shadow-2xl backdrop-blur-md relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-24 h-24 bg-sud-yellow/5 blur-3xl rounded-full" />
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-sud-yellow/10 flex items-center justify-center">
-                <div className="w-3 h-3 bg-sud-yellow rounded-full animate-pulse" />
+          {(() => {
+            const status = user.status || 'PENDING';
+            const config = {
+              PENDING: {
+                bg: 'bg-sud-yellow/5',
+                dot: 'bg-sud-yellow animate-pulse',
+                dotBg: 'bg-sud-yellow/10',
+                border: 'border-white/10',
+                label: 'Revisión Pendiente',
+                desc: 'Tu perfil está siendo revisado por el equipo de casting. Una vez aprobado, aparecerás en las búsquedas internas.',
+              },
+              APPROVED: {
+                bg: 'bg-sud-turquoise/5',
+                dot: 'bg-sud-turquoise',
+                dotBg: 'bg-sud-turquoise/10',
+                border: 'border-sud-turquoise/20',
+                label: 'Perfil Aprobado',
+                desc: 'Tu perfil ha sido aprobado. Ya apareces en las búsquedas internas del equipo de casting.',
+              },
+              INACTIVE: {
+                bg: 'bg-red-500/5',
+                dot: 'bg-red-500',
+                dotBg: 'bg-red-500/10',
+                border: 'border-red-500/20',
+                label: 'Perfil Inactivo',
+                desc: 'Tu perfil ha sido desactivado. Contacta con el equipo de SudTalent para más información.',
+              },
+            } as const;
+            const c = config[status as keyof typeof config] ?? config.PENDING;
+            return (
+              <div className={`${c.bg} border ${c.border} rounded-[2.5rem] p-8 space-y-6 shadow-2xl backdrop-blur-md relative overflow-hidden`}>
+                <div className={`absolute top-0 right-0 w-24 h-24 ${c.dotBg} blur-3xl rounded-full`} />
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl ${c.dotBg} flex items-center justify-center`}>
+                    <div className={`w-3 h-3 ${c.dot} rounded-full`} />
+                  </div>
+                  <p className="text-sm font-bold text-white leading-tight uppercase tracking-widest">{c.label}</p>
+                </div>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium">{c.desc}</p>
               </div>
-              <p className="text-sm font-bold text-white leading-tight uppercase tracking-widest">Revisión Pendiente</p>
-            </div>
-            <p className="text-xs text-slate-500 leading-relaxed font-medium">
-              Tu perfil está siendo revisado por el equipo de casting. Una vez aprobado, aparecerás en las búsquedas internas.
-            </p>
-          </div>
+            );
+          })()}
         </div>
       </div>
     </div>

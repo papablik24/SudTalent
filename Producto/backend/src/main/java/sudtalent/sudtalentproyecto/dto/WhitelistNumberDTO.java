@@ -20,6 +20,8 @@ public class WhitelistNumberDTO {
     private String email;
     private String status;
     private String category;
+    private UUID userId;       // ← FK al usuario registrado
+    private String userStatus; // ← status del usuario en la tabla users
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

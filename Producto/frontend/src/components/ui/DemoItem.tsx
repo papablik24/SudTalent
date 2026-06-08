@@ -24,7 +24,7 @@ interface DemoItemProps {
 
 export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isVideo = demo.mediaType === 'VIDEO';
+  const isVideo = demo.mediaType === 'VIDEO' || (demo.mediaType as string)?.toLowerCase().includes('video');
   const genreColor = demo.visualGenre ? (GENRE_COLORS[demo.visualGenre] ?? GENRE_COLORS['Otro']) : null;
 
   const formatDate = (val: any): string => {
@@ -162,7 +162,7 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
       {/* Player - expanded view for audio only */}
       {isExpanded && !isVideo && (
         <div className="px-6 pb-6 border-t border-white/5 pt-4">
-          <AudioPlayer src={demo.fileUrl} title={demo.title} onDownload={handleDownload} />
+          <AudioPlayer src={demo.fileUrl} title={demo.title} onDownload={handleDownload} showVolume />
         </div>
       )}
     </div>

@@ -56,7 +56,7 @@ public class WhitelistService {
     }
 
     public List<WhitelistNumberDTO> getAllNumbers() {
-        return repository.findAll().stream()
+        return repository.findAllWithUser().stream()
             .map(this::toDTO)
             .collect(Collectors.toList());
     }
@@ -344,6 +344,10 @@ public class WhitelistService {
             .email(number.getEmail())
             .category(number.getCategory())
             .status(number.getStatus().toString())
+            .userId(number.getUser() != null ? number.getUser().getId() : null)
+            .userStatus(number.getUser() != null && number.getUser().getStatus() != null
+                ? number.getUser().getStatus().name()
+                : null)
             .createdAt(number.getCreatedAt())
             .updatedAt(number.getUpdatedAt())
             .build();

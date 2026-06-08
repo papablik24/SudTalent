@@ -148,6 +148,7 @@ export default function App() {
                   onAdd={addToWhitelist}
                   onRemove={removeFromWhitelist}
                   onUpdate={updateStudent}
+                  onUpdateStatus={updateUserStatus}
                 />
               </MainLayout>
             </ProtectedRoute>

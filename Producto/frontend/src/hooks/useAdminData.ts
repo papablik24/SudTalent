@@ -20,22 +20,14 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     setLoading(true);
     setError(null);
     try {
-      // Cargar whitelist desde el backend
-      const whitelistData = await backendService.getWhitelist();
-      const mapped: WhitelistEntry[] = whitelistData.map((w: any) => ({
-        phone: w.phone,
-        name: w.name || '',
-        email: w.email || '', // ✅ Asegurar que se incluya email
-        category: w.category || 'NONE',
-        addedAt: w.createdAt,
-        addedBy: 'admin',
-        status: w.status,
-      }));
-      setWhitelist(mapped);
+      // Cargar whitelist y usuarios en paralelo
+      const [whitelistData, usuariosData] = await Promise.all([
+        backendService.getWhitelist(),
+        backendService.getAllUsers(),
+      ]);
 
-      // Cargar usuarios desde el backend
-      const usuarios = await backendService.getAllUsers();
-      const mappedUsers: UserProfile[] = usuarios.map((u: any) => ({
+      // Mapear usuarios primero
+      const mappedUsers: UserProfile[] = usuariosData.map((u: any) => ({
         uid: String(u.id),
         phone: u.phone || '',
         role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
@@ -47,10 +39,38 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
         createdAt: u.createdAt,
       }));
       setAllUsers(mappedUsers);
+
+      // Mapear whitelist — ahora el backend incluye userId y userStatus directamente
+      const mapped: WhitelistEntry[] = whitelistData.map((w: any) => {
+        // Preferir userId del backend; si no viene, intentar match por email como fallback
+        const matchedByEmail = !w.userId
+          ? mappedUsers.find(u => {
+              const uEmail = (u.email || '').toLowerCase().trim();
+              const wEmail = (w.email || '').toLowerCase().trim();
+              return uEmail && wEmail && uEmail === wEmail;
+            })
+          : null;
+
+        const uid = w.userId ? String(w.userId) : matchedByEmail?.uid;
+        const userStatus = w.userStatus || matchedByEmail?.status;
+
+        return {
+          phone: w.phone,
+          name: w.name || '',
+          email: w.email || '',
+          category: w.category || 'NONE',
+          addedAt: w.createdAt,
+          addedBy: 'admin',
+          status: userStatus || w.status,
+          uid,
+          userStatus,
+        } as any;
+      });
+      setWhitelist(mapped);
+
     } catch (err: any) {
       console.error('Error cargando datos del backend:', err);
-      const errorMsg = err.message || 'Error al cargar datos. Verifica que el backend esté corriendo.';
-      setError(errorMsg);
+      setError(err.message || 'Error al cargar datos. Verifica que el backend esté corriendo.');
     } finally {
       setLoading(false);
     }
@@ -127,7 +147,10 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     try {
       setError(null);
       await backendService.updateUserStatus(userId, status);
+      // Actualizar allUsers
       setAllUsers(prev => prev.map(u => u.uid === userId ? { ...u, status } : u));
+      // Actualizar también whitelist (que tiene uid del usuario enriquecido)
+      setWhitelist(prev => prev.map((w: any) => w.uid === userId ? { ...w, status, userStatus: status } : w));
     } catch (err: any) {
       setError(err.message || 'Error al actualizar estado');
       throw err;

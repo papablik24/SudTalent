@@ -53,6 +53,9 @@ public class UserController {
             map.put("status", u.getStatus() != null ? u.getStatus().name() : "PENDING");
             map.put("active", u.isActive());
             map.put("onboarded", u.isOnboarded());
+            map.put("profileImageUrl", u.getProfileImageUrl() != null ? u.getProfileImageUrl() : "");
+            map.put("age", u.getAge() != null ? u.getAge() : 0);
+            map.put("bio", u.getBio() != null ? u.getBio() : "");
             map.put("profileType", u.getProfileType() != null ? u.getProfileType().name() : "");
             map.put("createdAt", u.getCreatedAt());
             return map;

@@ -5,6 +5,7 @@ import { audioService } from '../../services/audioService';
 import { fetchAPI } from '../../services/backendService';
 import { AudioPlayer } from '../../components/ui/AudioPlayer';
 import { AudioDropZone } from '../../components/ui/AudioDropZone';
+import { InstagramFeed } from '../../components/InstagramFeed';
 
 interface UserProfileViewProps {
   user: UserProfile;
@@ -49,6 +50,38 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
       bio: user.bio || '',
     });
     if (user.avatar) setAvatarUrl(user.avatar);
+  }, [user.uid]);
+
+  // Cargar datos frescos desde el backend al montar (para age, bio, phone que pueden no estar en localStorage)
+  useEffect(() => {
+    const loadProfileFromBackend = async () => {
+      try {
+        const data = await fetchAPI<any>('/profile');
+        setEditData(prev => ({
+          ...prev,
+          phone: data.phone || prev.phone,
+          age: data.age || prev.age,
+          bio: data.bio || prev.bio,
+        }));
+        if (data.profileImageUrl) setAvatarUrl(data.profileImageUrl);
+        // Actualizar localStorage con datos frescos
+        const savedUser = localStorage.getItem('sud_current_user');
+        if (savedUser) {
+          const parsed = JSON.parse(savedUser);
+          const updated = {
+            ...parsed,
+            phone: data.phone || parsed.phone,
+            age: data.age || parsed.age,
+            bio: data.bio || parsed.bio,
+            avatar: data.profileImageUrl || parsed.avatar,
+          };
+          localStorage.setItem('sud_current_user', JSON.stringify(updated));
+        }
+      } catch {
+        // Si falla, usar los datos del localStorage que ya están cargados
+      }
+    };
+    loadProfileFromBackend();
   }, [user.uid]);
 
   useEffect(() => {
@@ -630,6 +663,9 @@ export function UserProfileView({ user, onNavigateToDemos, onUpdateUser }: UserP
           })()}
         </div>
       </div>
+
+      {/* ── Feed de Instagram ── */}
+      <InstagramFeed />
     </div>
   );
 }

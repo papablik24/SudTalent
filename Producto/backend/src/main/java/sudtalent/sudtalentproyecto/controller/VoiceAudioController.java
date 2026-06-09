@@ -122,6 +122,23 @@ public class VoiceAudioController {
     }
 
     /**
+     * 📋 Admin: Obtener demos de cualquier usuario por ID
+     * GET /api/voice-audios/user/{userId}
+     */
+    @GetMapping("/user/{userId}")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_ALUMNO', 'ROLE_PROFESOR')")
+    public ResponseEntity<?> getUserAudiosByAdmin(@PathVariable UUID userId,
+            @RequestParam(value = "category", required = false) String category) {
+        try {
+            List<VoiceAudioDTO> audios = voiceAudioService.getUserAudios(userId, category);
+            return ResponseEntity.ok(audios);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error obteniendo audios: " + e.getMessage()));
+        }
+    }
+
+    /**
      * 📋 Obtener audios del usuario
      * GET /api/voice-audios?category=profile
      */

@@ -16,5 +16,8 @@ public interface AlumnoRepository extends SoftDeleteRepository<Alumno> {
     
     @Query("SELECT a FROM Alumno a WHERE a.id = ?1 AND a.deletedAt IS NULL")
     Optional<Alumno> findByIdActive(UUID id);
+
+    @Query("SELECT a FROM Alumno a WHERE a.email = ?1 AND a.deletedAt IS NULL")
+    Optional<Alumno> findByEmailActive(String email);
 }
 

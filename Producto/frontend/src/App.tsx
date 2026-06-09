@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { MainLayout } from './layouts/MainLayout';
 import { AuthScreen } from './pages/AuthScreen';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -20,6 +20,15 @@ import { authService } from './services/backendService';
 import { UserProfile, TalentProfile } from './types';
 
 export default function App() {
+  return (
+    <Router>
+      <AppRoutes />
+    </Router>
+  );
+}
+
+function AppRoutes() {
+  const navigate = useNavigate();
   const { 
     currentUser, 
     role, 
@@ -95,9 +104,8 @@ export default function App() {
   const needsOnboarding = currentUser && role === 'USER' && !currentUser.onboarded;
 
   return (
-    <Router>
-      <div className="min-h-screen selection:bg-sud-orange selection:text-white bg-[#0a0a0a] text-slate-100">
-        <Routes>
+    <div className="min-h-screen selection:bg-sud-orange selection:text-white bg-[#0a0a0a] text-slate-100">
+      <Routes>
           {/* ── Auth ──────────────────────────────────────────── */}
           <Route path="/auth" element={
             currentUser ? <Navigate to="/" replace /> : (
@@ -133,7 +141,8 @@ export default function App() {
                 <AdminDashboard 
                   whitelist={whitelist} 
                   users={allUsers} 
-                  onNavigate={(path) => window.location.pathname = path}
+                  onNavigate={(path) => navigate(path)}
+                  onUpdateStatus={updateUserStatus}
                 />
               </MainLayout>
             </ProtectedRoute>
@@ -201,7 +210,7 @@ export default function App() {
                 <MainLayout user={currentUser} role="USER" onLogout={logout}>
                   <UserProfileView 
                     user={currentUser!} 
-                    onNavigateToDemos={() => window.location.pathname = '/demos'} 
+                    onNavigateToDemos={() => navigate('/demos')} 
                     onUpdateUser={(updated) => setCurrentUser(prev => prev ? { ...prev, ...updated } : null)}
                   />
                 </MainLayout>
@@ -248,6 +257,5 @@ export default function App() {
           } />
         </Routes>
       </div>
-    </Router>
   );
 }

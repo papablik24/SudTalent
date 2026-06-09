@@ -28,6 +28,28 @@ public class ProfileController {
     private SupabaseStorageService supabaseStorageService;
 
     /**
+     * GET /api/profile — obtiene los datos del perfil del usuario autenticado.
+     */
+    @GetMapping
+    @PreAuthorize("hasAnyAuthority('ROLE_ALUMNO', 'ROLE_ADMIN', 'ROLE_PROFESOR')")
+    public ResponseEntity<?> getMyProfile(Authentication auth) {
+        String email = auth.getName();
+        return userRepository.findByEmailActive(email).map(user -> {
+            var map = new java.util.HashMap<String, Object>();
+            map.put("id", user.getId());
+            map.put("name", user.getName() != null ? user.getName() : "");
+            map.put("email", user.getEmail() != null ? user.getEmail() : "");
+            map.put("phone", user.getPhone() != null ? user.getPhone() : "");
+            map.put("age", user.getAge() != null ? user.getAge() : 0);
+            map.put("bio", user.getBio() != null ? user.getBio() : "");
+            map.put("profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : "");
+            map.put("profileType", user.getProfileType() != null ? user.getProfileType().name() : "");
+            map.put("status", user.getStatus() != null ? user.getStatus().name() : "PENDING");
+            return ResponseEntity.ok((Object) map);
+        }).orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
      * PUT /api/profile — actualiza phone, age, bio del usuario autenticado.
      */
     @PutMapping

@@ -2,17 +2,18 @@ package sudtalent.sudtalentproyecto.service;
 
 import sudtalent.sudtalentproyecto.dto.PostulacionDTO;
 import sudtalent.sudtalentproyecto.dto.PostulacionRequestDTO;
-import sudtalent.sudtalentproyecto.model.Alumno;
 import sudtalent.sudtalentproyecto.model.Convocatoria;
 import sudtalent.sudtalentproyecto.model.Postulacion;
-import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
-import sudtalent.sudtalentproyecto.repository.ConvocatoriaRepository;
+import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
+import sudtalent.sudtalentproyecto.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
@@ -24,35 +25,32 @@ import java.util.stream.Collectors;
 public class PostulacionService {
 
     private final PostulacionRepository postulacionRepository;
-    private final AlumnoRepository alumnoRepository;
-    private final ConvocatoriaRepository convocatoriaRepository;
     private final SoftDeleteService softDeleteService;
+    private final UserRepository userRepository;
+
+    @PersistenceContext
+    private EntityManager entityManager;
 
     // ── Create ───────────────────────────────────────────────────────────
 
-    /**
-     * Crea una postulación a partir del DTO.
-     * El alumnoId puede venir en el body o extraerse del JWT (email como principal).
-     */
     public PostulacionDTO createPostulacion(PostulacionRequestDTO request, Authentication authentication) {
-        // Resolver alumno
-        Alumno alumno = resolveAlumno(request.getAlumnoId(), authentication);
+        UUID userUUID = resolveUserId(request.getAlumnoId(), authentication);
 
-        // Resolver convocatoria
-        Convocatoria convocatoria = convocatoriaRepository.findById(request.getConvocatoriaId())
-                .orElseThrow(() -> new RuntimeException("Convocatoria no encontrada: " + request.getConvocatoriaId()));
-
-        // Verificar que no exista una postulación activa duplicada
-        boolean yaPostulo = postulacionRepository.findByAlumnoId(alumno.getId())
+        // Verificar duplicado
+        boolean yaPostulo = postulacionRepository.findByAlumnoId(userUUID)
                 .stream()
-                .anyMatch(p -> p.getConvocatoria().getId().equals(convocatoria.getId()));
+                .anyMatch(p -> p.getConvocatoria().getId().equals(request.getConvocatoriaId()));
         if (yaPostulo) {
             throw new RuntimeException("Ya existe una postulación activa para esta convocatoria");
         }
 
+        // Usar getReference para evitar cargar entidades completas
+        User userRef = entityManager.getReference(User.class, userUUID);
+        Convocatoria convRef = entityManager.getReference(Convocatoria.class, request.getConvocatoriaId());
+
         Postulacion postulacion = Postulacion.builder()
-                .alumno(alumno)
-                .convocatoria(convocatoria)
+                .alumno(userRef)
+                .convocatoria(convRef)
                 .fechaPostulacion(LocalDate.now())
                 .estado("PENDIENTE")
                 .mensaje(request.getMensaje())
@@ -105,47 +103,35 @@ public class PostulacionService {
     // ── Helpers ──────────────────────────────────────────────────────────
 
     /**
-     * Resuelve el Alumno: primero intenta alumnoId del body,
-     * si no viene usa el email del JWT para buscarlo.
+     * Resuelve el UUID del usuario desde el JWT o el body.
+     * Directo de UserRepository — no usa AlumnoRepository.
      */
-    private Alumno resolveAlumno(UUID alumnoId, Authentication authentication) {
-        if (alumnoId != null) {
-            return alumnoRepository.findByIdActive(alumnoId)
-                    .orElseThrow(() -> new RuntimeException("Alumno no encontrado: " + alumnoId));
+    private UUID resolveUserId(UUID alumnoId, Authentication authentication) {
+        if (alumnoId != null && userRepository.findByIdActive(alumnoId).isPresent()) {
+            return alumnoId;
         }
-        // Extraer desde el JWT (el principal es el email del usuario)
         if (authentication == null || authentication.getName() == null) {
-            throw new RuntimeException("No se pudo determinar el alumno: sin autenticación");
+            throw new RuntimeException("No se pudo determinar el usuario: sin autenticación");
         }
         String email = authentication.getName();
-        // Buscar al usuario por email y castear a Alumno
-        return alumnoRepository.findAll().stream()
-                .filter(a -> email.equals(a.getEmail()) && a.getDeletedAt() == null)
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("Alumno no encontrado para el usuario: " + email));
+        return userRepository.findByEmailActive(email)
+                .map(User::getId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado: " + email));
     }
 
-    /**
-     * Convierte Postulacion → PostulacionDTO con datos enriquecidos.
-     * Alumno hereda de User: usa getName(), getEmail(), getPhone().
-     * Convocatoria usa getTitulo() y getCategoria().
-     */
     private PostulacionDTO toDTO(Postulacion p) {
-        Alumno alumno = p.getAlumno();
+        User user = p.getAlumno();
         Convocatoria conv = p.getConvocatoria();
 
         return PostulacionDTO.builder()
                 .id(p.getId())
-                .alumnoId(alumno != null ? alumno.getId() : null)
+                .alumnoId(user != null ? user.getId() : null)
                 .convocatoriaId(conv != null ? conv.getId() : null)
-                // Alumno hereda getName() / getEmail() / getPhone() de User
-                .userName(alumno != null ? alumno.getName() : null)
-                .userEmail(alumno != null ? alumno.getEmail() : null)
-                .userPhone(alumno != null ? alumno.getPhone() : null)
-                // Convocatoria campos nuevos
+                .userName(user != null ? user.getName() : null)
+                .userEmail(user != null ? user.getEmail() : null)
+                .userPhone(user != null ? user.getPhone() : null)
                 .convocatoriaTitulo(conv != null ? conv.getTitulo() : null)
                 .convocatoriaCategoria(conv != null ? conv.getCategoria() : null)
-                // Postulacion
                 .fechaPostulacion(p.getFechaPostulacion())
                 .estado(p.getEstado())
                 .createdAt(p.getCreatedAt())

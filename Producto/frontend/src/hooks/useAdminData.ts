@@ -36,6 +36,9 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
         email: u.email || '',
         status: u.status || 'PENDING',
         profileType: u.profileType || undefined,
+        avatar: u.profileImageUrl || undefined,
+        age: u.age,
+        bio: u.bio || '',
         createdAt: u.createdAt,
       }));
       setAllUsers(mappedUsers);

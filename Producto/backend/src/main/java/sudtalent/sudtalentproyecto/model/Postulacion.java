@@ -50,9 +50,10 @@ public class Postulacion {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
     
+    /** Referencia directa a User — no requiere tabla alumnos */
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "alumno_id", nullable = false)
-    private Alumno alumno;
+    private User alumno;
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "convocatoria_id", nullable = false)

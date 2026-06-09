@@ -1,61 +1,48 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import sudtalent.sudtalentproyecto.model.Alumno;
-import sudtalent.sudtalentproyecto.service.AlumnoService;
-import sudtalent.sudtalentproyecto.service.SoftDeleteService;
-import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import jakarta.validation.Valid;
+import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
+
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
+/**
+ * GET /api/alumnos — lista de alumnos enrolados con datos heredados de users.
+ * Solo accesible por administradores.
+ */
 @RestController
 @RequestMapping("/api/alumnos")
-@RequiredArgsConstructor
 public class AlumnoController {
-    private final AlumnoService alumnoService;
-    private final SoftDeleteService softDeleteService;
-    
+
+    @Autowired
+    private AlumnoRepository alumnoRepository;
+
+    /**
+     * Devuelve todos los alumnos enrolados (con fila en tabla alumnos)
+     * junto con sus datos relevantes heredados de users.
+     */
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<Alumno>> getAllAlumnos() {
-        return ResponseEntity.ok(alumnoService.getAllAlumnos());
-    }
-    
-    // ✅ CAMBIO: UUID
-    @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Alumno> getAlumnoById(@PathVariable UUID id) {
-        return ResponseEntity.ok(alumnoService.getAlumnoById(id));
-    }
-    
-    @PostMapping
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Alumno> createAlumno(@Valid @RequestBody Alumno alumno) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(alumnoService.createAlumno(alumno));
-    }
-    
-    // ✅ CAMBIO: UUID
-    @PutMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Alumno> updateAlumno(@PathVariable UUID id, @Valid @RequestBody Alumno alumnoUpdate) {
-        return ResponseEntity.ok(alumnoService.updateAlumno(id, alumnoUpdate));
-    }
-    
-    // ✅ CAMBIO: Soft delete
-    @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<?> deleteAlumno(@PathVariable UUID id) {
-        try {
-            softDeleteService.softDeleteAlumno(id);
-            return ResponseEntity.ok(Map.of("message", "Alumno eliminado correctamente"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                .body(Map.of("error", "Alumno no encontrado"));
-        }
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN')")
+    public ResponseEntity<List<Map<String, Object>>> getAlumnosEnrolados() {
+        var alumnos = alumnoRepository.findAllActive().stream().map(a -> {
+            var map = new java.util.HashMap<String, Object>();
+            map.put("usuarioId", a.getId());
+            map.put("nombre", a.getName() != null ? a.getName() : "");
+            map.put("email", a.getEmail() != null ? a.getEmail() : "");
+            map.put("telefono", a.getPhone() != null ? a.getPhone() : "");
+            map.put("estado", a.getStatus() != null ? a.getStatus().name() : "PENDING");
+            map.put("tipoPerfil", a.getProfileType() != null ? a.getProfileType().name() : "");
+            map.put("edad", a.getAge() != null ? a.getAge() : 0);
+            map.put("enrolado", a.isOnboarded());
+            map.put("activo", a.isActive());
+            map.put("fechaNacimiento", a.getFechaNacimiento());
+            map.put("profileImageUrl", a.getProfileImageUrl() != null ? a.getProfileImageUrl() : "");
+            return (Map<String, Object>) map;
+        }).toList();
+
+        return ResponseEntity.ok(alumnos);
     }
 }

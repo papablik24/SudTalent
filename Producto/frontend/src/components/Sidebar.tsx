@@ -10,7 +10,8 @@ import {
   LogOut,
   Briefcase,
   FileText,
-  ClipboardList
+  ClipboardList,
+  Bot
 } from 'lucide-react';
 import { NavItem } from './ui/NavItem';
 import { UserProfile, UserRole } from '../types';
@@ -78,6 +79,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               onClick={() => onNavigate('/admin/postulaciones')}
             />
             <NavItem 
+              icon={<Bot size={20} />} 
+              label="Asistente IA" 
+              active={currentPath === '/admin/asistente-ia'}
+              onClick={() => onNavigate('/admin/asistente-ia')}
+            />
+            <NavItem 
               icon={<Settings size={20} />} 
               label="Ajustes" 
               active={currentPath === '/admin/settings'}
@@ -109,6 +116,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               label="Mis Postulaciones" 
               active={currentPath === '/mis-postulaciones'}
               onClick={() => onNavigate('/mis-postulaciones')}
+            />
+            <NavItem 
+              icon={<Bot size={20} />} 
+              label="Asistente IA" 
+              active={currentPath === '/asistente-ia'}
+              onClick={() => onNavigate('/asistente-ia')}
             />
           </>
         )}

@@ -13,6 +13,7 @@ import { UserPostulacionesView } from './pages/user/UserPostulacionesView';
 import { UserProfileView } from './pages/user/UserProfileView';
 import { UserDemosView } from './pages/user/UserDemosView';
 import { UserOnboarding } from './pages/UserOnboarding';
+import { AsistenteIA } from './pages/AsistenteIA';
 import { ProtectedRoute } from './routes/ProtectedRoute';
 import { useAuth } from './hooks/useAuth';
 import { useAdminData } from './hooks/useAdminData';
@@ -61,8 +62,9 @@ function AppRoutes() {
         name: data.name || currentUser.name,
         email: data.email || currentUser.email,
         profileType: data.profileType || 'PERSONAL',
-        bio: data.bio,
-        age: data.age,
+        bio: data.bio || (profileData as any)?.bio,
+        age: data.age ?? (profileData as any)?.age,
+        phone: data.phone || currentUser.phone || undefined,
         // specialties llega como string[] del onboarding — se une con coma para el backend
         specialties: Array.isArray((profileData as any)?.specialties)
           ? ((profileData as any).specialties as string[]).join(',')
@@ -71,8 +73,9 @@ function AppRoutes() {
         childAge: data.profileType === 'PARENT' ? (profileData as any).childAge ?? (data as any).childAge : undefined,
       });
       // Actualizar el user con lo que devolvió el backend (incluye onboarded: true)
-      if (response?.onboarded !== undefined) {
-        data.onboarded = response.onboarded;
+      const respUser = (response as any)?.user ?? response;
+      if (respUser?.onboarded !== undefined) {
+        data.onboarded = respUser.onboarded;
       }
     } catch (err) {
       console.error('Error al completar onboarding en backend:', err);
@@ -87,6 +90,19 @@ function AppRoutes() {
 
     // 2. Persistir localmente
     localStorage.setItem('sud_current_user', JSON.stringify(updatedUser));
+
+    // 3. Actualizar sud_registered_users para que re-login local no resetee onboarded
+    const regStr = localStorage.getItem('sud_registered_users');
+    if (regStr && updatedUser.email) {
+      try {
+        const registered = JSON.parse(regStr);
+        const key = updatedUser.email.toLowerCase();
+        if (registered[key]) {
+          registered[key].user = { ...registered[key].user, ...updatedUser, onboarded: true };
+          localStorage.setItem('sud_registered_users', JSON.stringify(registered));
+        }
+      } catch { /* ignore */ }
+    }
 
     setCurrentUser(updatedUser);
   };
@@ -203,6 +219,14 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
 
+          <Route path="/admin/asistente-ia" element={
+            <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
+              <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
+                <AsistenteIA />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+
           {/* ── User Routes (require onboarded) ──────────────── */}
           <Route path="/profile" element={
             needsOnboarding ? <Navigate to="/onboarding" replace /> : (
@@ -211,6 +235,7 @@ function AppRoutes() {
                   <UserProfileView 
                     user={currentUser!} 
                     onNavigateToDemos={() => navigate('/demos')} 
+                    onNavigateToConvocatorias={() => navigate('/convocatorias')}
                     onUpdateUser={(updated) => setCurrentUser(prev => prev ? { ...prev, ...updated } : null)}
                   />
                 </MainLayout>
@@ -243,6 +268,16 @@ function AppRoutes() {
               <ProtectedRoute user={currentUser} role={role} allowedRoles={['USER']} loading={loading}>
                 <MainLayout user={currentUser} role="USER" onLogout={logout}>
                   <UserPostulacionesView user={currentUser!} />
+                </MainLayout>
+              </ProtectedRoute>
+            )
+          } />
+
+          <Route path="/asistente-ia" element={
+            needsOnboarding ? <Navigate to="/onboarding" replace /> : (
+              <ProtectedRoute user={currentUser} role={role} allowedRoles={['USER']} loading={loading}>
+                <MainLayout user={currentUser} role="USER" onLogout={logout}>
+                  <AsistenteIA />
                 </MainLayout>
               </ProtectedRoute>
             )

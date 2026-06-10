@@ -40,6 +40,7 @@ export interface OnboardRequest {
   age?: number;
   specialties?: string;
   bio?: string;
+  phone?: string;
 }
 
 // ==================== HTTP SERVICE ====================
@@ -208,14 +209,15 @@ export const backendService = {
     return fetchAPI<any[]>('/whitelist', { method: 'GET' });
   },
 
-  async addToWhitelist(entry: { phone: string; name?: string; email?: string; category?: string }): Promise<any> {
+  async addToWhitelist(entry: { phone: string; name?: string; email?: string; category?: string; role?: string }): Promise<any> {
     return fetchAPI<any>('/whitelist', {
       method: 'POST',
       body: JSON.stringify({ 
         phone: entry.phone,
         name: entry.name || '',
         email: entry.email || '',
-        category: entry.category || 'NONE'
+        category: entry.category || 'NONE',
+        role: entry.role || 'ALUMNO'
       }),
     });
   },

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertTriangle, UserPlus, CheckCircle, KeyRound, ArrowLeft, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertTriangle, UserPlus, CheckCircle, KeyRound, ArrowLeft, ShieldCheck, Sun, Moon } from 'lucide-react';
 import { authService } from '../services/backendService';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface AuthScreenProps {
   onLogin: (email: string, password: string) => Promise<any>;
@@ -12,6 +13,7 @@ interface AuthScreenProps {
 }
 
 export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenProps) {
+  const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot-password'>('login');
 
   // Login / Register state
@@ -147,7 +149,16 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-sud-black relative overflow-hidden">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-sud-black light:bg-slate-50 relative overflow-hidden transition-colors duration-300">
+      {/* Botón flotante para cambiar tema */}
+      <button 
+        onClick={toggleTheme}
+        className="absolute top-6 right-6 p-3 rounded-2xl bg-white/5 light:bg-white border border-white/10 light:border-slate-200 text-slate-400 light:text-slate-600 hover:text-white light:hover:text-slate-900 shadow-lg transition-all z-20 cursor-pointer"
+        title={theme === 'dark' ? "Modo Claro" : "Modo Oscuro"}
+      >
+        {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
+      </button>
+
       <div className="absolute top-0 right-0 w-[1000px] h-[1000px] bg-sud-turquoise/[0.03] blur-[200px] rounded-full -mr-96 -mt-96" />
       <div className="absolute bottom-0 left-0 w-[1000px] h-[1000px] bg-sud-orange/[0.03] blur-[200px] rounded-full -ml-96 -mb-96" />
       <img src="/logos/SUD_1.png" alt="" className="absolute bottom-0 left-1/2 -translate-x-1/2 w-[600px] opacity-[0.03] pointer-events-none select-none" />

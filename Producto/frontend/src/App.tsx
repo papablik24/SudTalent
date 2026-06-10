@@ -19,12 +19,15 @@ import { useAuth } from './hooks/useAuth';
 import { useAdminData } from './hooks/useAdminData';
 import { authService } from './services/backendService';
 import { UserProfile, TalentProfile } from './types';
+import { ThemeProvider } from './contexts/ThemeContext';
 
 export default function App() {
   return (
-    <Router>
-      <AppRoutes />
-    </Router>
+    <ThemeProvider>
+      <Router>
+        <AppRoutes />
+      </Router>
+    </ThemeProvider>
   );
 }
 

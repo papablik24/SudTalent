@@ -11,10 +11,13 @@ import {
   Briefcase,
   FileText,
   ClipboardList,
-  Bot
+  Bot,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { NavItem } from './ui/NavItem';
 import { UserProfile, UserRole } from '../types';
+import { useTheme } from '../contexts/ThemeContext';
 
 interface SidebarProps {
   role: UserRole;
@@ -25,6 +28,7 @@ interface SidebarProps {
 }
 
 export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: SidebarProps) {
+  const { theme, toggleTheme } = useTheme();
   return (
     <aside className="w-72 sud-glass-sidebar flex flex-col p-6 md:p-8 space-y-10 backdrop-blur-3xl relative z-20 h-full overflow-y-auto">
       <div className="flex flex-col">
@@ -157,6 +161,24 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
             )}
           </div>
         </div>
+        {/* Switch de Tema (Modo Claro / Modo Oscuro) */}
+        <button 
+          onClick={toggleTheme}
+          className="flex items-center space-x-3 text-slate-500 hover:text-white transition-all w-full group px-4 py-3 rounded-2xl hover:bg-white/5 border border-transparent cursor-pointer"
+        >
+          {theme === 'dark' ? (
+            <>
+              <Sun size={18} className="text-slate-500 group-hover:text-amber-400 transition-all" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em]">Modo Claro</span>
+            </>
+          ) : (
+            <>
+              <Moon size={18} className="text-slate-500 group-hover:text-indigo-600 transition-all" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500 light:text-slate-700">Modo Oscuro</span>
+            </>
+          )}
+        </button>
+
         <button 
           onClick={onLogout}
           className="flex items-center space-x-3 text-slate-500 hover:text-white transition-all w-full group px-4 py-3 rounded-2xl hover:bg-red-500/5 hover:border-red-500/10 border border-transparent"

@@ -13,11 +13,10 @@ function mapAuthResponseToUser(res: any): UserProfile {
   const status = user.status && validStatuses.includes(user.status as ProfileStatus)
     ? (user.status as ProfileStatus)
     : 'PENDING';
-
   return {
     uid: String(user.id),
     phone: user.phone || '',
-    role: user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+    role: user.role === 'ADMIN' ? 'ADMIN' : (user.role === 'PROFESOR' ? 'PROFESOR' : 'USER'),
     onboarded: user.onboarded ?? false,
     active: user.active ?? true,
     profileType: user.profileType === 'PERSONAL' || user.profileType === 'PARENT' ? user.profileType : undefined,
@@ -45,8 +44,7 @@ export function useAuth() {
       if (savedUser && token) {
         try {
           const user = JSON.parse(savedUser);
-
-          if (user.role && user.role !== 'ADMIN' && user.role !== 'USER') {
+          if (user.role && user.role !== 'ADMIN' && user.role !== 'USER' && user.role !== 'PROFESOR') {
             user.role = 'USER';
           }
 
@@ -106,8 +104,8 @@ export function useAuth() {
   // HELPER: Check if user is eligible (active + approved)
   // ═══════════════════════════════════════════════════════════════
   const isUserEligible = (user: UserProfile): boolean => {
-    // Admin solo necesita ser APPROVED
-    if (user.role === 'ADMIN') {
+    // Admin y Profesor solo necesitan ser APPROVED
+    if (user.role === 'ADMIN' || user.role === 'PROFESOR') {
       return user.status === 'APPROVED';
     }
     // Usuarios regulares pueden ser APPROVED o PENDING
@@ -202,7 +200,7 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
     const userData: UserProfile = {
       uid: String(user.id),
       phone: user.phone || '',
-      role: (user.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole,
+      role: (user.role === 'ADMIN' ? 'ADMIN' : (user.role === 'PROFESOR' ? 'PROFESOR' : 'USER')) as UserRole,
       name: user.name || user.nombre || '',
       email: user.email || '',
       onboarded: user.onboarded ?? true,

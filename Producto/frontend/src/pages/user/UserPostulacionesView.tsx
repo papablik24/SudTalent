@@ -237,21 +237,21 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                     {new Date(post.createdAt).toLocaleDateString()}
                   </div>
                   {post.voiceAudioTitle && (
-                    <div className="flex items-center gap-1.5 text-[10px] text-sud-turquoise font-bold uppercase tracking-widest">
-                      <AudioLines size={12} />
-                      <span>Demo: {post.voiceAudioTitle}</span>
+                    <div className="flex items-center gap-1.5 text-[10px] text-sud-turquoise font-bold uppercase tracking-widest min-w-0 max-w-full">
+                      <AudioLines size={12} className="shrink-0" />
+                      <span className="truncate max-w-[150px] sm:max-w-[250px]" title={post.voiceAudioTitle}>Demo: {post.voiceAudioTitle}</span>
                     </div>
                   )}
                 </div>
               </div>
             </div>
 
-            <div className="flex flex-row items-center justify-between md:justify-end gap-4 w-full md:w-auto shrink-0 border-t border-white/5 md:border-t-0 pt-4 md:pt-0">
+            <div className="flex flex-wrap items-center justify-between md:justify-end gap-4 w-full md:w-auto shrink-0 border-t border-white/5 md:border-t-0 pt-4 md:pt-0">
               <div className="flex items-center gap-3">
                 <StatusBadge status={post.estado} size="md" />
               </div>
               
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {/* Editar */}
                 {(post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION') ? (
                   <button 

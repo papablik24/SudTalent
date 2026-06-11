@@ -8,6 +8,7 @@ import { AdminTalentReview } from './components/AdminTalentReview';
 import { AdminSettings } from './pages/admin/AdminSettings';
 import { ConvocatoriasAdmin } from './pages/admin/ConvocatoriasAdmin';
 import { AdminPostulaciones } from './pages/admin/AdminPostulaciones';
+import { AdminProfesores } from './pages/admin/AdminProfesores';
 import { ConvocatoriasUser } from './pages/user/ConvocatoriasUser';
 import { UserPostulacionesView } from './pages/user/UserPostulacionesView';
 import { UserProfileView } from './pages/user/UserProfileView';
@@ -15,6 +16,7 @@ import { UserDemosView } from './pages/user/UserDemosView';
 import { UserOnboarding } from './pages/UserOnboarding';
 import { AsistenteIA } from './pages/AsistenteIA';
 import { ProtectedRoute } from './routes/ProtectedRoute';
+import { ProfesorDashboard } from './pages/profesor/ProfesorDashboard';
 import { useAuth } from './hooks/useAuth';
 import { useAdminData } from './hooks/useAdminData';
 import { authService } from './services/backendService';
@@ -141,6 +143,7 @@ function AppRoutes() {
           <Route path="/onboarding" element={
             !currentUser ? <Navigate to="/auth" replace /> :
             role === 'ADMIN' ? <Navigate to="/admin" replace /> :
+            role === 'PROFESOR' ? <Navigate to="/profesor" replace /> :
             currentUser.onboarded ? <Navigate to="/profile" replace /> : (
               <UserOnboarding 
                 onComplete={handleOnboardingComplete} 
@@ -211,6 +214,14 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
 
+          <Route path="/admin/profesores" element={
+            <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
+              <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
+                <AdminProfesores />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+
           <Route path="/admin/settings" element={
             <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
               <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
@@ -227,6 +238,13 @@ function AppRoutes() {
               <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
                 <AsistenteIA />
               </MainLayout>
+            </ProtectedRoute>
+          } />
+
+          {/* ── Profesor Routes ──────────────────────────────── */}
+          <Route path="/profesor" element={
+            <ProtectedRoute user={currentUser} role={role} allowedRoles={['PROFESOR']} loading={loading}>
+              <ProfesorDashboard user={currentUser!} onLogout={logout} />
             </ProtectedRoute>
           } />
 
@@ -290,6 +308,7 @@ function AppRoutes() {
           <Route path="*" element={
             !currentUser ? <Navigate to="/auth" replace /> :
             role === 'ADMIN' ? <Navigate to="/admin" replace /> :
+            role === 'PROFESOR' ? <Navigate to="/profesor" replace /> :
             needsOnboarding ? <Navigate to="/onboarding" replace /> :
             <Navigate to="/profile" replace />
           } />

@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-export type UserRole = 'ADMIN' | 'USER';
+export type UserRole = 'ADMIN' | 'USER' | 'PROFESOR';
 export type ProfileType = 'PERSONAL' | 'PARENT';
 export type ProfileCategory = 'ADULT' | 'MINOR' | 'BOTH' | 'NONE';
 export type DemoCategory = 'Doblaje' | 'Locución' | 'Podcast' | 'Presentación';

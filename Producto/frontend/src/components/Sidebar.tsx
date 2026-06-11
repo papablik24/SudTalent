@@ -12,6 +12,7 @@ import {
   FileText,
   ClipboardList,
   Bot,
+  GraduationCap,
   Sun,
   Moon
 } from 'lucide-react';
@@ -81,6 +82,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               label="Postulaciones" 
               active={currentPath === '/admin/postulaciones'}
               onClick={() => onNavigate('/admin/postulaciones')}
+            />
+            <NavItem 
+              icon={<GraduationCap size={20} />} 
+              label="Profesores" 
+              active={currentPath === '/admin/profesores'}
+              onClick={() => onNavigate('/admin/profesores')}
             />
             <NavItem 
               icon={<Bot size={20} />} 

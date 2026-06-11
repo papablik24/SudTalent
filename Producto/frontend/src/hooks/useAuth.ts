@@ -13,11 +13,10 @@ function mapAuthResponseToUser(res: any): UserProfile {
   const status = user.status && validStatuses.includes(user.status as ProfileStatus)
     ? (user.status as ProfileStatus)
     : 'PENDING';
-
   return {
     uid: String(user.id),
     phone: user.phone || '',
-    role: user.role === 'ADMIN' ? 'ADMIN' : 'USER',
+    role: user.role === 'ADMIN' ? 'ADMIN' : (user.role === 'PROFESOR' ? 'PROFESOR' : 'USER'),
     onboarded: user.onboarded ?? false,
     active: user.active ?? true,
     profileType: user.profileType === 'PERSONAL' || user.profileType === 'PARENT' ? user.profileType : undefined,
@@ -45,8 +44,7 @@ export function useAuth() {
       if (savedUser && token) {
         try {
           const user = JSON.parse(savedUser);
-
-          if (user.role && user.role !== 'ADMIN' && user.role !== 'USER') {
+          if (user.role && user.role !== 'ADMIN' && user.role !== 'USER' && user.role !== 'PROFESOR') {
             user.role = 'USER';
           }
 
@@ -70,21 +68,22 @@ export function useAuth() {
           setCurrentUser(user);
           setRole(user.role);
 
-          // Refrescar status desde el backend en segundo plano
-          try {
-            const fresh = await authService.me() as any;
-            const freshUser = fresh?.user ?? fresh;
-            const validStatuses: ProfileStatus[] = ['PENDING', 'APPROVED', 'INACTIVE'];
-            const refreshedStatus = freshUser?.status && validStatuses.includes(freshUser.status as ProfileStatus)
-              ? (freshUser.status as ProfileStatus)
-              : user.status;
+          // Refrescar status y onboarded desde el backend en segundo plano
+            try {
+              const fresh = await authService.me() as any;
+              const freshUser = fresh?.user ?? fresh;
+              const validStatuses: ProfileStatus[] = ['PENDING', 'APPROVED', 'INACTIVE'];
+              const refreshedStatus = freshUser?.status && validStatuses.includes(freshUser.status as ProfileStatus)
+                ? (freshUser.status as ProfileStatus)
+                : user.status;
+              const refreshedOnboarded = freshUser?.onboarded ?? user.onboarded;
 
-            if (refreshedStatus !== user.status) {
-              const updated = { ...user, status: refreshedStatus };
-              localStorage.setItem('sud_current_user', JSON.stringify(updated));
-              setCurrentUser(updated);
-            }
-          } catch {
+              if (refreshedStatus !== user.status || refreshedOnboarded !== user.onboarded) {
+                const updated = { ...user, status: refreshedStatus, onboarded: refreshedOnboarded };
+                localStorage.setItem('sud_current_user', JSON.stringify(updated));
+                setCurrentUser(updated);
+              }
+            } catch {
             // Si falla el refresco, mantener la sesión local (fallback offline)
           }
 
@@ -105,8 +104,8 @@ export function useAuth() {
   // HELPER: Check if user is eligible (active + approved)
   // ═══════════════════════════════════════════════════════════════
   const isUserEligible = (user: UserProfile): boolean => {
-    // Admin solo necesita ser APPROVED
-    if (user.role === 'ADMIN') {
+    // Admin y Profesor solo necesitan ser APPROVED
+    if (user.role === 'ADMIN' || user.role === 'PROFESOR') {
       return user.status === 'APPROVED';
     }
     // Usuarios regulares pueden ser APPROVED o PENDING
@@ -201,7 +200,7 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
     const userData: UserProfile = {
       uid: String(user.id),
       phone: user.phone || '',
-      role: (user.role === 'ADMIN' ? 'ADMIN' : 'USER') as UserRole,
+      role: (user.role === 'ADMIN' ? 'ADMIN' : (user.role === 'PROFESOR' ? 'PROFESOR' : 'USER')) as UserRole,
       name: user.name || user.nombre || '',
       email: user.email || '',
       onboarded: user.onboarded ?? true,
@@ -298,6 +297,17 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
     if (!acc || acc.password !== password) {
       setError('Correo o contraseña incorrectos.');
       return false;
+    }
+
+    // Preservar onboarded:true si ya se completó previamente
+    const savedStr = localStorage.getItem('sud_current_user');
+    if (savedStr) {
+      try {
+        const saved = JSON.parse(savedStr);
+        if (saved.uid === acc.user.uid && saved.onboarded) {
+          acc.user.onboarded = true;
+        }
+      } catch { /* ignore */ }
     }
 
     // ✅ PREVENT 403: Check eligibility

@@ -84,7 +84,7 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
   }, [loadData]);
 
   // Agregar a whitelist
-  const addToWhitelist = async (phone: string, name: string, category: ProfileCategory = 'NONE', email: string = '') => {
+  const addToWhitelist = async (phone: string, name: string, category: ProfileCategory = 'NONE', email: string = '', role: string = 'ALUMNO') => {
     try {
       setError(null);
       
@@ -96,12 +96,13 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
         return;
       }
       
-      // ✅ Enviar phone, name, email, category al backend
+      // ✅ Enviar phone, name, email, category, role al backend
       const response = await backendService.addToWhitelist({ 
         phone: normalizedPhone,
         name,
         email,
-        category
+        category,
+        role
       });
       
       const newEntry: WhitelistEntry = {

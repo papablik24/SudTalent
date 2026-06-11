@@ -38,6 +38,7 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
   const [firstName, setFirstName] = useState(initialName.first);
   const [lastName, setLastName] = useState(initialName.last);
   const [email, setEmail] = useState(userEmail || '');
+  const [phone, setPhone] = useState(userPhone || '');
   const [age, setAge] = useState(initialAge?.toString() || '');
 
   // Guardian fields
@@ -83,17 +84,21 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
     if (specialties.length === 0) { setValidationError('Selecciona al menos una especialidad.'); return; }
     setSaving(true);
     const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    const parsedAge = profileType === 'PERSONAL' && age ? parseInt(age) : undefined;
     const userData: Partial<UserProfile> = {
       name: fullName,
       email: email || undefined,
       profileType: profileType!,
       onboarded: true,
+      age: parsedAge,
+      bio: bio.trim() || undefined,
+      phone: phone.replace(/[^0-9]/g, '') || undefined,
     };
     const profileData: Partial<TalentProfile> = {
       type: profileType!,
       specialties,
       bio: bio.trim() || undefined,
-      age: profileType === 'PERSONAL' && age ? parseInt(age) : undefined,
+      age: parsedAge,
       childName: profileType === 'PARENT' ? childName.trim() : undefined,
       childAge: profileType === 'PARENT' && childAge ? parseInt(childAge) : undefined,
       location: availability.trim() || undefined,
@@ -188,8 +193,25 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                   <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="sud-input w-full" placeholder="Ej: Pérez" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Teléfono <span className="text-slate-700">(validado)</span></label>
-                  <input type="text" value={userPhone} disabled className="sud-input w-full opacity-50 cursor-not-allowed" />
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Teléfono {phone ? <span className="text-slate-700">(validado)</span> : <span className="text-slate-700">(opcional)</span>}</label>
+                  {phone && userPhone ? (
+                    <input type="text" value={phone} disabled className="sud-input w-full opacity-50 cursor-not-allowed" />
+                  ) : (
+                    <div className="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden focus-within:border-sud-orange transition-all">
+                      <span className="px-3 py-2 text-slate-500 font-mono text-sm border-r border-white/10 select-none">+56 9</span>
+                      <input
+                        type="tel"
+                        value={phone.replace(/[^0-9]/g, '').replace(/^569?/, '')}
+                        onChange={e => {
+                          const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                          setPhone(digits ? `569${digits}` : '');
+                        }}
+                        placeholder="XXXX XXXX"
+                        maxLength={8}
+                        className="bg-transparent px-3 py-2 w-full text-white outline-none font-mono tracking-widest"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Correo Electrónico <span className="text-slate-700">(opcional)</span></label>

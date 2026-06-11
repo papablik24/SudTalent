@@ -58,4 +58,8 @@ public class Postulacion {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "convocatoria_id", nullable = false)
     private Convocatoria convocatoria;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "voice_audio_id", nullable = true)
+    private VoiceAudio voiceAudio;
 }

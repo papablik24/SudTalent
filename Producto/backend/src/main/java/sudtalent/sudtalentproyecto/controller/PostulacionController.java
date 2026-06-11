@@ -56,14 +56,21 @@ public class PostulacionController {
         return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
     
-    /** Actualizar estado de postulación (admin/profesor) */
+    /** Actualizar estado / mensaje / demo de postulación */
     @PutMapping("/{id}")
-    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PROFESOR')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<PostulacionDTO> updatePostulacion(
             @PathVariable UUID id,
-            @RequestBody Map<String, String> body) {
+            @RequestBody Map<String, String> body,
+            Authentication authentication) {
         String estado = body.get("estado");
-        return ResponseEntity.ok(postulacionService.updateEstado(id, estado));
+        String mensaje = body.get("mensaje");
+        String voiceAudioIdStr = body.get("voiceAudioId");
+        UUID voiceAudioId = null;
+        if (voiceAudioIdStr != null && !voiceAudioIdStr.trim().isEmpty() && !voiceAudioIdStr.equals("undefined")) {
+            voiceAudioId = UUID.fromString(voiceAudioIdStr);
+        }
+        return ResponseEntity.ok(postulacionService.updatePostulacion(id, estado, mensaje, voiceAudioId, authentication));
     }
     
     @DeleteMapping("/{id}")

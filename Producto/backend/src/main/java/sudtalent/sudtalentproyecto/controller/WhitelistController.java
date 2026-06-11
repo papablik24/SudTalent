@@ -58,7 +58,7 @@ public class WhitelistController {
         String email = dto.getEmail() != null ? dto.getEmail() : "";
         
         return ResponseEntity.status(HttpStatus.CREATED)
-            .body(whitelistService.createNumberWithUser(phoneToAdd, name, email));
+            .body(whitelistService.createNumberWithUser(phoneToAdd, name, email, dto.getRole()));
     }
 
     // Actualizar estado por ID
@@ -117,7 +117,8 @@ public class WhitelistController {
             .body(whitelistService.createNumberWithUser(
                 phoneToAdd, 
                 dto.getName(), 
-                dto.getEmail()
+                dto.getEmail(),
+                dto.getRole()
             ));
     }
 

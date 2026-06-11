@@ -441,17 +441,17 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
       </section>
 
       {/* ── Header con foto de perfil ── */}
-      <section className="relative rounded-[3rem] overflow-hidden bg-black border border-white/10 shadow-2xl">
+      <section className="relative rounded-[3rem] overflow-hidden bg-black light:bg-white border border-white/10 light:border-slate-200 shadow-2xl light:shadow-md">
         <div className="h-48 sud-vibrant-gradient opacity-10 blur-3xl absolute -top-24 w-full" />
         <div className="p-6 md:p-10 relative flex flex-col md:flex-row items-center md:items-end gap-6 md:gap-8">
 
           {/* Avatar */}
           <div className="relative flex-shrink-0 group">
-            <div className="w-32 h-32 rounded-[2rem] bg-white/5 border-2 border-white/10 p-1 shadow-xl overflow-hidden">
+            <div className="w-32 h-32 rounded-[2rem] bg-white/5 light:bg-slate-50 border-2 border-white/10 light:border-slate-200 p-1 shadow-xl overflow-hidden">
               {avatarUrl ? (
                 <img src={avatarUrl} alt="Avatar" className="w-full h-full object-cover rounded-[1.6rem]" />
               ) : (
-                <div className="w-full h-full rounded-[1.8rem] bg-sud-dark flex items-center justify-center">
+                <div className="w-full h-full rounded-[1.8rem] bg-sud-dark light:bg-slate-100 flex items-center justify-center">
                   {user.profileType === 'PARENT'
                     ? <Baby size={48} className="text-sud-orange" />
                     : <User size={48} className="text-slate-700 group-hover:text-sud-orange transition-colors" />}
@@ -461,7 +461,7 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
             <button
               onClick={() => avatarInputRef.current?.click()}
               disabled={isUploadingAvatar}
-              className="absolute -bottom-2 -right-2 bg-sud-orange hover:bg-sud-orange/80 disabled:opacity-50 p-2.5 rounded-2xl shadow-lg ring-4 ring-black transition-all"
+              className="absolute -bottom-2 -right-2 bg-sud-orange hover:bg-sud-orange/80 disabled:opacity-50 p-2.5 rounded-2xl shadow-lg ring-4 ring-black light:ring-white transition-all"
               title="Cambiar foto de perfil"
             >
               {isUploadingAvatar
@@ -501,7 +501,7 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
               Mis Demos
             </button>
             <button onClick={() => { setIsEditing(!isEditing); setSaveError(null); }}
-              className={`p-4 md:p-5 rounded-3xl border transition-all ${isEditing ? 'bg-white/10 border-white/20 text-white' : 'bg-transparent border-white/10 text-white/40 hover:text-white'}`}>
+              className={`p-4 md:p-5 rounded-3xl border transition-all cursor-pointer ${isEditing ? 'bg-white/10 light:bg-slate-200 border-white/20 light:border-slate-300 text-white light:text-slate-800' : 'bg-transparent border-white/10 light:border-slate-200 text-white/40 light:text-slate-400 hover:text-white light:hover:text-slate-700'}`}>
               <Settings size={18} />
             </button>
           </div>
@@ -668,7 +668,7 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
               className="w-full sud-btn-primary py-5 rounded-[2rem] text-sm font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-2xl shadow-sud-turquoise/10 hover:scale-[1.02] transition-all"
             >
               <Sparkles size={18} />
-              Ir A Oportunidades
+              Postularme Ahora
             </button>
           )}
         </div>

@@ -36,7 +36,8 @@ public class AuthDTOs {
             Integer childAge,
             Integer age,
             String specialties,
-            String bio
+            String bio,
+            String phone
     ) {}
 
     // ✅ CAMBIO: UUID en lugar de Long

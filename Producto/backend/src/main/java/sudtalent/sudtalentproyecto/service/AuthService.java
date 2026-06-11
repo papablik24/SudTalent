@@ -201,6 +201,12 @@ public class AuthService {
         if (request.age() != null) {
             user.setAge(request.age());
         }
+        if (request.phone() != null && !request.phone().isBlank()) {
+            String phoneDigits = request.phone().replaceAll("[^0-9]", "");
+            if (phoneDigits.length() >= 8 && phoneDigits.length() <= 15) {
+                user.setPhone(phoneDigits);
+            }
+        }
         user.setOnboarded(true);
         user.setStatus(User.ProfileStatus.PENDING);
         

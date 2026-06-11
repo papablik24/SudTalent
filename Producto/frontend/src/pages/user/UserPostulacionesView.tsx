@@ -1,8 +1,11 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, Briefcase, ArrowRight } from 'lucide-react';
-import { motion } from 'motion/react';
+import { useNavigate } from 'react-router-dom';
+import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, Briefcase, ArrowRight, X, AudioLines, Sparkles } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { fetchAPI } from '../../services/backendService';
+import { convocatoriaService } from '../../services/convocatoriaService';
 import {
   postulacionService,
   Postulacion,
@@ -11,9 +14,22 @@ import {
 } from '../../services/postulacionService';
 
 export function UserPostulacionesView({ user }: { user: UserProfile }) {
+  const navigate = useNavigate();
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  // Edit state
+  const [editingPost, setEditingPost] = useState<Postulacion | null>(null);
+  const [editMensaje, setEditMensaje] = useState('');
+  const [userDemos, setUserDemos] = useState<any[]>([]);
+  const [selectedDemoId, setSelectedDemoId] = useState<string>('');
+  const [saving, setSaving] = useState(false);
+
+  // Detail state
+  const [selectedPost, setSelectedPost] = useState<Postulacion | null>(null);
+  const [selectedConv, setSelectedConv] = useState<any | null>(null);
+  const [loadingConvDetail, setLoadingConvDetail] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -28,12 +44,70 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
     setLoading(true);
     setError(null);
     try {
-      const posts = await postulacionService.getPostulacionesByUser(user.uid);
+      const [posts, audios] = await Promise.all([
+        postulacionService.getPostulacionesByUser(user.uid),
+        fetchAPI<any[]>(`/voice-audios/user/${user.uid}?category=demo`),
+      ]);
       setPostulaciones(posts);
+      setUserDemos(audios || []);
     } catch (err: any) {
       setError(err.message || 'Error al cargar historial.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    if (!confirm('¿Estás seguro de que deseas cancelar esta postulación?')) return;
+    try {
+      await postulacionService.updatePostulacion(id, { estado: 'CANCELADA' });
+      // Actualizar la lista localmente
+      setPostulaciones(prev => prev.map(p => p.id === id ? { ...p, estado: 'CANCELADA' as any } : p));
+    } catch (err: any) {
+      alert(err.message || 'Error al cancelar la postulación.');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingPost) return;
+    setSaving(true);
+    try {
+      const payload: { mensaje: string; voiceAudioId?: string } = {
+        mensaje: editMensaje,
+      };
+      
+      // Permitir cambiar la demo solo si la postulación está PENDIENTE
+      if (editingPost.estado === 'PENDIENTE' && selectedDemoId) {
+        payload.voiceAudioId = selectedDemoId;
+      }
+
+      const updated = await postulacionService.updatePostulacion(editingPost.id, payload);
+      setPostulaciones(prev => prev.map(p => p.id === editingPost.id ? { 
+        ...p, 
+        mensaje: updated.mensaje,
+        voiceAudioId: updated.voiceAudioId,
+        voiceAudioTitle: updated.voiceAudioTitle,
+        voiceAudioUrl: updated.voiceAudioUrl,
+      } : p));
+      setEditingPost(null);
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar cambios.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSelectPost = async (post: Postulacion) => {
+    setSelectedPost(post);
+    setLoadingConvDetail(true);
+    try {
+      const conv = await convocatoriaService.getConvocatoriaById(post.convocatoriaId);
+      setSelectedConv(conv);
+    } catch (err) {
+      console.error('Error al cargar detalle de convocatoria:', err);
+      setSelectedConv(null);
+    } finally {
+      setLoadingConvDetail(false);
     }
   };
 
@@ -90,7 +164,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
       </header>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
           { label: 'Total', value: stats.total, color: 'text-white', bg: 'bg-white/5', border: 'border-white/10' },
           { label: 'Pendientes', value: stats.pendientes, color: 'text-amber-400', bg: 'bg-amber-500/5', border: 'border-amber-500/20' },
@@ -106,7 +180,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
           <input
@@ -117,11 +191,11 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
             className="sud-input w-full pl-11"
           />
         </div>
-        <div className="relative">
+        <div className="relative w-full sm:w-auto">
           <select
             value={filterEstado}
             onChange={e => setFilterEstado(e.target.value as any)}
-            className="sud-input appearance-none pr-10 min-w-[160px]"
+            className="sud-input appearance-none pr-10 w-full sm:min-w-[200px]"
           >
             <option value="TODAS">Todos los estados</option>
             {POSTULACION_ESTADOS.map(e => <option key={e} value={e}>{e.replace('_', ' ')}</option>)}
@@ -138,7 +212,8 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.05 }}
-            className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 group hover:border-white/20 transition-all"
+            onClick={() => handleSelectPost(post)}
+            className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 group hover:border-white/20 transition-all cursor-pointer"
           >
             <div className="flex items-start gap-5 flex-1">
               <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] shrink-0">
@@ -161,12 +236,61 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                     <Calendar size={12} />
                     {new Date(post.createdAt).toLocaleDateString()}
                   </div>
+                  {post.voiceAudioTitle && (
+                    <div className="flex items-center gap-1.5 text-[10px] text-sud-turquoise font-bold uppercase tracking-widest min-w-0 max-w-full">
+                      <AudioLines size={12} className="shrink-0" />
+                      <span className="truncate max-w-[150px] sm:max-w-[250px]" title={post.voiceAudioTitle}>Demo: {post.voiceAudioTitle}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-4 shrink-0">
-              <StatusBadge status={post.estado} size="md" />
+            <div className="flex flex-wrap items-center justify-between md:justify-end gap-4 w-full md:w-auto shrink-0 border-t border-white/5 md:border-t-0 pt-4 md:pt-0">
+              <div className="flex items-center gap-3">
+                <StatusBadge status={post.estado} size="md" />
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Editar */}
+                {(post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION') ? (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setEditingPost(post);
+                      setEditMensaje(post.mensaje || '');
+                      setSelectedDemoId(post.voiceAudioId || '');
+                    }}
+                    className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all cursor-pointer"
+                  >
+                    Editar
+                  </button>
+                ) : (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate('/demos');
+                    }}
+                    className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all cursor-pointer"
+                    title="Esta postulación no es editable. Ir a Mis Demos."
+                  >
+                    Editar
+                  </button>
+                )}
+
+                {/* Cancelar */}
+                {(post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION') && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleCancel(post.id);
+                    }}
+                    className="px-4 py-2 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all cursor-pointer"
+                  >
+                    Cancelar
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         ))}
@@ -185,6 +309,194 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
           </div>
         )}
       </div>
+
+      {/* ── Edit Modal ──────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {editingPost && (
+          <div className="fixed inset-y-0 right-0 left-0 md:left-72 z-50 flex items-center justify-center p-4 md:p-6 backdrop-blur-md bg-black/60" onClick={() => setEditingPost(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-lg p-6 md:p-10 relative overflow-y-auto max-h-[90vh] space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setEditingPost(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Editar Postulación</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                  {editingPost.convocatoriaTitulo}
+                </p>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Mensaje / Presentación</label>
+                <textarea 
+                  value={editMensaje}
+                  onChange={e => setEditMensaje(e.target.value)}
+                  className="sud-input w-full h-32 py-4 resize-none"
+                  placeholder="Escribe un mensaje presentándote o indicando tus detalles..."
+                />
+              </div>
+
+              {editingPost.estado === 'PENDIENTE' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Cambiar Demo de Voz</label>
+                  {userDemos.length > 0 ? (
+                    <div className="relative">
+                      <select
+                        value={selectedDemoId}
+                        onChange={e => setSelectedDemoId(e.target.value)}
+                        className="sud-input w-full appearance-none pr-10"
+                      >
+                        {userDemos.map(demo => (
+                          <option key={demo.id} value={demo.id}>{demo.title} ({demo.category || 'Demo'})</option>
+                        ))}
+                      </select>
+                      <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    </div>
+                  ) : (
+                    <div className="p-4 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-center gap-2 text-red-400 text-xs font-bold uppercase tracking-widest">
+                      <AlertCircle size={16} />
+                      <span>Debes subir una demo antes de postular.</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <button 
+                onClick={handleSaveEdit}
+                disabled={saving || (editingPost.estado === 'PENDIENTE' && userDemos.length === 0)}
+                className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all disabled:opacity-50 disabled:pointer-events-none"
+              >
+                {saving ? (
+                  <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
+                ) : (
+                  <>Guardar Cambios</>
+                )}
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Detail Modal ────────────────────────────────────────────── */}
+      <AnimatePresence>
+        {selectedPost && (
+          <div className="fixed inset-y-0 right-0 left-0 md:left-72 z-50 flex items-center justify-center p-4 md:p-6 backdrop-blur-md bg-black/60" onClick={() => setSelectedPost(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-2xl p-6 md:p-10 relative overflow-y-auto max-h-[90vh] md:max-h-[85vh] space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setSelectedPost(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <StatusBadge status={selectedPost.estado} size="md" />
+                  {selectedPost.convocatoriaCategoria && (
+                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-sud-orange/10 text-sud-orange border border-sud-orange/20">
+                      {selectedPost.convocatoriaCategoria}
+                    </span>
+                  )}
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                    <Calendar size={12} />
+                    Postulado el: {new Date(selectedPost.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <h3 className="text-3xl font-black text-white uppercase tracking-tight">{selectedPost.convocatoriaTitulo || 'Convocatoria'}</h3>
+              </div>
+
+              {/* Descripción de la Convocatoria */}
+              <div className="space-y-2 border-t border-white/5 pt-4">
+                <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Descripción del Casting</h4>
+                {loadingConvDetail ? (
+                  <div className="flex items-center gap-2 text-xs text-slate-400 py-2">
+                    <div className="w-4 h-4 border-2 border-sud-orange/20 border-t-sud-orange rounded-full animate-spin" />
+                    <span>Cargando detalles...</span>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{selectedConv?.descripcion || 'Descripción no disponible.'}</p>
+                )}
+              </div>
+
+              {/* Mensaje enviado */}
+              {selectedPost.mensaje && (
+                <div className="space-y-2 border-t border-white/5 pt-4">
+                  <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Tu Mensaje de Presentación</h4>
+                  <p className="text-sm text-slate-300 leading-relaxed italic bg-white/[0.01] p-4 border border-white/5 rounded-2xl">
+                    "{selectedPost.mensaje}"
+                  </p>
+                </div>
+              )}
+
+              {/* Demo Asociada */}
+              <div className="space-y-3 border-t border-white/5 pt-4">
+                <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Demo de Voz Enviada</h4>
+                {selectedPost.voiceAudioId ? (
+                  <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-sud-turquoise/10 text-sud-turquoise rounded-lg">
+                        <AudioLines size={16} />
+                      </div>
+                      <span className="text-sm font-bold text-white truncate">{selectedPost.voiceAudioTitle || 'Demo de voz'}</span>
+                    </div>
+                    {selectedPost.voiceAudioUrl && (
+                      <audio src={selectedPost.voiceAudioUrl} controls className="w-full h-10 accent-sud-turquoise mt-2" />
+                    )}
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-500 italic">No se asoció ninguna demo de voz a esta postulación.</p>
+                )}
+              </div>
+
+              {/* Botones de acción dentro del modal de detalle */}
+              <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-white/10">
+                {/* Cancelar */}
+                {(selectedPost.estado === 'PENDIENTE' || selectedPost.estado === 'EN_REVISION') && (
+                  <button 
+                    onClick={() => {
+                      handleCancel(selectedPost.id);
+                      setSelectedPost(null);
+                    }}
+                    className="flex-1 px-6 py-4 rounded-2xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs font-black uppercase tracking-widest text-red-400 transition-all cursor-pointer text-center"
+                  >
+                    Cancelar Postulación
+                  </button>
+                )}
+
+                {/* Editar */}
+                {(selectedPost.estado === 'PENDIENTE' || selectedPost.estado === 'EN_REVISION') ? (
+                  <button 
+                    onClick={() => {
+                      setEditingPost(selectedPost);
+                      setEditMensaje(selectedPost.mensaje || '');
+                      setSelectedDemoId(selectedPost.voiceAudioId || '');
+                      setSelectedPost(null);
+                    }}
+                    className="flex-1 px-6 py-4 rounded-2xl sud-btn-primary text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center flex items-center justify-center gap-2"
+                  >
+                    Editar Mensaje / Demo <Sparkles size={14} />
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => {
+                      navigate('/demos');
+                      setSelectedPost(null);
+                    }}
+                    className="flex-1 px-6 py-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-black uppercase tracking-widest text-slate-400 transition-all cursor-pointer text-center"
+                  >
+                    Ir a Mis Demos
+                  </button>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

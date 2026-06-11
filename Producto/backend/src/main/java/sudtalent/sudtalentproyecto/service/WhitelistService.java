@@ -151,7 +151,7 @@ public class WhitelistService {
 
     // ==================== FUNCIONALIDAD 2: Crear usuario cuando se agrega a whitelist ====================
     
-    public WhitelistNumberDTO createNumberWithUser(String phone, String name, String email) {
+    public WhitelistNumberDTO createNumberWithUser(String phone, String name, String email, String roleStr) {
         if(repository.findByPhone(phone).isPresent()) {
             throw new IllegalArgumentException("Número ya existe en whitelist");
         }
@@ -174,12 +174,19 @@ public class WhitelistService {
             String syntheticEmail = finalEmail != null ? finalEmail : phone + "@sudtalent.app";
             String syntheticPassword = "whitelist_" + phone + "_sud2026";
             
+            User.Role roleEnum = User.Role.ALUMNO;
+            if (roleStr != null) {
+                try {
+                    roleEnum = User.Role.valueOf(roleStr);
+                } catch(Exception e) {}
+            }
+
             user = User.builder()
                 .name(finalName != null ? finalName : "")
                 .email(syntheticEmail)
                 .password(passwordEncoder.encode(syntheticPassword))
                 .phone(phone)
-                .role(User.Role.ALUMNO)
+                .role(roleEnum)
                 .onboarded(false)
                 .status(User.ProfileStatus.PENDING)
                 .active(true)
@@ -192,11 +199,18 @@ public class WhitelistService {
             System.out.println("ℹ️ Usuario ya existe: " + phone);
         }
         
-        // Crear número de whitelist vinculado al usuario
+        User.Role roleEnumWL = User.Role.ALUMNO;
+        if (roleStr != null) {
+            try {
+                roleEnumWL = User.Role.valueOf(roleStr);
+            } catch(Exception e) {}
+        }
+
         WhitelistNumber number = WhitelistNumber.builder()
             .phone(phone)
             .name(finalName)
             .email(finalEmail)
+            .role(roleEnumWL)
             .status(WhitelistNumber.Status.PENDIENTE)
             .user(user)
             .build();
@@ -343,6 +357,7 @@ public class WhitelistService {
             .name(number.getName())
             .email(number.getEmail())
             .category(number.getCategory())
+            .role(number.getRole() != null ? number.getRole().name() : null)
             .status(number.getStatus().toString())
             .userId(number.getUser() != null ? number.getUser().getId() : null)
             .userStatus(number.getUser() != null && number.getUser().getStatus() != null

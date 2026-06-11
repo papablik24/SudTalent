@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Briefcase, Calendar, Sparkles, CheckCircle2, Search, ChevronDown, Clock, X, FileText, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { fetchAPI } from '../../services/backendService';
 import {
   convocatoriaService,
   Convocatoria,
@@ -16,11 +18,29 @@ import {
   Postulacion,
 } from '../../services/postulacionService';
 
+const formatFecha = (fechaStr: string) => {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day).toLocaleDateString();
+  }
+  return new Date(fechaStr).toLocaleDateString();
+};
+
 export function ConvocatoriasUser({ user }: { user: UserProfile }) {
+  const navigate = useNavigate();
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [myPostulaciones, setMyPostulaciones] = useState<Record<string, Postulacion>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [showNoDemosModal, setShowNoDemosModal] = useState(false);
+  const [applyingConv, setApplyingConv] = useState<Convocatoria | null>(null);
+  const [userDemos, setUserDemos] = useState<any[]>([]);
+  const [selectedDemoId, setSelectedDemoId] = useState<string>('');
+  const [showDemoSelectorModal, setShowDemoSelectorModal] = useState(false);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -87,13 +107,42 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
     setApplyingId(conv.id);
     setApplySuccess(null);
     try {
-      await new Promise(r => setTimeout(r, 500)); // small UX delay
+      // Validar si el usuario tiene demos subidas
+      const audios = await fetchAPI<any[]>(`/voice-audios/user/${user.uid}?category=demo`);
+      const hasDemos = audios && audios.length > 0;
+      
+      if (!hasDemos) {
+        setApplyingId(null);
+        setShowNoDemosModal(true);
+        return;
+      }
+
+      // Guardar demos y abrir selector modal
+      setUserDemos(audios);
+      setApplyingConv(conv);
+      setSelectedDemoId(audios[0].id); // Seleccionar la primera por defecto
+      setShowDemoSelectorModal(true);
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setApplyingId(null);
+    }
+  };
+
+  const confirmApply = async () => {
+    if (!applyingConv || !selectedDemoId) return;
+    setApplyingId(applyingConv.id);
+    try {
       const post = await postulacionService.createPostulacion({
-        convocatoriaId: conv.id,
+        convocatoriaId: applyingConv.id,
         alumnoId: user.uid,
+        voiceAudioId: selectedDemoId,
       });
-      setMyPostulaciones(prev => ({ ...prev, [conv.id]: post }));
-      setApplySuccess(conv.id);
+      setMyPostulaciones(prev => ({ ...prev, [applyingConv.id]: post }));
+      setApplySuccess(applyingConv.id);
+      setSelectedConv(null); // Cerrar modal de detalles
+      setShowDemoSelectorModal(false);
+      setApplyingConv(null);
       setTimeout(() => setApplySuccess(null), 3000);
     } catch (err: any) {
       setError(err.message);
@@ -104,7 +153,13 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
 
   // ── Days remaining ───────────────────────────────────────────────────
   const daysRemaining = (deadline: string) => {
-    const diff = Math.ceil((new Date(deadline).getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+    if (!deadline) return 0;
+    const parts = deadline.split('-');
+    if (parts.length !== 3) return 0;
+    const target = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
     return diff > 0 ? diff : 0;
   };
 
@@ -229,7 +284,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                 <div className="flex items-center justify-between border-y border-white/5 py-4">
                   <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
                     <Calendar size={14} className="text-sud-orange" />
-                    <span>Cierra: {new Date(conv.fechaLimite).toLocaleDateString()}</span>
+                    <span>Cierre: {formatFecha(conv.fechaLimite)}</span>
                   </div>
                   <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${days <= 3 ? 'text-red-400' : 'text-slate-600'}`}>
                     <Clock size={14} />
@@ -316,7 +371,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                 <div className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
                   <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
                     <Calendar size={14} className="text-sud-orange" />
-                    Cierre: {new Date(selectedConv.fechaLimite).toLocaleDateString()}
+                    Cierre: {formatFecha(selectedConv.fechaLimite)}
                   </div>
                   <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${daysRemaining(selectedConv.fechaLimite) <= 3 ? 'text-red-400' : 'text-slate-500'}`}>
                     <Clock size={14} />
@@ -349,6 +404,108 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                   </button>
                 )}
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── No Demos Modal ─────────────────────────────────────────── */}
+      <AnimatePresence>
+        {showNoDemosModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => setShowNoDemosModal(false)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-md p-10 relative overflow-hidden text-center space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setShowNoDemosModal(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="w-16 h-16 mx-auto rounded-full bg-sud-orange/10 border border-sud-orange/30 flex items-center justify-center text-sud-orange">
+                <AlertCircle size={32} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Falta Demo de Voz</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">Debes subir una demo de voz antes de postular.</p>
+              </div>
+
+              <button 
+                onClick={() => {
+                  setShowNoDemosModal(false);
+                  navigate('/demos');
+                }}
+                className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all"
+              >
+                Ir a Mis Demos <Sparkles size={16} />
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Demo Selector Modal ─────────────────────────────────────── */}
+      <AnimatePresence>
+        {showDemoSelectorModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => setShowDemoSelectorModal(false)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-lg p-10 relative overflow-hidden space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setShowDemoSelectorModal(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Selecciona tu Demo de Voz</h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Para postular a <span className="text-sud-orange font-bold">"{applyingConv?.titulo}"</span>, debes seleccionar cuál de tus demos de voz deseas enviar al equipo de casting.
+                </p>
+              </div>
+
+              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                {userDemos.map(demo => (
+                  <div 
+                    key={demo.id} 
+                    onClick={() => setSelectedDemoId(demo.id)}
+                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                      selectedDemoId === demo.id 
+                        ? 'bg-sud-turquoise/10 border-sud-turquoise text-white' 
+                        : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2.5 rounded-xl ${selectedDemoId === demo.id ? 'bg-sud-turquoise/20 text-sud-turquoise' : 'bg-white/5 text-slate-500'}`}>
+                        <Briefcase size={16} />
+                      </div>
+                      <div className="text-left">
+                        <p className="text-sm font-bold truncate max-w-[200px]">{demo.title}</p>
+                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{demo.category || 'Demo'}</p>
+                      </div>
+                    </div>
+                    
+                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                      selectedDemoId === demo.id ? 'border-sud-turquoise' : 'border-slate-700'
+                    }`}>
+                      {selectedDemoId === demo.id && <div className="w-2.5 h-2.5 rounded-full bg-sud-turquoise" />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <button 
+                onClick={confirmApply}
+                disabled={applyingId === applyingConv?.id || !selectedDemoId}
+                className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all"
+              >
+                {applyingId === applyingConv?.id ? (
+                  <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                ) : (
+                  <>Confirmar Postulación <Sparkles size={16} /></>
+                )}
+              </button>
             </motion.div>
           </div>
         )}

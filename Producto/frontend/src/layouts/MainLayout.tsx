@@ -92,7 +92,7 @@ export function MainLayout({ children, user, role, onLogout }: MainLayoutProps) 
 
   return (
     <div
-      className="flex h-screen overflow-hidden bg-sud-black selection:bg-sud-turquoise selection:text-black max-w-[100vw]"
+      className="flex h-screen overflow-hidden bg-sud-black light:bg-slate-50 selection:bg-sud-turquoise selection:text-black max-w-[100vw]"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -151,7 +151,7 @@ export function MainLayout({ children, user, role, onLogout }: MainLayoutProps) 
       <div className="flex-1 flex flex-col h-full overflow-hidden relative min-w-0 max-w-full">
 
         {/* Barra superior móvil con botón hamburguesa */}
-        <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-white/[0.05] bg-sud-black/80 backdrop-blur-sm z-20 shrink-0">
+        <div className="flex md:hidden items-center justify-between px-4 py-3 border-b border-white/[0.05] light:border-slate-200 bg-sud-black/80 light:bg-white/80 backdrop-blur-sm z-20 shrink-0">
           <button
             onClick={() => setSidebarOpen(true)}
             className="w-9 h-9 rounded-xl bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
@@ -179,7 +179,7 @@ export function MainLayout({ children, user, role, onLogout }: MainLayoutProps) 
           </motion.div>
         </main>
 
-        <footer className="shrink-0 h-12 md:h-16 bg-sud-black flex items-center px-4 md:px-12 border-t border-white/[0.02] justify-between relative z-20">
+        <footer className="shrink-0 h-12 md:h-16 bg-sud-black light:bg-slate-50 flex items-center px-4 md:px-12 border-t border-white/[0.02] light:border-slate-200 justify-between relative z-20">
           <div className="flex gap-4 md:gap-8 items-center">
             <div className="flex items-center gap-2 md:gap-3">
               <img

@@ -5,6 +5,7 @@ import sudtalent.sudtalentproyecto.dto.PostulacionRequestDTO;
 import sudtalent.sudtalentproyecto.model.Convocatoria;
 import sudtalent.sudtalentproyecto.model.Postulacion;
 import sudtalent.sudtalentproyecto.model.User;
+import sudtalent.sudtalentproyecto.model.VoiceAudio;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,12 +49,21 @@ public class PostulacionService {
         User userRef = entityManager.getReference(User.class, userUUID);
         Convocatoria convRef = entityManager.getReference(Convocatoria.class, request.getConvocatoriaId());
 
+        VoiceAudio audioRef = null;
+        if (request.getVoiceAudioId() != null) {
+            audioRef = entityManager.find(VoiceAudio.class, request.getVoiceAudioId());
+            if (audioRef == null || audioRef.isDeleted() || !audioRef.getUser().getId().equals(userUUID)) {
+                throw new RuntimeException("El audio seleccionado no pertenece al usuario o no es válido");
+            }
+        }
+
         Postulacion postulacion = Postulacion.builder()
                 .alumno(userRef)
                 .convocatoria(convRef)
                 .fechaPostulacion(LocalDate.now())
                 .estado("PENDIENTE")
                 .mensaje(request.getMensaje())
+                .voiceAudio(audioRef)
                 .build();
 
         return toDTO(postulacionRepository.save(postulacion));
@@ -87,10 +97,58 @@ public class PostulacionService {
 
     // ── Update ───────────────────────────────────────────────────────────
 
-    public PostulacionDTO updateEstado(UUID id, String nuevoEstado) {
+    public PostulacionDTO updatePostulacion(UUID id, String nuevoEstado, String nuevoMensaje, UUID nuevoVoiceAudioId, Authentication authentication) {
         Postulacion postulacion = postulacionRepository.findByIdActive(id)
                 .orElseThrow(() -> new RuntimeException("Postulación no encontrada"));
-        postulacion.setEstado(nuevoEstado);
+        
+        // Determinar el usuario autenticado
+        UUID authenticatedUserId = resolveUserId(null, authentication);
+        
+        // Obtener el rol del usuario autenticado
+        boolean isAdmin = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN") || a.getAuthority().equals("ADMIN"));
+        boolean isProfesor = authentication.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_PROFESOR") || a.getAuthority().equals("PROFESOR"));
+        
+        // Si el usuario es ALUMNO, validar propiedad y estado
+        if (!isAdmin && !isProfesor) {
+            // El alumno debe ser el dueño de la postulación
+            if (postulacion.getAlumno() == null || !postulacion.getAlumno().getId().equals(authenticatedUserId)) {
+                throw new org.springframework.security.access.AccessDeniedException("No tienes permisos para editar esta postulación");
+            }
+            
+            boolean isCanceling = "CANCELADA".equals(nuevoEstado);
+            if (isCanceling) {
+                // Para cancelar, el estado actual debe ser PENDIENTE o EN_REVISION
+                String currentEstado = postulacion.getEstado();
+                if (!"PENDIENTE".equals(currentEstado) && !"EN_REVISION".equals(currentEstado)) {
+                    throw new RuntimeException("Solo se pueden cancelar postulaciones en estado PENDIENTE o EN_REVISION");
+                }
+            } else {
+                // Si está editando (mensaje o demo), la postulación debe estar en estado PENDIENTE
+                if (!"PENDIENTE".equals(postulacion.getEstado())) {
+                    throw new RuntimeException("Solo se pueden editar postulaciones en estado PENDIENTE");
+                }
+                // El alumno no puede cambiar el estado de la postulación a otra cosa
+                if (nuevoEstado != null && !nuevoEstado.equals(postulacion.getEstado())) {
+                    throw new org.springframework.security.access.AccessDeniedException("No tienes permisos para cambiar el estado de la postulación");
+                }
+            }
+        }
+
+        if (nuevoEstado != null) {
+            postulacion.setEstado(nuevoEstado);
+        }
+        if (nuevoMensaje != null) {
+            postulacion.setMensaje(nuevoMensaje);
+        }
+        if (nuevoVoiceAudioId != null) {
+            VoiceAudio audioRef = entityManager.find(VoiceAudio.class, nuevoVoiceAudioId);
+            if (audioRef == null || audioRef.isDeleted() || !audioRef.getUser().getId().equals(postulacion.getAlumno().getId())) {
+                throw new RuntimeException("El audio seleccionado no pertenece al usuario o no es válido");
+            }
+            postulacion.setVoiceAudio(audioRef);
+        }
         return toDTO(postulacionRepository.save(postulacion));
     }
 
@@ -122,6 +180,7 @@ public class PostulacionService {
     private PostulacionDTO toDTO(Postulacion p) {
         User user = p.getAlumno();
         Convocatoria conv = p.getConvocatoria();
+        VoiceAudio audio = p.getVoiceAudio();
 
         return PostulacionDTO.builder()
                 .id(p.getId())
@@ -134,6 +193,10 @@ public class PostulacionService {
                 .convocatoriaCategoria(conv != null ? conv.getCategoria() : null)
                 .fechaPostulacion(p.getFechaPostulacion())
                 .estado(p.getEstado())
+                .mensaje(p.getMensaje())
+                .voiceAudioId(audio != null ? audio.getId() : null)
+                .voiceAudioTitle(audio != null ? audio.getTitle() : null)
+                .voiceAudioUrl(audio != null ? audio.getFileUrl() : null)
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
                 .deletedAt(p.getDeletedAt())

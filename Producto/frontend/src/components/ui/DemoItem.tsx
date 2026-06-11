@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { AudioLines, Video, Film, Trash2, ChevronDown } from 'lucide-react';
 import { VoiceDemo } from '../../types';
 import { AudioPlayer } from './AudioPlayer';
+import { Postulacion } from '../../services/postulacionService';
+import { StatusBadge } from './StatusBadge';
 /** Color map for visual genre badges */
 const GENRE_COLORS: Record<string, string> = {
   Acción:    'bg-red-500/15 text-red-400 border-red-500/20',
@@ -20,9 +22,10 @@ const GENRE_COLORS: Record<string, string> = {
 interface DemoItemProps {
   demo: VoiceDemo;
   onDelete?: (id: string) => void;
+  postulacionesAsociadas?: Postulacion[];
 }
 
-export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
+export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete, postulacionesAsociadas }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isVideo = demo.mediaType === 'VIDEO' || (demo.mediaType as string)?.toLowerCase().includes('video');
   const genreColor = demo.visualGenre ? (GENRE_COLORS[demo.visualGenre] ?? GENRE_COLORS['Otro']) : null;
@@ -157,6 +160,44 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete }) => {
         {demo.description && (
           <p className="text-[10px] text-slate-500 italic mt-2 line-clamp-2">{demo.description}</p>
         )}
+
+        {/* Usage in postulations */}
+        <div className="mt-4 pt-3 border-t border-white/5 space-y-2">
+          {postulacionesAsociadas && postulacionesAsociadas.length > 0 ? (
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black uppercase tracking-widest px-2.5 py-1 rounded-lg border bg-amber-500/10 text-amber-400 border-amber-500/20">
+                  ⚠️ Usada en {postulacionesAsociadas.length} postulación{postulacionesAsociadas.length === 1 ? '' : 'es'}
+                </span>
+              </div>
+              <div className="bg-black/20 border border-white/5 rounded-2xl p-3 space-y-2.5">
+                {postulacionesAsociadas.map(post => (
+                  <div key={post.id} className="flex items-center justify-between gap-3 text-[10px]">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-bold text-slate-300 truncate uppercase tracking-tight">
+                        {post.convocatoriaTitulo || 'Convocatoria sin título'}
+                      </p>
+                      {post.createdAt && (
+                        <p className="text-[8px] text-slate-500 font-mono mt-0.5">
+                          Postulado el: {new Date(post.createdAt).toLocaleDateString('es-CL')}
+                        </p>
+                      )}
+                    </div>
+                    <div className="shrink-0">
+                      {post.estado && <StatusBadge status={post.estado} />}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center">
+              <span className="text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg border bg-white/5 text-slate-500 border-white/10">
+                No usada en postulaciones
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Player - expanded view for audio only */}

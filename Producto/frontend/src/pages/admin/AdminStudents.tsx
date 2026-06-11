@@ -1,14 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight } from 'lucide-react';
 import { UserProfile, WhitelistEntry, ProfileCategory, ProfileStatus } from '../../types';
-import { generateAlumnosPDF } from '../../services/reportService';
+import { generateAlumnosPDF, generateAlumnosExcel } from '../../services/reportService';
 import { fetchAPI } from '../../services/backendService';
 import { AudioPlayer } from '../../components/ui/AudioPlayer';
 
 interface AdminStudentsProps {
   whitelist: WhitelistEntry[];
   users: UserProfile[];
-  onAdd: (phone: string, name: string, category: ProfileCategory, email?: string) => void;
+  onAdd: (phone: string, name: string, category: ProfileCategory, email?: string, role?: string) => void;
   onRemove: (phone: string) => void;
   onUpdate: (phone: string, updates: any) => void;
   onUpdateStatus?: (userId: string, status: ProfileStatus) => void;
@@ -19,29 +19,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
   const [newCategory, setNewCategory] = useState<ProfileCategory>('NONE');
+  const [newRole, setNewRole] = useState('ALUMNO');
   const [searchTerm, setSearchTerm] = useState('');
-
-  // Estado de edición inline
-  const [editingEntry, setEditingEntry] = useState<any | null>(null);
-  const [editName, setEditName] = useState('');
-  const [editPhone, setEditPhone] = useState('');
-  const [editEmail, setEditEmail] = useState('');
-  const [editCategory, setEditCategory] = useState<ProfileCategory>('NONE');
-
-  // Panel de perfil
-  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
-  const [userDemos, setUserDemos] = useState<any[]>([]);
-  const [loadingDemos, setLoadingDemos] = useState(false);
-
-  // Cargar demos cuando se selecciona un usuario
-  useEffect(() => {
-    if (!selectedEntry?.uid) { setUserDemos([]); return; }
-    setLoadingDemos(true);
-    fetchAPI<any[]>(`/voice-audios/user/${selectedEntry.uid}`)
-      .then(data => setUserDemos(data || []))
-      .catch(() => setUserDemos([]))
-      .finally(() => setLoadingDemos(false));
-  }, [selectedEntry?.uid]);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [demoCounts, setDemoCounts] = useState<Record<string, number>>({});
 
   // ── Lista unificada ────────────────────────────────────────────
   const displayUsers = [
@@ -77,13 +58,138 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
     e.email?.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  useEffect(() => {
+    const fetchAllDemoCounts = async () => {
+      const uidsToFetch = displayUsers
+        .filter(u => u.uid && demoCounts[u.uid] === undefined)
+        .map(u => u.uid);
+
+      if (uidsToFetch.length === 0) return;
+
+      const counts: Record<string, number> = { ...demoCounts };
+      await Promise.all(
+        uidsToFetch.map(async (uid) => {
+          try {
+            const audios = await fetchAPI<any[]>(`/voice-audios/user/${uid}`);
+            counts[uid] = audios ? audios.length : 0;
+          } catch (err) {
+            console.error(`Error al obtener demos del usuario ${uid}:`, err);
+            counts[uid] = 0;
+          }
+        })
+      );
+      setDemoCounts(counts);
+    };
+
+    fetchAllDemoCounts();
+  }, [displayUsers]);
+
+  const handleExportExcel = async () => {
+    setExportingExcel(true);
+    try {
+      const enrichedData = await Promise.all(
+        filteredList.map(async (entry) => {
+          let demoCount: string | number = 0;
+          if (entry.uid) {
+            try {
+              const audios = await fetchAPI<any[]>(`/voice-audios/user/${entry.uid}`);
+              demoCount = audios ? audios.length : 0;
+            } catch (err) {
+              console.error(`Error al obtener demos de ${entry.name}:`, err);
+              demoCount = 'No disponible';
+            }
+          } else {
+            demoCount = 'No disponible';
+          }
+
+          // Buscar el usuario registrado correspondiente
+          const registeredUser = users.find(u =>
+            u.uid === entry.uid ||
+            (u.email && entry.email && u.email.toLowerCase() === entry.email.toLowerCase()) ||
+            (u.phone && entry.phone && u.phone.replace(/\D/g, '').slice(-8) === entry.phone.replace(/\D/g, '').slice(-8))
+          );
+
+          // Obtener rol / tipo de perfil
+          let rolTipo = 'No disponible';
+          if (registeredUser?.role === 'ADMIN') {
+            rolTipo = 'Administrador';
+          } else if (registeredUser?.profileType) {
+            rolTipo = registeredUser.profileType;
+          } else if (entry.category && entry.category !== 'NONE') {
+            rolTipo = entry.category;
+          } else if (entry.role) {
+            rolTipo = entry.role;
+          }
+
+          // Mapear etiquetas de estado
+          const STATUS_LABELS: Record<string, string> = {
+            APPROVED: 'Aprobado',
+            PENDING: 'En Revisión',
+            INACTIVE: 'Inactivo',
+            PENDIENTE: 'Pendiente',
+            ACTIVO: 'Activo',
+            INACTIVO: 'Inactivo',
+          };
+          const rawStatus = entry.status || registeredUser?.status || '';
+          const estado = STATUS_LABELS[rawStatus] || rawStatus || 'No disponible';
+
+          // Fecha de registro formateada
+          const rawDate = entry.addedAt || registeredUser?.createdAt;
+          const fechaRegistro = rawDate ? new Date(rawDate).toLocaleDateString('es-CL') : 'No disponible';
+
+          return {
+            'Nombre': entry.name || registeredUser?.name || 'No disponible',
+            'Email': entry.email || registeredUser?.email || 'No disponible',
+            'Teléfono': entry.phone || registeredUser?.phone || 'No disponible',
+            'Edad': registeredUser?.age && registeredUser.age > 0 ? registeredUser.age : 'No disponible',
+            'Rol/Tipo de Perfil': rolTipo,
+            'Estado del Perfil': estado,
+            'Cantidad de Demos': demoCount,
+            'Fecha de Registro': fechaRegistro
+          };
+        })
+      );
+
+      generateAlumnosExcel(enrichedData);
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error);
+      alert('Hubo un error al exportar los datos a Excel.');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
+
+  // Estado de edición inline
+  const [editingEntry, setEditingEntry] = useState<any | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editPhone, setEditPhone] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  const [editCategory, setEditCategory] = useState<ProfileCategory>('NONE');
+
+  // Panel de perfil
+  const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
+  const [userDemos, setUserDemos] = useState<any[]>([]);
+  const [loadingDemos, setLoadingDemos] = useState(false);
+
+  // Cargar demos cuando se selecciona un usuario
+  useEffect(() => {
+    if (!selectedEntry?.uid) { setUserDemos([]); return; }
+    setLoadingDemos(true);
+    fetchAPI<any[]>(`/voice-audios/user/${selectedEntry.uid}`)
+      .then(data => setUserDemos(data || []))
+      .catch(() => setUserDemos([]))
+      .finally(() => setLoadingDemos(false));
+  }, [selectedEntry?.uid]);
+
+  // (Lista unificada y filtrada movida arriba para evitar temporal dead zone)
+
   // ── Añadir ────────────────────────────────────────────────────
   const handleAdd = (e: React.FormEvent) => {
     e.preventDefault();
     const digitsOnly = newPhone.replace(/\D/g, '');
     if (digitsOnly.length >= 8 && newName.trim()) {
-      onAdd(`569${digitsOnly}`, newName.trim(), newCategory, newEmail.trim());
-      setNewPhone(''); setNewName(''); setNewEmail(''); setNewCategory('NONE');
+      onAdd(`569${digitsOnly}`, newName.trim(), newCategory, newEmail.trim(), newRole);
+      setNewPhone(''); setNewName(''); setNewEmail(''); setNewCategory('NONE'); setNewRole('ALUMNO');
     } else {
       alert('Por favor ingrese un nombre y 8 dígitos de teléfono.');
     }
@@ -188,6 +294,15 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                 </select>
               </div>
               <div className="space-y-2">
+                <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Tipo de Perfil / Rol</label>
+                <select value={newRole} onChange={e => setNewRole(e.target.value)} className="sud-input w-full appearance-none cursor-pointer">
+                  <option value="ALUMNO">Alumno</option>
+                  <option value="PROFESOR">Profesor</option>
+                  <option value="ADMIN">Administrador</option>
+                </select>
+                <p className="text-[8px] text-slate-700 uppercase tracking-widest font-bold px-1">El rol se asignará cuando el usuario se registre</p>
+              </div>
+              <div className="space-y-2">
                 <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
                   Correo <span className="text-slate-700">(opcional)</span>
                 </label>
@@ -219,6 +334,19 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                   <FileDown size={15} />
                   Exportar PDF
                 </button>
+                <button
+                  onClick={handleExportExcel}
+                  disabled={exportingExcel}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sud-turquoise/10 hover:bg-sud-turquoise/20 border border-sud-turquoise/20 text-sud-turquoise font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Exportar lista como Excel"
+                >
+                  {exportingExcel ? (
+                    <span className="w-3.5 h-3.5 rounded-full border border-sud-turquoise border-t-transparent animate-spin shrink-0" />
+                  ) : (
+                    <FileDown size={15} className="shrink-0" />
+                  )}
+                  {exportingExcel ? 'Exportando...' : 'Exportar Excel'}
+                </button>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />
                   <input placeholder="Buscar alumno..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -235,6 +363,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                     <th className="px-4 py-4">Teléfono</th>
                     <th className="px-4 py-4">Correo</th>
                     <th className="px-4 py-4">Estado</th>
+                    <th className="px-4 py-4">Demos</th>
                     <th className="px-4 py-4">Categoría</th>
                     <th className="px-4 py-4 text-right">Acciones</th>
                   </tr>
@@ -261,11 +390,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                                 const fullUser = users.find(u => u.uid === entry.uid);
                                 setSelectedEntry({ ...entry, avatar: fullUser?.avatar || entry.avatar });
                               }}
-                              className={`text-sm font-black uppercase tracking-tight text-left transition-colors ${
-                                entry.uid
+                              className={`text-sm font-black uppercase tracking-tight text-left transition-colors ${entry.uid
                                   ? 'text-white hover:text-sud-turquoise cursor-pointer'
                                   : 'text-slate-500 cursor-default'
-                              }`}
+                                }`}
                               title={entry.uid ? 'Ver perfil' : 'Sin cuenta registrada'}
                             >
                               {entry.name || 'Sin Nombre'}
@@ -351,6 +479,16 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                           )}
                         </td>
 
+                        {/* Demos */}
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${entry.uid && demoCounts[entry.uid] > 0
+                              ? 'text-sud-turquoise border-sud-turquoise/20 bg-sud-turquoise/5 font-black'
+                              : 'text-slate-500 border-white/5 bg-white/5'
+                            }`}>
+                            {entry.uid ? (demoCounts[entry.uid] !== undefined ? (demoCounts[entry.uid] > 0 ? `${demoCounts[entry.uid]} demos` : 'Sin demos') : 'Cargando...') : 'Sin demos'}
+                          </span>
+                        </td>
+
                         {/* Categoría */}
                         <td className="px-4 py-3">
                           {isEditing ? (
@@ -362,12 +500,11 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                               <option value="BOTH">Ambos</option>
                             </select>
                           ) : (
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-current/10 ${
-                              entry.category === 'ADULT' ? 'text-blue-400 bg-blue-400/5' :
-                              entry.category === 'MINOR' ? 'text-pink-400 bg-pink-400/5' :
-                              entry.category === 'BOTH'  ? 'text-purple-400 bg-purple-400/5' :
-                              'text-slate-500 opacity-50 bg-white/5'
-                            }`}>
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-current/10 ${entry.category === 'ADULT' ? 'text-blue-400 bg-blue-400/5' :
+                                entry.category === 'MINOR' ? 'text-pink-400 bg-pink-400/5' :
+                                  entry.category === 'BOTH' ? 'text-purple-400 bg-purple-400/5' :
+                                    'text-slate-500 opacity-50 bg-white/5'
+                              }`}>
                               {getCategoryLabel(entry.category)}
                             </span>
                           )}
@@ -389,6 +526,16 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                               </>
                             ) : (
                               <>
+                                {entry.uid && (
+                                  <button onClick={() => {
+                                    const fullUser = users.find(u => u.uid === entry.uid);
+                                    setSelectedEntry({ ...entry, avatar: fullUser?.avatar || entry.avatar });
+                                  }}
+                                    className="p-2 text-white/10 hover:text-sud-turquoise hover:bg-sud-turquoise/5 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    title="Ver perfil">
+                                    <User size={18} />
+                                  </button>
+                                )}
                                 <button onClick={() => handleStartEdit(entry)}
                                   className="p-2 text-white/10 hover:text-sud-turquoise hover:bg-sud-turquoise/5 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100"
                                   title="Editar">
@@ -539,11 +686,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                       <div key={demo.id} className="p-4 bg-white/[0.03] rounded-2xl border border-white/5 space-y-2">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-black text-white uppercase tracking-tight truncate">{demo.title}</p>
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                            (demo.mediaType || '').toLowerCase().includes('video')
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${(demo.mediaType || '').toLowerCase().includes('video')
                               ? 'bg-sud-turquoise/10 text-sud-turquoise'
                               : 'bg-sud-orange/10 text-sud-orange'
-                          }`}>
+                            }`}>
                             {(demo.mediaType || '').toLowerCase().includes('video') ? 'Video' : 'Audio'}
                           </span>
                         </div>

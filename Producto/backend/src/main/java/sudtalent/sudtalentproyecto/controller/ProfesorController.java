@@ -9,7 +9,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/profesores")
@@ -25,7 +24,7 @@ public class ProfesorController {
     
     @GetMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profesor> getProfesorById(@PathVariable UUID id) {
+    public ResponseEntity<Profesor> getProfesorById(@PathVariable Long id) {
         return ResponseEntity.ok(profesorService.getProfesorById(id));
     }
     
@@ -37,13 +36,13 @@ public class ProfesorController {
     
     @PutMapping("/{id}")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Profesor> updateProfesor(@PathVariable UUID id, @Valid @RequestBody Profesor profesorUpdate) {
+    public ResponseEntity<Profesor> updateProfesor(@PathVariable Long id, @Valid @RequestBody Profesor profesorUpdate) {
         return ResponseEntity.ok(profesorService.updateProfesor(id, profesorUpdate));
     }
     
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Void> deleteProfesor(@PathVariable UUID id) {
+    public ResponseEntity<Void> deleteProfesor(@PathVariable Long id) {
         profesorService.deleteProfesor(id);
         return ResponseEntity.noContent().build();
     }

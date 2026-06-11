@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 export interface AlumnoReportRow {
   nombre: string;
@@ -155,4 +156,19 @@ export function generateAlumnosPDF(entries: any[]) {
   }
 
   doc.save(`sudtalent-alumnos-${new Date().toISOString().slice(0, 10)}.pdf`);
+}
+
+export function generateAlumnosExcel(data: any[]) {
+  const worksheet = XLSX.utils.json_to_sheet(data);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Alumnos');
+  
+  // Ajustar el ancho de las columnas de forma automática
+  const maxProps = Object.keys(data[0] || {});
+  worksheet['!cols'] = maxProps.map(key => ({
+    wch: Math.max(key.length + 2, ...data.map(row => String(row[key] || '').length + 2))
+  }));
+
+  // Usar directamente XLSX.writeFile para asegurar la descarga del archivo reporte_alumnos_sudtalent.xlsx
+  XLSX.writeFile(workbook, 'reporte_alumnos_sudtalent.xlsx');
 }

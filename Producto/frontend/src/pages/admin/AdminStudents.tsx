@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight } from 'lucide-react';
 import { UserProfile, WhitelistEntry, ProfileCategory, ProfileStatus } from '../../types';
-import { generateAlumnosPDF } from '../../services/reportService';
+import { generateAlumnosPDF, generateAlumnosExcel } from '../../services/reportService';
 import { fetchAPI } from '../../services/backendService';
 import { AudioPlayer } from '../../components/ui/AudioPlayer';
 
@@ -21,6 +21,82 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [newCategory, setNewCategory] = useState<ProfileCategory>('NONE');
   const [newRole, setNewRole] = useState('ALUMNO');
   const [searchTerm, setSearchTerm] = useState('');
+  const [exportingExcel, setExportingExcel] = useState(false);
+
+  const handleExportExcel = async () => {
+    setExportingExcel(true);
+    try {
+      const enrichedData = await Promise.all(
+        filteredList.map(async (entry) => {
+          let demoCount: string | number = 0;
+          if (entry.uid) {
+            try {
+              const audios = await fetchAPI<any[]>(`/voice-audios/user/${entry.uid}`);
+              demoCount = audios ? audios.length : 0;
+            } catch (err) {
+              console.error(`Error al obtener demos de ${entry.name}:`, err);
+              demoCount = 'No disponible';
+            }
+          } else {
+            demoCount = 'No disponible';
+          }
+
+          // Buscar el usuario registrado correspondiente
+          const registeredUser = users.find(u => 
+            u.uid === entry.uid || 
+            (u.email && entry.email && u.email.toLowerCase() === entry.email.toLowerCase()) ||
+            (u.phone && entry.phone && u.phone.replace(/\D/g, '').slice(-8) === entry.phone.replace(/\D/g, '').slice(-8))
+          );
+
+          // Obtener rol / tipo de perfil
+          let rolTipo = 'No disponible';
+          if (registeredUser?.role === 'ADMIN') {
+            rolTipo = 'Administrador';
+          } else if (registeredUser?.profileType) {
+            rolTipo = registeredUser.profileType;
+          } else if (entry.category && entry.category !== 'NONE') {
+            rolTipo = entry.category;
+          } else if (entry.role) {
+            rolTipo = entry.role;
+          }
+
+          // Mapear etiquetas de estado
+          const STATUS_LABELS: Record<string, string> = {
+            APPROVED: 'Aprobado',
+            PENDING: 'En Revisión',
+            INACTIVE: 'Inactivo',
+            PENDIENTE: 'Pendiente',
+            ACTIVO: 'Activo',
+            INACTIVO: 'Inactivo',
+          };
+          const rawStatus = entry.status || registeredUser?.status || '';
+          const estado = STATUS_LABELS[rawStatus] || rawStatus || 'No disponible';
+
+          // Fecha de registro formateada
+          const rawDate = entry.addedAt || registeredUser?.createdAt;
+          const fechaRegistro = rawDate ? new Date(rawDate).toLocaleDateString('es-CL') : 'No disponible';
+
+          return {
+            'Nombre': entry.name || registeredUser?.name || 'No disponible',
+            'Email': entry.email || registeredUser?.email || 'No disponible',
+            'Teléfono': entry.phone || registeredUser?.phone || 'No disponible',
+            'Edad': registeredUser?.age && registeredUser.age > 0 ? registeredUser.age : 'No disponible',
+            'Rol/Tipo de Perfil': rolTipo,
+            'Estado del Perfil': estado,
+            'Cantidad de Demos': demoCount,
+            'Fecha de Registro': fechaRegistro
+          };
+        })
+      );
+
+      generateAlumnosExcel(enrichedData);
+    } catch (error) {
+      console.error('Error al exportar a Excel:', error);
+      alert('Hubo un error al exportar los datos a Excel.');
+    } finally {
+      setExportingExcel(false);
+    }
+  };
 
   // Estado de edición inline
   const [editingEntry, setEditingEntry] = useState<any | null>(null);
@@ -228,6 +304,19 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                 >
                   <FileDown size={15} />
                   Exportar PDF
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  disabled={exportingExcel}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sud-turquoise/10 hover:bg-sud-turquoise/20 border border-sud-turquoise/20 text-sud-turquoise font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="Exportar lista como Excel"
+                >
+                  {exportingExcel ? (
+                    <span className="w-3.5 h-3.5 rounded-full border border-sud-turquoise border-t-transparent animate-spin shrink-0" />
+                  ) : (
+                    <FileDown size={15} className="shrink-0" />
+                  )}
+                  {exportingExcel ? 'Exportando...' : 'Exportar Excel'}
                 </button>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />

@@ -28,11 +28,11 @@ Tus tareas principales e información sobre la que puedes guiar:
 
 Restricciones críticas:
 - NO inventes datos reales de usuarios, convocatorias, demos, profesores o administradores si no los tienes disponibles.
-- Si un usuario te pregunta por datos específicos (por ejemplo: "¿quién postuló a X convocatoria?" o "¿cuál es mi nota en Y demo?"), debes responder de manera educada que como asistente de chat no tienes acceso directo en tiempo real para visualizar esos registros privados de la base de datos por motivos de seguridad, y que deben revisarlo en sus respectivas secciones (Mi Perfil, Oportunidades o Mis Postulaciones).
+- Si un usuario te pregunta por datos específicos de los cuales no hay registro en el contexto (por ejemplo, notas de demos específicas, contraseñas, etc.), debes responder de manera educada que no tienes acceso en tiempo real a esa información específica y que deben revisarlo en sus respectivas secciones.
 - Responde siempre en español de Chile o neutro latinoamericano, con un tono amable, profesional, cercano, claro y de forma breve (evita textos excesivamente largos).
 `;
 
-export async function sendMessageToGemini(history: ChatMessage[]): Promise<string> {
+export async function sendMessageToGemini(history: ChatMessage[], userContext?: string): Promise<string> {
   const currentKey = import.meta.env.VITE_GEMINI_API_KEY;
 
   if (!currentKey) {
@@ -51,11 +51,26 @@ export async function sendMessageToGemini(history: ChatMessage[]): Promise<strin
       parts: [{ text: msg.text }]
     }));
 
+    // Inyectar el bloque "Contexto real de SudTalent" en el prompt del sistema
+    const finalInstruction = `
+${SYSTEM_INSTRUCTION.trim()}
+
+### Contexto real de SudTalent
+${userContext || 'No hay información de contexto del usuario disponible actualmente.'}
+
+Instrucciones para responder con base en el contexto:
+- Si el usuario te pregunta cosas como "¿Qué me falta en mi perfil?" o "¿Mi perfil está completo?", analiza los datos reales de arriba: comprueba si la edad, el teléfono o la biografía están como "No disponible" o vacíos, o si la cantidad de demos es 0. Indícales cuáles de estos datos faltan y sugiéreles ir a "Mi Perfil" para completarlos.
+- Si te preguntan "¿Tengo demos subidas?", responde usando la sección "DEMOS DE VOZ Y PORTAFOLIO" indicando la cantidad y nombres de las demos si están presentes.
+- Si te preguntan "¿Qué puedo mejorar para postular?", sugiéreles completar su perfil y subir demos pertinentes al área que les interese de doblaje/locución.
+- Si te preguntan "¿Dónde puedo ver mis convocatorias?", explícales que pueden verlas en la sección "Oportunidades" de la barra lateral, y sus postulaciones enviadas en "Mis Postulaciones".
+- Nunca inventes datos que no figuren en el bloque "Contexto real de SudTalent". Si no se indica alguna postulación o convocatoria en la lista de arriba, asume que no hay o di amablemente que no posees ese dato en particular.
+`.trim();
+
     const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: contents,
       config: {
-        systemInstruction: SYSTEM_INSTRUCTION.trim(),
+        systemInstruction: finalInstruction,
         temperature: 0.7,
       }
     });

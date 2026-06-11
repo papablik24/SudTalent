@@ -2,17 +2,149 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Bot, Send, Trash2, AlertTriangle, Sparkles, RefreshCw, User as UserIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChatMessage, sendMessageToGemini } from '../services/geminiService';
+import { useAuth } from '../hooks/useAuth';
+import { fetchAPI, backendService } from '../services/backendService';
+import { demoService } from '../services/demoService';
+import { postulacionService } from '../services/postulacionService';
+import { convocatoriaService } from '../services/convocatoriaService';
 
 export function AsistenteIA() {
+  const { currentUser } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [userContext, setUserContext] = useState<string>('');
   
   // Detectar si la clave de API está configurada en la compilación / entorno de Vite
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean>(true);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Cargar contexto del usuario actual
+  useEffect(() => {
+    const fetchUserContextData = async () => {
+      if (!currentUser) return;
+
+      try {
+        let profileDetails: any = null;
+        let userDemos: any[] = [];
+        let userPostulaciones: any[] = [];
+        let activeConvocatorias: any[] = [];
+        let allUsersCount: string | number = 'No disponible';
+        let allPostulacionesCount: string | number = 'No disponible';
+        let allConvocatoriasCount: string | number = 'No disponible';
+
+        const token = localStorage.getItem('sud_jwt_token') || '';
+
+        // 1. Obtener datos de /profile
+        try {
+          profileDetails = await fetchAPI<any>('/profile');
+        } catch (err) {
+          console.warn('Error al obtener perfil, usando datos locales:', err);
+        }
+
+        // Si falló /profile o no está disponible, usar datos básicos del currentUser
+        const nombre = profileDetails?.name || currentUser.name || 'No disponible';
+        const rol = currentUser.role || 'No disponible';
+        const tipoPerfil = profileDetails?.profileType || currentUser.profileType || 'No disponible';
+        const estadoPerfil = profileDetails?.status || currentUser.status || 'No disponible';
+        const edad = profileDetails?.age && profileDetails.age > 0 ? profileDetails.age : (currentUser.age || 'No disponible');
+        const telefono = profileDetails?.phone || currentUser.phone || 'No disponible';
+        const bio = profileDetails?.bio || currentUser.bio || 'No disponible';
+
+        // 2. Alumno vs Admin
+        if (currentUser.role === 'ADMIN') {
+          // Si es ADMIN, podemos intentar cargar datos generales si están disponibles
+          try {
+            const users = await backendService.getAllUsers();
+            allUsersCount = users.length;
+          } catch {}
+
+          try {
+            const pos = await postulacionService.getAllPostulaciones();
+            allPostulacionesCount = pos.length;
+          } catch {}
+
+          try {
+            const conv = await convocatoriaService.getConvocatorias();
+            allConvocatoriasCount = conv.length;
+          } catch {}
+        } else {
+          // Si es Alumno/USER, cargar demos, postulaciones y convocatorias activas
+          try {
+            if (token) {
+              userDemos = await demoService.getUserDemos(token);
+            }
+          } catch (err) {
+            console.warn('Error al obtener demos:', err);
+          }
+
+          try {
+            userPostulaciones = await postulacionService.getPostulacionesByUser(currentUser.uid);
+          } catch (err) {
+            console.warn('Error al obtener postulaciones:', err);
+          }
+
+          try {
+            activeConvocatorias = await convocatoriaService.getConvocatoriasActivas();
+          } catch (err) {
+            console.warn('Error al obtener convocatorias activas:', err);
+          }
+        }
+
+        // 3. Formatear el bloque de contexto
+        let contextText = `DATOS DEL USUARIO ACTUAL:
+- Nombre: ${nombre}
+- Rol/Tipo de Perfil: ${rol} (${tipoPerfil})
+- Estado de Cuenta: ${estadoPerfil}
+- Edad: ${edad}
+- Teléfono: ${telefono}
+- Bio: ${bio}
+`;
+
+        if (currentUser.role === 'ADMIN') {
+          contextText += `
+DATOS GENERALES DE LA PLATAFORMA (VISTA ADMINISTRADOR):
+- Total de Usuarios Registrados: ${allUsersCount}
+- Total de Convocatorias en la Plataforma: ${allConvocatoriasCount}
+- Total de Postulaciones en la Plataforma: ${allPostulacionesCount}
+`;
+        } else {
+          contextText += `
+DEMOS DE VOZ Y PORTAFOLIO:
+- Cantidad de Demos Subidas: ${userDemos.length}
+`;
+          if (userDemos.length > 0) {
+            contextText += `Demos actuales:\n` + userDemos.map((d, i) => `  - "${d.title}" - Categoría: ${d.category} (Formato: ${d.fileFormat || 'No disponible'}, Tamaño: ${d.fileSizeMb}MB)`).join('\n') + '\n';
+          }
+
+          contextText += `
+MIS POSTULACIONES A AUDICIONES:
+- Cantidad de Postulaciones: ${userPostulaciones.length}
+`;
+          if (userPostulaciones.length > 0) {
+            contextText += `Historial de postulaciones:\n` + userPostulaciones.map((p, i) => `  - A Convocatoria: "${p.convocatoriaTitulo || 'No disponible'}" (Categoría: ${p.convocatoriaCategoria || 'No disponible'}) - Estado: ${p.estado || 'PENDIENTE'}`).join('\n') + '\n';
+          }
+
+          contextText += `
+CONVOCATORIAS DISPONIBLES EN LA PLATAFORMA:
+- Cantidad de Convocatorias Activas: ${activeConvocatorias.length}
+`;
+          if (activeConvocatorias.length > 0) {
+            contextText += `Oportunidades activas:\n` + activeConvocatorias.map((c, i) => `  - Convocatoria: "${c.titulo}" (Categoría: ${c.categoria}) - Fecha Límite: ${c.fechaLimite}`).join('\n') + '\n';
+          }
+        }
+
+        setUserContext(contextText);
+        console.log('Contexto de usuario cargado con éxito para Asistente IA.');
+      } catch (err) {
+        console.error('Error al construir el contexto del Asistente IA:', err);
+      }
+    };
+
+    fetchUserContextData();
+  }, [currentUser]);
 
   // Verificar si la clave de API está definida al montar la vista
   useEffect(() => {
@@ -53,7 +185,7 @@ export function AsistenteIA() {
     try {
       // Enviamos el historial completo para mantener el contexto básico de la conversación
       const historyToSend = [...messages, userMessage];
-      const botResponse = await sendMessageToGemini(historyToSend);
+      const botResponse = await sendMessageToGemini(historyToSend, userContext);
       
       setMessages(prev => [...prev, { role: 'model', text: botResponse }]);
     } catch (err: any) {
@@ -149,7 +281,7 @@ export function AsistenteIA() {
           <div className="px-4 py-3 md:px-6 md:py-4 border-b border-white/5 bg-white/[0.01] flex items-center justify-between shrink-0">
             <div className="flex items-center gap-2.5 md:gap-3">
               <div className="w-8 h-8 md:w-9 md:h-9 rounded-xl bg-sud-turquoise/10 border border-sud-turquoise/20 flex items-center justify-center text-sud-turquoise shadow-lg shadow-sud-turquoise/5">
-                <Bot size={16} md={18} />
+                <Bot size={18} />
               </div>
               <div>
                 <p className="text-[11px] md:text-xs font-black uppercase text-white light:text-slate-900 tracking-wide">Asistente SudTalent</p>
@@ -185,7 +317,7 @@ export function AsistenteIA() {
                         ? 'bg-sud-turquoise/10 border-sud-turquoise/25 text-sud-turquoise' 
                         : 'bg-sud-orange/10 border-sud-orange/25 text-sud-orange'
                     }`}>
-                      {isBot ? <Bot size={15} md={18} /> : <UserIcon size={15} md={18} />}
+                      {isBot ? <Bot size={18} /> : <UserIcon size={18} />}
                     </div>
 
                     {/* Globo del Mensaje */}
@@ -209,7 +341,7 @@ export function AsistenteIA() {
                 className="flex items-start gap-2.5 md:gap-4 max-w-[90%] mr-auto"
               >
                 <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-sud-turquoise/10 border border-sud-turquoise/25 flex items-center justify-center text-sud-turquoise shrink-0">
-                  <Bot size={15} md={18} className="animate-pulse" />
+                  <Bot size={18} className="animate-pulse" />
                 </div>
                 <div className="p-3 md:p-4 rounded-2xl rounded-tl-sm bg-white/[0.02] border border-white/5 text-slate-400 light:text-slate-600 text-[13px] md:text-sm flex items-center space-x-2 shadow-md">
                   <span>Asistente está escribiendo</span>
@@ -251,7 +383,7 @@ export function AsistenteIA() {
               disabled={!input.trim() || loading}
               className="sud-btn-primary rounded-2xl shrink-0 flex items-center justify-center cursor-pointer w-[46px] h-[46px] md:w-[54px] md:h-[54px] !p-0"
             >
-              <Send size={15} md={18} />
+              <Send size={18} />
             </button>
           </form>
         </div>

@@ -32,6 +32,18 @@ const EMPTY_FORM: FormData = {
   requisitosText: '',
 };
 
+const formatFecha = (fechaStr: string) => {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    return new Date(year, month, day).toLocaleDateString();
+  }
+  return new Date(fechaStr).toLocaleDateString();
+};
+
 export function ConvocatoriasAdmin() {
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
@@ -104,7 +116,8 @@ export function ConvocatoriasAdmin() {
     if (!formData.titulo.trim()) { setFormError('El título es requerido.'); return; }
     if (!formData.descripcion.trim()) { setFormError('La descripción es requerida.'); return; }
     if (!formData.fechaLimite) { setFormError('La fecha límite es requerida.'); return; }
-    if (new Date(formData.fechaLimite) < new Date(new Date().toDateString())) {
+    const todayStr = new Date().toLocaleDateString('sv-SE');
+    if (formData.fechaLimite < todayStr) {
       setFormError('La fecha límite no puede ser anterior a hoy.'); return;
     }
 
@@ -117,7 +130,7 @@ export function ConvocatoriasAdmin() {
         .split('\n')
         .map(r => r.trim())
         .filter(Boolean),
-      fechaLimite: new Date(formData.fechaLimite).toISOString(),
+      fechaLimite: formData.fechaLimite,
       estado: formData.estado,
     };
 
@@ -160,7 +173,7 @@ export function ConvocatoriasAdmin() {
       categoria: conv.categoria,
       generoVisual: conv.generoVisual,
       requisitos: conv.requisitos,
-      fechaLimite: conv.fechaLimite ? new Date(conv.fechaLimite).toISOString().split('T')[0] : '',
+      fechaLimite: conv.fechaLimite || '',
       estado: conv.estado,
       requisitosText: conv.requisitos.join('\n'),
     });
@@ -283,7 +296,7 @@ export function ConvocatoriasAdmin() {
               <div className="flex items-center gap-6 pt-2">
                 <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
                   <Calendar size={14} />
-                  <span>Cierre: {new Date(conv.fechaLimite).toLocaleDateString()}</span>
+                  <span>Cierre: {formatFecha(conv.fechaLimite)}</span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-sud-turquoise font-bold uppercase tracking-widest">
                   <Users size={14} />

@@ -5,6 +5,7 @@ import { UserProfile, VoiceDemo, DemoCategory, VisualGenre, MediaType, FileForma
 import { DemoItem } from '../../components/ui/DemoItem';
 import { AudioDropZone } from '../../components/ui/AudioDropZone';
 import { demoService, DemoDTO } from '../../services/demoService';
+import { postulacionService, Postulacion } from '../../services/postulacionService';
 
 // ─── Allowed formats ────────────────────────────────────────────────
 const AUDIO_FORMATS = ['MP3', 'WAV'] as const;
@@ -41,6 +42,8 @@ const DEFAULT_FORM: DemoForm = {
 
 export function UserDemosView({ user }: { user: UserProfile }) {
   const [demos, setDemos] = useState<VoiceDemo[]>([]);
+  const [userPostulaciones, setUserPostulaciones] = useState<Postulacion[]>([]);
+  const [confirmDeleteDemo, setConfirmDeleteDemo] = useState<{ id: string; count: number } | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [isLoadingDemos, setIsLoadingDemos] = useState(true);
   const [form, setForm] = useState<DemoForm>(DEFAULT_FORM);
@@ -59,7 +62,10 @@ export function UserDemosView({ user }: { user: UserProfile }) {
           return;
         }
 
-        const demoData = await demoService.getUserDemos(token);
+        const [demoData, postData] = await Promise.all([
+          demoService.getUserDemos(token),
+          postulacionService.getPostulacionesByUser(user.uid)
+        ]);
         
         // Convertir DemoDTO a VoiceDemo para compatibilidad con DemoItem
         const mappedDemos = demoData.map((demo: DemoDTO) => {
@@ -83,7 +89,9 @@ export function UserDemosView({ user }: { user: UserProfile }) {
         });
 
         setDemos(mappedDemos);
+        setUserPostulaciones(postData || []);
         console.log('✅ Demos cargadas:', mappedDemos.length);
+        console.log('✅ Postulaciones cargadas:', (postData || []).length);
       } catch (error) {
         console.error('❌ Error cargando demos:', error);
       } finally {
@@ -162,10 +170,20 @@ export function UserDemosView({ user }: { user: UserProfile }) {
 
   // ── Delete demo ─────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
+    const associatedPosts = userPostulaciones.filter(p => p.voiceAudioId === id && !p.deletedAt);
+    if (associatedPosts.length > 0) {
+      setConfirmDeleteDemo({ id, count: associatedPosts.length });
+      return;
+    }
+
     if (!confirm('¿Estás seguro de que deseas eliminar esta demo?')) {
       return;
     }
 
+    await executeDelete(id);
+  };
+
+  const executeDelete = async (id: string) => {
     try {
       const token = localStorage.getItem('sud_jwt_token');
       if (!token) {
@@ -380,20 +398,71 @@ export function UserDemosView({ user }: { user: UserProfile }) {
             </div>
           ) : (
             <div className="grid grid-cols-1 gap-4">
-              {demos.map(demo => (
-                <motion.div
-                  key={demo.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                >
-                  <DemoItem demo={demo} onDelete={handleDelete} />
-                </motion.div>
-              ))}
+              {demos.map(demo => {
+                const associatedPosts = userPostulaciones.filter(p => p.voiceAudioId === demo.id && !p.deletedAt);
+                return (
+                  <motion.div
+                    key={demo.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                  >
+                    <DemoItem 
+                      demo={demo} 
+                      onDelete={handleDelete} 
+                      postulacionesAsociadas={associatedPosts}
+                    />
+                  </motion.div>
+                );
+              })}
             </div>
           )}
         </div>
       </div>
+
+      {/* ── Delete Confirmation Modal ────────────────────────────── */}
+      <AnimatePresence>
+        {confirmDeleteDemo && (
+          <div className="fixed inset-0 z-55 flex items-center justify-center p-4 backdrop-blur-md bg-black/60" onClick={() => setConfirmDeleteDemo(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-md p-8 relative space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setConfirmDeleteDemo(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+
+              <div className="space-y-2">
+                <h3 className="text-xl font-black text-white uppercase tracking-tight">Confirmar Eliminación</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Atención requerida</p>
+              </div>
+              
+              <p className="text-sm text-slate-300 leading-relaxed font-medium">
+                ¿Estás seguro? Esta demo está siendo usada en <strong className="text-sud-orange">{confirmDeleteDemo.count} postulación{confirmDeleteDemo.count === 1 ? '' : 'es'}</strong>. Si la eliminas, esas postulaciones podrían quedar sin demo asociada.
+              </p>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-3 pt-2">
+                <button
+                  onClick={() => setConfirmDeleteDemo(null)}
+                  className="px-5 py-3 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-black uppercase tracking-widest text-slate-300 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => {
+                    executeDelete(confirmDeleteDemo.id);
+                    setConfirmDeleteDemo(null);
+                  }}
+                  className="px-5 py-3 rounded-xl bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 text-xs font-black uppercase tracking-widest text-red-400 transition-all cursor-pointer"
+                >
+                  Eliminar de todas formas
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

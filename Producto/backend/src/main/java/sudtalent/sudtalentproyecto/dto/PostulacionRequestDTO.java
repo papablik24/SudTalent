@@ -22,4 +22,6 @@ public class PostulacionRequestDTO {
     private UUID alumnoId;
 
     private String mensaje;
+    
+    private UUID voiceAudioId;
 }

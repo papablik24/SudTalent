@@ -36,6 +36,12 @@ public class PostulacionDTO {
     // Postulacion info
     private LocalDate fechaPostulacion;
     private String estado; // PENDIENTE, EN_REVISION, ACEPTADA, RECHAZADA
+    private String mensaje;
+
+    // VoiceAudio info
+    private UUID voiceAudioId;
+    private String voiceAudioTitle;
+    private String voiceAudioUrl;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

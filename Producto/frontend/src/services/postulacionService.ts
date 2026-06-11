@@ -25,6 +25,9 @@ export interface Postulacion {
   userPhone?: string;
   estado?: PostulacionEstado;
   mensaje?: string;
+  voiceAudioId?: string;
+  voiceAudioTitle?: string;
+  voiceAudioUrl?: string;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -34,6 +37,7 @@ export interface CreatePostulacionDTO {
   convocatoriaId: string;   // UUID de la convocatoria
   alumnoId?: string;        // UUID del alumno (opcional, si no lo extrae el backend del JWT)
   mensaje?: string;
+  voiceAudioId?: string;
 }
 
 // ── Public API ─────────────────────────────────────────────────────────
@@ -146,6 +150,23 @@ export async function deletePostulacion(id: string): Promise<void> {
   }
 }
 
+/**
+ * Actualizar campos de la postulación (estado, mensaje, etc.)
+ */
+export async function updatePostulacion(id: string, data: { estado?: string; mensaje?: string; voiceAudioId?: string }): Promise<Postulacion> {
+  try {
+    const response = await fetchAPI<Postulacion>(`/postulaciones/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+    console.log('✅ Postulación actualizada:', response);
+    return response;
+  } catch (error) {
+    console.error(`Error al actualizar postulación ${id}:`, error);
+    throw error;
+  }
+}
+
 export const postulacionService = {
   getAllPostulaciones,
   getPostulacionById,
@@ -154,5 +175,6 @@ export const postulacionService = {
   hasUserApplied,
   createPostulacion,
   updatePostulacionStatus,
+  updatePostulacion,
   deletePostulacion,
 };

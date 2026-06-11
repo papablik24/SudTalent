@@ -22,6 +22,67 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [newRole, setNewRole] = useState('ALUMNO');
   const [searchTerm, setSearchTerm] = useState('');
   const [exportingExcel, setExportingExcel] = useState(false);
+  const [demoCounts, setDemoCounts] = useState<Record<string, number>>({});
+
+  // ── Lista unificada ────────────────────────────────────────────
+  const displayUsers = [
+    ...whitelist.map(w => ({
+      ...(w as any),
+      type: 'WHITELIST' as const,
+      category: (w as any).category || 'NONE',
+      uid: (w as any).uid,
+      status: (w as any).userStatus || (w as any).status,
+    })),
+    ...users
+      .filter(u => u.role !== 'ADMIN')
+      .filter(u => {
+        const uEmail = (u.email || '').toLowerCase();
+        const uPhone = (u.phone || '').replace(/\D/g, '');
+        return !whitelist.some((w: any) => {
+          const wEmail = (w.email || '').toLowerCase();
+          const wPhone = (w.phone || '').replace(/\D/g, '');
+          return (uEmail && wEmail && uEmail === wEmail) ||
+            (uPhone.length >= 8 && wPhone.length >= 8 && uPhone.slice(-8) === wPhone.slice(-8));
+        });
+      })
+      .map(u => ({
+        phone: u.phone, name: u.name, email: u.email,
+        addedAt: u.createdAt, type: 'REGISTERED' as const,
+        status: u.status, category: (u as any).category || 'NONE', uid: u.uid,
+      })),
+  ];
+
+  const filteredList = displayUsers.filter(e =>
+    e.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    e.phone?.includes(searchTerm) ||
+    e.email?.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  useEffect(() => {
+    const fetchAllDemoCounts = async () => {
+      const uidsToFetch = displayUsers
+        .filter(u => u.uid && demoCounts[u.uid] === undefined)
+        .map(u => u.uid);
+
+      if (uidsToFetch.length === 0) return;
+
+      const counts: Record<string, number> = { ...demoCounts };
+      await Promise.all(
+        uidsToFetch.map(async (uid) => {
+          try {
+            const audios = await fetchAPI<any[]>(`/voice-audios/user/${uid}`);
+            counts[uid] = audios ? audios.length : 0;
+          } catch (err) {
+            console.error(`Error al obtener demos del usuario ${uid}:`, err);
+            counts[uid] = 0;
+          }
+        })
+      );
+      setDemoCounts(counts);
+    };
+
+    fetchAllDemoCounts();
+  }, [displayUsers]);
 
   const handleExportExcel = async () => {
     setExportingExcel(true);
@@ -42,8 +103,8 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
           }
 
           // Buscar el usuario registrado correspondiente
-          const registeredUser = users.find(u => 
-            u.uid === entry.uid || 
+          const registeredUser = users.find(u =>
+            u.uid === entry.uid ||
             (u.email && entry.email && u.email.toLowerCase() === entry.email.toLowerCase()) ||
             (u.phone && entry.phone && u.phone.replace(/\D/g, '').slice(-8) === entry.phone.replace(/\D/g, '').slice(-8))
           );
@@ -120,39 +181,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
       .finally(() => setLoadingDemos(false));
   }, [selectedEntry?.uid]);
 
-  // ── Lista unificada ────────────────────────────────────────────
-  const displayUsers = [
-    ...whitelist.map(w => ({
-      ...(w as any),
-      type: 'WHITELIST' as const,
-      category: (w as any).category || 'NONE',
-      uid: (w as any).uid,
-      status: (w as any).userStatus || (w as any).status,
-    })),
-    ...users
-      .filter(u => u.role !== 'ADMIN')
-      .filter(u => {
-        const uEmail = (u.email || '').toLowerCase();
-        const uPhone = (u.phone || '').replace(/\D/g, '');
-        return !whitelist.some((w: any) => {
-          const wEmail = (w.email || '').toLowerCase();
-          const wPhone = (w.phone || '').replace(/\D/g, '');
-          return (uEmail && wEmail && uEmail === wEmail) ||
-            (uPhone.length >= 8 && wPhone.length >= 8 && uPhone.slice(-8) === wPhone.slice(-8));
-        });
-      })
-      .map(u => ({
-        phone: u.phone, name: u.name, email: u.email,
-        addedAt: u.createdAt, type: 'REGISTERED' as const,
-        status: u.status, category: (u as any).category || 'NONE', uid: u.uid,
-      })),
-  ];
-
-  const filteredList = displayUsers.filter(e =>
-    e.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.phone?.includes(searchTerm) ||
-    e.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // (Lista unificada y filtrada movida arriba para evitar temporal dead zone)
 
   // ── Añadir ────────────────────────────────────────────────────
   const handleAdd = (e: React.FormEvent) => {
@@ -334,6 +363,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                     <th className="px-4 py-4">Teléfono</th>
                     <th className="px-4 py-4">Correo</th>
                     <th className="px-4 py-4">Estado</th>
+                    <th className="px-4 py-4">Demos</th>
                     <th className="px-4 py-4">Categoría</th>
                     <th className="px-4 py-4 text-right">Acciones</th>
                   </tr>
@@ -360,11 +390,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                                 const fullUser = users.find(u => u.uid === entry.uid);
                                 setSelectedEntry({ ...entry, avatar: fullUser?.avatar || entry.avatar });
                               }}
-                              className={`text-sm font-black uppercase tracking-tight text-left transition-colors ${
-                                entry.uid
+                              className={`text-sm font-black uppercase tracking-tight text-left transition-colors ${entry.uid
                                   ? 'text-white hover:text-sud-turquoise cursor-pointer'
                                   : 'text-slate-500 cursor-default'
-                              }`}
+                                }`}
                               title={entry.uid ? 'Ver perfil' : 'Sin cuenta registrada'}
                             >
                               {entry.name || 'Sin Nombre'}
@@ -450,6 +479,16 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                           )}
                         </td>
 
+                        {/* Demos */}
+                        <td className="px-4 py-3">
+                          <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full border ${entry.uid && demoCounts[entry.uid] > 0
+                              ? 'text-sud-turquoise border-sud-turquoise/20 bg-sud-turquoise/5 font-black'
+                              : 'text-slate-500 border-white/5 bg-white/5'
+                            }`}>
+                            {entry.uid ? (demoCounts[entry.uid] !== undefined ? (demoCounts[entry.uid] > 0 ? `${demoCounts[entry.uid]} demos` : 'Sin demos') : 'Cargando...') : 'Sin demos'}
+                          </span>
+                        </td>
+
                         {/* Categoría */}
                         <td className="px-4 py-3">
                           {isEditing ? (
@@ -461,12 +500,11 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                               <option value="BOTH">Ambos</option>
                             </select>
                           ) : (
-                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-current/10 ${
-                              entry.category === 'ADULT' ? 'text-blue-400 bg-blue-400/5' :
-                              entry.category === 'MINOR' ? 'text-pink-400 bg-pink-400/5' :
-                              entry.category === 'BOTH'  ? 'text-purple-400 bg-purple-400/5' :
-                              'text-slate-500 opacity-50 bg-white/5'
-                            }`}>
+                            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-current/10 ${entry.category === 'ADULT' ? 'text-blue-400 bg-blue-400/5' :
+                                entry.category === 'MINOR' ? 'text-pink-400 bg-pink-400/5' :
+                                  entry.category === 'BOTH' ? 'text-purple-400 bg-purple-400/5' :
+                                    'text-slate-500 opacity-50 bg-white/5'
+                              }`}>
                               {getCategoryLabel(entry.category)}
                             </span>
                           )}
@@ -488,6 +526,16 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                               </>
                             ) : (
                               <>
+                                {entry.uid && (
+                                  <button onClick={() => {
+                                    const fullUser = users.find(u => u.uid === entry.uid);
+                                    setSelectedEntry({ ...entry, avatar: fullUser?.avatar || entry.avatar });
+                                  }}
+                                    className="p-2 text-white/10 hover:text-sud-turquoise hover:bg-sud-turquoise/5 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100 cursor-pointer"
+                                    title="Ver perfil">
+                                    <User size={18} />
+                                  </button>
+                                )}
                                 <button onClick={() => handleStartEdit(entry)}
                                   className="p-2 text-white/10 hover:text-sud-turquoise hover:bg-sud-turquoise/5 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100"
                                   title="Editar">
@@ -638,11 +686,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                       <div key={demo.id} className="p-4 bg-white/[0.03] rounded-2xl border border-white/5 space-y-2">
                         <div className="flex items-center justify-between">
                           <p className="text-sm font-black text-white uppercase tracking-tight truncate">{demo.title}</p>
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-                            (demo.mediaType || '').toLowerCase().includes('video')
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${(demo.mediaType || '').toLowerCase().includes('video')
                               ? 'bg-sud-turquoise/10 text-sud-turquoise'
                               : 'bg-sud-orange/10 text-sud-orange'
-                          }`}>
+                            }`}>
                             {(demo.mediaType || '').toLowerCase().includes('video') ? 'Video' : 'Audio'}
                           </span>
                         </div>

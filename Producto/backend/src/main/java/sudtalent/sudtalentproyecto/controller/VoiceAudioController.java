@@ -1,16 +1,15 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
-
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.dto.VoiceAudioDTO;
 import sudtalent.sudtalentproyecto.service.VoiceAudioService;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 
 import java.util.List;
 import java.util.Map;
@@ -19,13 +18,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/voice-audios")
 @CrossOrigin(origins = "${app.cors.allowed-origins}")
+@RequiredArgsConstructor
 public class VoiceAudioController {
 
-    @Autowired
-    private VoiceAudioService voiceAudioService;
-
-    @Autowired
-    private UserRepository userRepository;
+    private final VoiceAudioService voiceAudioService;
+    private final UserRepository userRepository;
 
     /**
      * Obtener usuario autenticado desde SecurityContextHolder
@@ -180,7 +177,7 @@ public class VoiceAudioController {
         try {
             System.out.println("📥 [getAudio] Obteniendo audio: " + audioId);
             
-            User user = getAuthenticatedUser();
+            getAuthenticatedUser(); // verifica que el usuario esté autenticado
 
             VoiceAudioDTO audio = voiceAudioService.getAudioById(audioId);
 

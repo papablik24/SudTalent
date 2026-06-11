@@ -24,7 +24,7 @@ import {
   Mail,
   MapPin
 } from 'lucide-react';
-import { UserProfile, TalentProfile, VoiceDemo, DemoCategory, ProfileStatus, ProfileType, VisualGenre, MediaType, VISUAL_GENRES } from '../types';
+import { UserProfile, TalentProfile, VoiceDemo, DemoCategory, ProfileStatus, ProfileType, VisualGenre, MediaType, VISUAL_GENRES } from '../../types';
 
 interface AdminTalentReviewProps {
   users: UserProfile[];

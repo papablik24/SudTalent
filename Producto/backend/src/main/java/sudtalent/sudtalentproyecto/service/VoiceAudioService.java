@@ -1,6 +1,5 @@
 package sudtalent.sudtalentproyecto.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -9,6 +8,7 @@ import sudtalent.sudtalentproyecto.model.VoiceAudio;
 import sudtalent.sudtalentproyecto.dto.VoiceAudioDTO;
 import sudtalent.sudtalentproyecto.repository.VoiceAudioRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.util.List;
@@ -16,16 +16,12 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
+@RequiredArgsConstructor
 public class VoiceAudioService {
 
-    @Autowired
-    private VoiceAudioRepository voiceAudioRepository;
-
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private SupabaseStorageService supabaseStorageService;
+    private final VoiceAudioRepository voiceAudioRepository;
+    private final UserRepository userRepository;
+    private final SupabaseStorageService supabaseStorageService;
 
     @Value("${app.supabase.project-id:}")
     private String supabaseProjectId;

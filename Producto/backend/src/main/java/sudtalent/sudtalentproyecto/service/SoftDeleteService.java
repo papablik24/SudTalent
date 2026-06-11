@@ -1,6 +1,5 @@
 package sudtalent.sudtalentproyecto.service;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.model.Alumno;
@@ -12,30 +11,19 @@ import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
 import sudtalent.sudtalentproyecto.repository.ProfesorRepository;
 import sudtalent.sudtalentproyecto.repository.ConvocatoriaRepository;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
-import sudtalent.sudtalentproyecto.repository.WhitelistNumberRepository;
+import lombok.RequiredArgsConstructor;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Service
+@RequiredArgsConstructor
 public class SoftDeleteService {
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private AlumnoRepository alumnoRepository;
-    
-    @Autowired
-    private ProfesorRepository profesorRepository;
-    
-    @Autowired
-    private ConvocatoriaRepository convocatoriaRepository;
-    
-    @Autowired
-    private PostulacionRepository postulacionRepository;
-    
-    @Autowired
-    private WhitelistNumberRepository whitelistRepository;
+
+    private final UserRepository userRepository;
+    private final AlumnoRepository alumnoRepository;
+    private final ProfesorRepository profesorRepository;
+    private final ConvocatoriaRepository convocatoriaRepository;
+    private final PostulacionRepository postulacionRepository;
     
     /**
      * Soft delete de usuario - marca como eliminado pero mantiene datos

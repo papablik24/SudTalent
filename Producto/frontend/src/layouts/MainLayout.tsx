@@ -166,7 +166,7 @@ export function MainLayout({ children, user, role, onLogout }: MainLayoutProps) 
           <div className="w-9" />
         </div>
 
-        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 relative z-10">
+        <main className="flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-12 relative z-10 light:bg-slate-50 transition-colors duration-300">
           <div className="fixed top-0 right-0 w-96 h-96 bg-sud-turquoise/[0.03] blur-[120px] rounded-full pointer-events-none" />
           <div className="fixed bottom-0 left-0 w-96 h-96 bg-sud-orange/[0.03] blur-[120px] rounded-full pointer-events-none" />
 

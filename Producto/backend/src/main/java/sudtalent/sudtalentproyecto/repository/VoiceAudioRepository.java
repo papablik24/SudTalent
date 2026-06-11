@@ -2,14 +2,12 @@ package sudtalent.sudtalentproyecto.repository;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 import sudtalent.sudtalentproyecto.model.VoiceAudio;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
 public interface VoiceAudioRepository extends JpaRepository<VoiceAudio, UUID> {
 
     @Query("SELECT v FROM VoiceAudio v WHERE v.user.id = ?1 AND v.deletedAt IS NULL ORDER BY v.createdAt DESC")

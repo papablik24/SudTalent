@@ -49,7 +49,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
       </div>
 
       <nav className="flex-1 space-y-3">
-        <p className="text-[10px] uppercase font-black text-slate-700 tracking-[0.3em] mb-4 px-2">Navegación</p>
+        <p className="text-[10px] uppercase font-black text-slate-700 light:text-slate-400 tracking-[0.3em] mb-4 px-2">Navegación</p>
         
         {role === 'ADMIN' ? (
           <>
@@ -138,10 +138,10 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
         )}
       </nav>
 
-      <div className="pt-8 border-t border-white/5 space-y-6">
-        <div className="flex items-center space-x-4 p-4 rounded-3xl bg-white/[0.02] border border-white/5">
-          <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] flex items-center justify-center shadow-lg shadow-sud-turquoise/10 shrink-0">
-            <div className="w-full h-full rounded-[0.9rem] bg-black flex items-center justify-center overflow-hidden">
+      <div className="pt-8 border-t border-white/5 light:border-slate-200 space-y-6">
+        <div className="flex items-center space-x-4 p-4 rounded-3xl bg-white/2 light:bg-slate-100 border border-white/5 light:border-slate-200">
+          <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-px flex items-center justify-center shadow-lg shadow-sud-turquoise/10 shrink-0">
+            <div className="w-full h-full rounded-[0.9rem] bg-black light:bg-slate-200 flex items-center justify-center overflow-hidden">
               {user?.avatar ? (
                 <img src={user.avatar} alt="Avatar" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
               ) : (
@@ -150,7 +150,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
             </div>
           </div>
           <div className="truncate flex-1 min-w-0 space-y-0.5">
-            <p className="text-sm font-black truncate text-white uppercase tracking-tight">
+            <p className="text-sm font-black truncate text-white light:text-slate-900 uppercase tracking-tight">
               {user?.name || (role === 'ADMIN' ? 'Admin' : 'Alumno')}
             </p>
             {user?.phone && (
@@ -171,7 +171,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
         {/* Switch de Tema (Modo Claro / Modo Oscuro) */}
         <button 
           onClick={toggleTheme}
-          className="flex items-center space-x-3 text-slate-500 hover:text-white transition-all w-full group px-4 py-3 rounded-2xl hover:bg-white/5 border border-transparent cursor-pointer"
+          className="flex items-center space-x-3 text-slate-500 hover:text-white light:hover:text-slate-900 transition-all w-full group px-4 py-3 rounded-2xl hover:bg-white/5 light:hover:bg-slate-100 border border-transparent cursor-pointer"
         >
           {theme === 'dark' ? (
             <>
@@ -188,7 +188,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
 
         <button 
           onClick={onLogout}
-          className="flex items-center space-x-3 text-slate-500 hover:text-white transition-all w-full group px-4 py-3 rounded-2xl hover:bg-red-500/5 hover:border-red-500/10 border border-transparent"
+          className="flex items-center space-x-3 text-slate-500 hover:text-white light:hover:text-red-600 transition-all w-full group px-4 py-3 rounded-2xl hover:bg-red-500/5 light:hover:bg-red-50 hover:border-red-500/10 light:hover:border-red-200 border border-transparent"
         >
           <LogOut size={18} className="group-hover:text-red-400 group-hover:translate-x-1 transition-all" />
           <span className="text-[10px] font-black uppercase tracking-[0.2em] group-hover:text-red-400">Cerrar Sesión</span>

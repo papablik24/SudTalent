@@ -2,13 +2,11 @@ package sudtalent.sudtalentproyecto.repository;
 
 import sudtalent.sudtalentproyecto.model.Postulacion;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Repository
 public interface PostulacionRepository extends SoftDeleteRepository<Postulacion> {
     
     @Query("SELECT p FROM Postulacion p WHERE p.deletedAt IS NULL")

@@ -2,7 +2,6 @@ package sudtalent.sudtalentproyecto.service;
 
 import sudtalent.sudtalentproyecto.model.Alumno;
 import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
-import sudtalent.sudtalentproyecto.service.SoftDeleteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

@@ -1,18 +1,16 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.security.core.context.SecurityContextHolder;
 import sudtalent.sudtalentproyecto.model.User;
-import sudtalent.sudtalentproyecto.model.VoiceAudio;
 import sudtalent.sudtalentproyecto.dto.VoiceAudioDTO;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
 import sudtalent.sudtalentproyecto.service.VoiceAudioService;
+import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -20,13 +18,11 @@ import java.util.UUID;
 @RestController
 @RequestMapping("/api/demos")
 @CrossOrigin(origins = "${app.cors.allowed-origins}")
+@RequiredArgsConstructor
 public class DemoController {
 
-    @Autowired
-    private VoiceAudioService voiceAudioService;
-
-    @Autowired
-    private UserRepository userRepository;
+    private final VoiceAudioService voiceAudioService;
+    private final UserRepository userRepository;
 
     /**
      * 📤 POST /api/demos/upload - Subir demo (audio o video)

@@ -4,7 +4,7 @@ import { MainLayout } from './layouts/MainLayout';
 import { AuthScreen } from './pages/AuthScreen';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminStudents } from './pages/admin/AdminStudents';
-import { AdminTalentReview } from './components/AdminTalentReview';
+import { AdminTalentReview } from './pages/admin/AdminTalentReview';
 import { AdminSettings } from './pages/admin/AdminSettings';
 import { ConvocatoriasAdmin } from './pages/admin/ConvocatoriasAdmin';
 import { AdminPostulaciones } from './pages/admin/AdminPostulaciones';

@@ -210,7 +210,7 @@ public class WhitelistService {
             .phone(phone)
             .name(finalName)
             .email(finalEmail)
-            .role(roleEnumWL)
+            .role(roleEnumWL != null ? roleEnumWL.name() : User.Role.ALUMNO.name())
             .status(WhitelistNumber.Status.PENDIENTE)
             .user(user)
             .build();

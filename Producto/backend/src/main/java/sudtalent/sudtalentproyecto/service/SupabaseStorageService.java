@@ -7,7 +7,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
-import java.net.URL;
+import java.net.URI;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.util.UUID;
@@ -23,8 +23,6 @@ public class SupabaseStorageService {
 
     @Value("${app.supabase.project-id:}")
     private String supabaseProjectId;
-
-    private static final String BUCKET_NAME = "user-audios";
 
     /**
      * 📤 Subir archivo a Supabase Storage usando HttpURLConnection
@@ -81,8 +79,7 @@ public class SupabaseStorageService {
             System.out.println("   Archivo: " + file.getOriginalFilename() + " (" + file.getSize() + " bytes)");
 
             // 4️⃣ Crear conexión HTTP
-            URL url = new URL(uploadUrl);
-            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            HttpURLConnection connection = (HttpURLConnection) URI.create(uploadUrl).toURL().openConnection();
             connection.setRequestMethod("PUT");  // ⚠️ Supabase Storage usa PUT, no POST
             connection.setDoOutput(true);
             connection.setConnectTimeout(10000);
@@ -168,9 +165,7 @@ public class SupabaseStorageService {
 
         String uploadUrl = String.format("%s/storage/v1/object/%s/%s", supabaseUrl, bucketName, encodedPath);
 
-        @SuppressWarnings("deprecation")
-        URL url = new URL(uploadUrl);
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+        HttpURLConnection connection = (HttpURLConnection) URI.create(uploadUrl).toURL().openConnection();
         connection.setRequestMethod("PUT");
         connection.setDoOutput(true);
         connection.setConnectTimeout(10000);

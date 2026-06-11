@@ -56,7 +56,7 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete, postulacione
   };
 
   return (
-    <div className="bg-white/5 hover:bg-white/[0.08] border border-white/5 rounded-[2rem] overflow-hidden shadow-xl relative">
+    <div className="bg-white/5 hover:bg-white/8 border border-white/5 rounded-[2rem] overflow-hidden shadow-xl relative">
       {/* Header - always visible */}
       <div
         className="p-6 transition-all group cursor-pointer"
@@ -66,7 +66,7 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete, postulacione
         <div className="flex items-start gap-4 mb-4">
           {/* Media icon */}
           <div
-            className={`w-16 h-16 rounded-3xl bg-black border border-white/10 flex items-center justify-center transition-all shadow-lg relative overflow-hidden shrink-0 flex-shrink-0 ${
+            className={`w-16 h-16 rounded-3xl bg-black border border-white/10 flex items-center justify-center transition-all shadow-lg relative overflow-hidden shrink-0${
               isVideo ? 'group-hover:bg-sud-turquoise/10' : 'group-hover:bg-sud-orange/10'
             }`}
           >

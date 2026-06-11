@@ -1,9 +1,10 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+
+import lombok.RequiredArgsConstructor;
 import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
 
 import java.util.List;
@@ -13,12 +14,12 @@ import java.util.Map;
  * GET /api/alumnos — lista de alumnos enrolados con datos heredados de users.
  * Solo accesible por administradores.
  */
+@RequiredArgsConstructor
 @RestController
 @RequestMapping("/api/alumnos")
 public class AlumnoController {
 
-    @Autowired
-    private AlumnoRepository alumnoRepository;
+    private final AlumnoRepository alumnoRepository;
 
     /**
      * Devuelve todos los alumnos enrolados (con fila en tabla alumnos)

@@ -1,24 +1,22 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.service.SoftDeleteService;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 import java.util.Map;
 import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/users")
+@RequiredArgsConstructor
 public class UserController {
-    
-    @Autowired
-    private UserRepository userRepository;
-    
-    @Autowired
-    private SoftDeleteService softDeleteService;
+
+    private final UserRepository userRepository;
+    private final SoftDeleteService softDeleteService;
 
     // ─── Admin endpoints ──────────────────────────────────────────
     

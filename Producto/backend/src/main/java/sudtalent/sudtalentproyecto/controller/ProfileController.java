@@ -1,6 +1,5 @@
 package sudtalent.sudtalentproyecto.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -9,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.service.SupabaseStorageService;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import lombok.RequiredArgsConstructor;
 
 import java.io.IOException;
 import java.util.Map;
@@ -19,13 +19,11 @@ import java.util.Map;
  */
 @RestController
 @RequestMapping("/api/profile")
+@RequiredArgsConstructor
 public class ProfileController {
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private SupabaseStorageService supabaseStorageService;
+    private final UserRepository userRepository;
+    private final SupabaseStorageService supabaseStorageService;
 
     /**
      * GET /api/profile — obtiene los datos del perfil del usuario autenticado.

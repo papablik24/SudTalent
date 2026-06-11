@@ -12,8 +12,8 @@ export function NavItem({ icon, label, active = false, onClick }: {
       onClick={onClick}
       className={`flex items-center space-x-4 w-full px-5 py-4 rounded-[1.2rem] transition-all duration-300 relative group font-black uppercase tracking-[0.1em] text-[10px] ${
       active 
-        ? 'bg-white/5 text-white shadow-xl shadow-black' 
-        : 'text-slate-600 hover:text-slate-200 hover:bg-white/[0.02]'
+        ? 'bg-white/5 text-white light:bg-slate-100 light:text-slate-900 shadow-xl shadow-black/10' 
+        : 'text-slate-600 hover:text-slate-200 hover:bg-white/[0.02] light:text-slate-500 light:hover:text-slate-900 light:hover:bg-slate-100'
     }`}>
       {active && (
         <motion.div 

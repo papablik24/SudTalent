@@ -105,6 +105,7 @@ public class User {
     private String profileImageUrl; // URL de la foto de perfil
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    @Builder.Default
     private List<VoiceAudio> voiceAudios = new ArrayList<>();
 
     public enum Role {

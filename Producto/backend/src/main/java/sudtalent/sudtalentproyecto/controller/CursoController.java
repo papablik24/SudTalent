@@ -94,6 +94,13 @@ public class CursoController {
         return ResponseEntity.noContent().build();
     }
 
+    @PutMapping("/asignar-alumno/{alumnoId}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Void> asignarCursosAAlumno(@PathVariable UUID alumnoId, @RequestBody List<UUID> cursoIds) {
+        cursoService.asignarCursosAAlumno(alumnoId, cursoIds);
+        return ResponseEntity.noContent().build();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────
     private UUID getAuthenticatedUserId(Authentication auth) {
         String email = auth.getName();

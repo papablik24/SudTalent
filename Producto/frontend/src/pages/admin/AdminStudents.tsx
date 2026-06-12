@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight } from 'lucide-react';
+import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen } from 'lucide-react';
 import { UserProfile, WhitelistEntry, ProfileCategory, ProfileStatus } from '../../types';
 import { generateAlumnosPDF, generateAlumnosExcel } from '../../services/reportService';
 import { fetchAPI } from '../../services/backendService';
@@ -23,6 +23,48 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [searchTerm, setSearchTerm] = useState('');
   const [exportingExcel, setExportingExcel] = useState(false);
   const [demoCounts, setDemoCounts] = useState<Record<string, number>>({});
+
+  const [allCursos, setAllCursos] = useState<any[]>([]);
+
+  useEffect(() => {
+    fetchAPI<any[]>('/cursos')
+      .then(data => setAllCursos(data || []))
+      .catch(err => console.error('Error al cargar cursos:', err));
+  }, []);
+
+  const handleToggleCourse = async (cursoId: string, isEnrolled: boolean) => {
+    if (!selectedEntry?.uid) return;
+    try {
+      const currentCursoIds = allCursos
+        .filter(c => c.alumnos?.some((a: any) => a.id === selectedEntry.uid))
+        .map(c => c.id);
+        
+      let nextCursoIds: string[];
+      if (isEnrolled) {
+        nextCursoIds = [...currentCursoIds, cursoId];
+      } else {
+        nextCursoIds = currentCursoIds.filter(id => id !== cursoId);
+      }
+      
+      await fetchAPI(`/cursos/asignar-alumno/${selectedEntry.uid}`, {
+        method: 'PUT',
+        body: JSON.stringify(nextCursoIds)
+      });
+      
+      setAllCursos(prev => prev.map(c => {
+        if (c.id === cursoId) {
+          const updatedAlumnos = isEnrolled 
+            ? [...(c.alumnos || []), { id: selectedEntry.uid, nombreAlumno: selectedEntry.name }]
+            : (c.alumnos || []).filter((a: any) => a.id !== selectedEntry.uid);
+          return { ...c, alumnos: updatedAlumnos };
+        }
+        return c;
+      }));
+    } catch (err) {
+      console.error('Error al actualizar asignación de cursos:', err);
+      alert('Error al actualizar asignación de cursos');
+    }
+  };
 
   // ── Lista unificada ────────────────────────────────────────────
   const displayUsers = [
@@ -582,7 +624,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
       {selectedEntry && (
         <>
           <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-40" onClick={() => setSelectedEntry(null)} />
-          <div className="fixed inset-y-0 right-0 w-full md:w-[520px] bg-sud-black border-l border-white/10 z-50 flex flex-col overflow-hidden">
+          <div className="fixed inset-y-0 right-0 w-full md:w-[520px] bg-sud-black border-l border-white/10 z-50 flex flex-col h-full max-h-screen overflow-hidden">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b border-white/10 shrink-0">
               <div>
@@ -597,7 +639,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
               </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            <div className="flex-1 overflow-y-auto p-6 pb-20 md:pb-24 space-y-6 min-h-0">
               {/* Avatar + info básica */}
               <div className="flex items-center gap-5">
                 <div className="w-16 h-16 rounded-[1.5rem] bg-sud-gradient p-[1px] shrink-0">
@@ -679,6 +721,34 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                         <Clock size={13} /> En revisión
                       </button>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Cursos Asignados */}
+              {selectedEntry.uid && (
+                <div className="space-y-3">
+                  <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest flex items-center gap-2">
+                    <BookOpen size={13} className="text-sud-orange" /> Cursos Asignados
+                  </p>
+                  <div className="max-h-48 overflow-y-auto border border-white/10 rounded-2xl p-4 bg-white/[0.01] space-y-2.5">
+                    {allCursos.map(curso => {
+                      const isEnrolled = curso.alumnos?.some((a: any) => a.id === selectedEntry.uid);
+                      return (
+                        <label
+                          key={curso.id}
+                          className="flex items-start gap-3 text-xs font-bold text-slate-300 hover:text-white cursor-pointer select-none py-0.5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isEnrolled}
+                            onChange={(e) => handleToggleCourse(curso.id, e.target.checked)}
+                            className="w-4 h-4 rounded border-white/10 bg-black text-sud-turquoise focus:ring-0 accent-sud-turquoise shrink-0 mt-0.5"
+                          />
+                          <span className="leading-snug">{curso.titulo} ({curso.modalidad})</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
               )}

@@ -9,11 +9,7 @@ import {
   Video,
   Zap,
   Users,
-  CheckCircle2,
   AlertCircle,
-  Loader,
-  UserPlus,
-  UserMinus,
   ChevronRight,
 } from 'lucide-react';
 import { motion } from 'motion/react';
@@ -39,48 +35,18 @@ interface Props {
 
 export function UserCursosView({ user }: Props) {
   const [cursos, setCursos] = useState<CursoDTO[]>([]);
-  const [misCursos, setMisCursos] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [enrolling, setEnrolling] = useState<string | null>(null);
-  const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null);
   const [selectedCurso, setSelectedCurso] = useState<CursoDTO | null>(null);
 
   useEffect(() => {
-    Promise.all([cursoService.getAll(), cursoService.getMisCursos()])
-      .then(([todos, mios]) => {
-        setCursos(todos);
-        setMisCursos(new Set(mios.map(c => c.id)));
+    cursoService.getMisCursos()
+      .then(data => {
+        setCursos(data || []);
       })
       .catch(err => setError(err.message || 'Error al cargar cursos'))
       .finally(() => setLoading(false));
   }, []);
-
-  const showToast = (msg: string, ok: boolean) => {
-    setToast({ msg, ok });
-    setTimeout(() => setToast(null), 3000);
-  };
-
-  const handleToggle = async (curso: CursoDTO) => {
-    setEnrolling(curso.id);
-    try {
-      if (misCursos.has(curso.id)) {
-        const updated = await cursoService.unenroll(curso.id);
-        setCursos(prev => prev.map(c => (c.id === curso.id ? updated : c)));
-        setMisCursos(prev => { const n = new Set(prev); n.delete(curso.id); return n; });
-        showToast(`Te desinscribiste de "${curso.titulo}"`, true);
-      } else {
-        const updated = await cursoService.enroll(curso.id);
-        setCursos(prev => prev.map(c => (c.id === curso.id ? updated : c)));
-        setMisCursos(prev => new Set([...prev, curso.id]));
-        showToast(`¡Inscrito en "${curso.titulo}"!`, true);
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Error al procesar inscripción', false);
-    } finally {
-      setEnrolling(null);
-    }
-  };
 
   if (loading) {
     return (
@@ -106,31 +72,14 @@ export function UserCursosView({ user }: Props) {
       <CursoDetalle
         curso={updated}
         userRole="USER"
-        userId={(user as any).uid ?? (user as any).id ?? ''}
+        userId={user.uid}
         onBack={() => setSelectedCurso(null)}
       />
     );
   }
 
-  const inscritos = cursos.filter(c => misCursos.has(c.id));
-  const disponibles = cursos.filter(c => !misCursos.has(c.id));  return (
+  return (
     <div className="space-y-10">
-      {/* Toast */}
-      {toast && (
-        <motion.div
-          initial={{ opacity: 0, y: -20 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0 }}
-          className={`fixed top-6 right-6 z-[9999] px-5 py-3 rounded-2xl text-sm font-black uppercase tracking-widest shadow-2xl ${
-            toast.ok
-              ? 'bg-emerald-500/20 border border-emerald-500/30 text-emerald-400'
-              : 'bg-red-500/20 border border-red-500/30 text-red-400'
-          }`}
-        >
-          {toast.msg}
-        </motion.div>
-      )}
-
       {/* Header */}
       <header>
         <h2 className="text-3xl font-black tracking-tighter text-white">
@@ -138,64 +87,38 @@ export function UserCursosView({ user }: Props) {
           <span className="sud-vibrant-text-gradient uppercase tracking-widest">Cursos</span>
         </h2>
         <p className="text-slate-400 mt-1 font-medium text-[10px] tracking-widest uppercase">
-          Explora y enrólate en los cursos de Sudamerican Voices
+          Accede a tus clases oficiales y revisa anuncios y materiales
         </p>
       </header>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-4">
-        {[
-          { label: 'Disponibles',    value: cursos.length,    color: 'text-white',         bg: 'bg-white/5',         border: 'border-white/10' },
-          { label: 'Inscrito en',    value: inscritos.length, color: 'text-emerald-400',   bg: 'bg-emerald-500/5',   border: 'border-emerald-500/20' },
-          { label: 'Por explorar',   value: disponibles.length, color: 'text-sud-turquoise', bg: 'bg-sud-turquoise/5', border: 'border-sud-turquoise/20' },
-        ].map(s => (
-          <div key={s.label} className={`p-5 rounded-2xl border ${s.bg} ${s.border} text-center`}>
-            <p className={`text-3xl font-black ${s.color}`}>{s.value}</p>
-            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">{s.label}</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-5 rounded-2xl border border-emerald-500/20 bg-emerald-500/5 text-center md:text-left md:flex md:items-center md:justify-between">
+          <div>
+            <p className="text-3xl font-black text-emerald-400">{cursos.length}</p>
+            <p className="text-[9px] text-slate-500 font-black uppercase tracking-widest mt-1">Cursos Asignados</p>
           </div>
-        ))}
+          <div className="hidden md:block text-slate-500 text-xs font-medium">
+            Clases oficiales asignadas por administración.
+          </div>
+        </div>
       </div>
 
-      {/* Mis cursos inscritos */}
-      {inscritos.length > 0 && (
-        <section className="space-y-4">
-          <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
-            <CheckCircle2 size={14} className="text-emerald-400" /> Mis Inscripciones
-          </h3>
-          {inscritos.map((curso, i) => (
-            <CursoCard
-              key={curso.id}
-              curso={curso}
-              enrolled
-              enrolling={enrolling === curso.id}
-              onToggle={handleToggle}
-              onView={() => setSelectedCurso(curso)}
-              delay={i * 0.04}
-            />
-          ))}
-        </section>
-      )}
-
-      {/* Cursos disponibles */}
+      {/* Mis cursos asignados */}
       <section className="space-y-4">
-        <h3 className="text-[11px] font-black uppercase tracking-[0.3em] text-slate-500 flex items-center gap-2">
-          <BookOpen size={14} className="text-sud-turquoise" /> Cursos Disponibles
-        </h3>
-        {disponibles.length === 0 ? (
+        {cursos.length === 0 ? (
           <div className="py-16 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
             <GraduationCap size={36} className="mx-auto text-slate-700 mb-4" />
             <p className="text-slate-500 font-black text-[10px] uppercase tracking-widest">
-              Ya estás inscrito en todos los cursos disponibles
+              No tienes cursos asignados aún
             </p>
+            <p className="text-slate-600 text-xs mt-1">Contacta a la administración para que te asigne un curso oficial.</p>
           </div>
         ) : (
-          disponibles.map((curso, i) => (
+          cursos.map((curso, i) => (
             <CursoCard
               key={curso.id}
               curso={curso}
-              enrolled={false}
-              enrolling={enrolling === curso.id}
-              onToggle={handleToggle}
               onView={() => setSelectedCurso(curso)}
               delay={i * 0.04}
             />
@@ -209,16 +132,10 @@ export function UserCursosView({ user }: Props) {
 // ── Card de curso ────────────────────────────────────────────────────
 function CursoCard({
   curso,
-  enrolled,
-  enrolling,
-  onToggle,
   onView,
   delay,
 }: {
   curso: CursoDTO;
-  enrolled: boolean;
-  enrolling: boolean;
-  onToggle: (c: CursoDTO) => void;
   onView: () => void;
   delay: number;
 }) {
@@ -233,9 +150,16 @@ function CursoCard({
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay }}
-      className={`sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6 transition-all ${
-        enrolled ? 'border-emerald-500/20' : 'hover:border-white/20'
-      }`}
+      onClick={onView}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          onView();
+        }
+      }}
+      role="button"
+      tabIndex={0}
+      className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6 transition-all hover:border-white/20 hover:bg-white/[0.02] active:scale-[0.99] cursor-pointer group/card outline-none focus-visible:ring-2 focus-visible:ring-sud-turquoise/50"
     >
       {/* Icono */}
       <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center shrink-0 ${meta.colorBg} ${meta.color}`}>
@@ -245,17 +169,10 @@ function CursoCard({
       {/* Info */}
       <div className="flex-1 min-w-0 space-y-2">
         <div className="flex flex-wrap items-center gap-2">
-          <h3 className={`text-base font-black uppercase tracking-tight transition-colors ${
-            enrolled ? 'text-emerald-400' : 'text-white'
-          }`}>
+          <h3 className="text-base font-black uppercase tracking-tight text-white">
             {curso.titulo}
           </h3>
           <ModalidadBadge modalidad={curso.modalidad} />
-          {enrolled && (
-            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-              Inscrito
-            </span>
-          )}
         </div>
 
         <p className="text-[10px] text-slate-500">{curso.descripcion}</p>
@@ -264,41 +181,23 @@ function CursoCard({
           {curso.profesorNombre && (
             <span className="text-[10px] text-slate-400 flex items-center gap-1.5">
               <GraduationCap size={12} className="text-violet-400" />
-              {curso.profesorNombre}
+              Profesor: {curso.profesorNombre}
             </span>
           )}
           <span className="text-[10px] text-slate-600 flex items-center gap-1.5">
             <Users size={11} />
-            {curso.totalAlumnos} inscrito{curso.totalAlumnos !== 1 ? 's' : ''}
+            {curso.totalAlumnos} alumno{curso.totalAlumnos !== 1 ? 's' : ''} inscrito{curso.totalAlumnos !== 1 ? 's' : ''}
           </span>
         </div>
       </div>
 
-      {/* Botón inscripción + ver detalle */}
-      <div className="flex items-center gap-2 shrink-0">
-        <button
-          onClick={onView}
-          className="flex items-center gap-1.5 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+      {/* Botón ver detalle */}
+      <div className="flex items-center gap-2 shrink-0 w-full md:w-auto mt-4 md:mt-0 justify-end">
+        <div
+          className="flex items-center justify-center gap-1.5 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise group-hover/card:bg-sud-turquoise/20 transition-all w-full md:w-auto text-center select-none"
         >
-          Ver <ChevronRight size={13} />
-        </button>
-        <button
-          onClick={() => onToggle(curso)}
-          disabled={enrolling}
-          className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all disabled:opacity-50 ${
-            enrolled
-              ? 'bg-red-500/10 border-red-500/20 text-red-400 hover:bg-red-500/20'
-              : 'bg-sud-turquoise/10 border-sud-turquoise/20 text-sud-turquoise hover:bg-sud-turquoise/20'
-          }`}
-        >
-          {enrolling ? (
-            <Loader size={14} className="animate-spin" />
-          ) : enrolled ? (
-            <><UserMinus size={14} /> Desinscribirse</>
-          ) : (
-            <><UserPlus size={14} /> Inscribirse</>
-          )}
-        </button>
+          Entrar al Curso <ChevronRight size={13} />
+        </div>
       </div>
     </motion.div>
   );

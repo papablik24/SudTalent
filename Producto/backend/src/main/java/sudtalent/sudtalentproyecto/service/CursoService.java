@@ -151,6 +151,35 @@ public class CursoService {
         }
     }
 
+    @Transactional
+    public void asignarCursosAAlumno(UUID alumnoId, List<UUID> cursoIds) {
+        User alumno = userRepository.findById(alumnoId)
+                .orElseThrow(() -> new RuntimeException("Alumno no encontrado"));
+
+        List<Curso> todosLosCursos = cursoRepository.findAll();
+
+        for (Curso curso : todosLosCursos) {
+            boolean debeEstarInscrito = cursoIds.contains(curso.getId());
+            boolean estaInscrito = curso.getAlumnos().stream()
+                    .anyMatch(a -> a.getAlumnoId().equals(alumnoId));
+
+            if (debeEstarInscrito && !estaInscrito) {
+                Curso.CursoAlumno entrada = new Curso.CursoAlumno(
+                        alumno.getId(),
+                        alumno.getName(),
+                        alumno.getEmail(),
+                        alumno.getProfileImageUrl(),
+                        java.time.LocalDateTime.now()
+                );
+                curso.getAlumnos().add(entrada);
+                cursoRepository.save(curso);
+            } else if (!debeEstarInscrito && estaInscrito) {
+                curso.getAlumnos().removeIf(a -> a.getAlumnoId().equals(alumnoId));
+                cursoRepository.save(curso);
+            }
+        }
+    }
+
     // ── Mapper ───────────────────────────────────────────────────────
 
     private CursoDTO toDTO(Curso c) {

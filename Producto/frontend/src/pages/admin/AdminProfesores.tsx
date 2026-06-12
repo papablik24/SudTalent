@@ -15,6 +15,8 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { profesorService, ProfesorDTO, CreateProfesorRequest, UpdateProfesorRequest } from '../../services/profesorService';
+import { cursoService } from '../../services/cursoService';
+import { CursoDTO } from '../../types';
 
 // ── Especialidades disponibles ──────────────────────────────────────
 const ESPECIALIDADES = [
@@ -37,6 +39,7 @@ interface ProfesorForm {
   especialidad: string;
   password?: string;
   confirmPassword?: string;
+  cursosAsignados: string[];
 }
 
 const EMPTY_FORM: ProfesorForm = {
@@ -46,10 +49,12 @@ const EMPTY_FORM: ProfesorForm = {
   especialidad: 'General',
   password: '',
   confirmPassword: '',
+  cursosAsignados: [],
 };
 
 export function AdminProfesores() {
   const [profesores, setProfesores] = useState<ProfesorDTO[]>([]);
+  const [realCursos, setRealCursos] = useState<CursoDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,10 +100,14 @@ export function AdminProfesores() {
     setLoading(true);
     setError(null);
     try {
-      const data = await profesorService.getAll();
-      setProfesores(data);
+      const [profData, cursosData] = await Promise.all([
+        profesorService.getAll(),
+        cursoService.getAll()
+      ]);
+      setProfesores(profData);
+      setRealCursos(cursosData);
     } catch (err: any) {
-      setError(err.message || 'Error al cargar profesores');
+      setError(err.message || 'Error al cargar profesores o cursos');
     } finally {
       setLoading(false);
     }
@@ -137,6 +146,10 @@ export function AdminProfesores() {
 
   const openEdit = (p: ProfesorDTO) => {
     setEditingId(p.id);
+    const cursosDelProfesor = realCursos
+      .filter(c => c.profesorId === p.id)
+      .map(c => c.id);
+
     setForm({
       name: p.name,
       email: p.email,
@@ -144,6 +157,7 @@ export function AdminProfesores() {
       especialidad: p.especialidad || 'General',
       password: '',
       confirmPassword: '',
+      cursosAsignados: cursosDelProfesor,
     });
     setFormError(null);
     setShowModal(true);
@@ -197,6 +211,13 @@ export function AdminProfesores() {
     setFormError(null);
 
     try {
+      const selectedCursoTitles = realCursos
+        .filter(c => form.cursosAsignados.includes(c.id))
+        .map(c => c.titulo);
+      const cursosString = selectedCursoTitles.join(',');
+
+      let profesorId: string;
+
       if (editingId) {
         // Update
         const updated = await profesorService.update(editingId, {
@@ -204,7 +225,9 @@ export function AdminProfesores() {
           email: form.email.trim(),
           phone: form.phone.trim() || undefined,
           especialidad: form.especialidad,
+          cursosAsignados: cursosString,
         });
+        profesorId = editingId;
         setProfesores(prev => prev.map(p => (p.id === editingId ? updated : p)));
       } else {
         // Create
@@ -214,9 +237,23 @@ export function AdminProfesores() {
           phone: form.phone.trim() || undefined,
           especialidad: form.especialidad,
           password: form.password,
+          cursosAsignados: cursosString,
         });
+        profesorId = created.id;
         setProfesores(prev => [...prev, created]);
       }
+
+      await cursoService.asignarCursos(profesorId, form.cursosAsignados);
+
+      setRealCursos(prev => prev.map(c => {
+        if (form.cursosAsignados.includes(c.id)) {
+          return { ...c, profesorId: profesorId };
+        } else if (c.profesorId === profesorId) {
+          return { ...c, profesorId: undefined };
+        }
+        return c;
+      }));
+
       setShowModal(false);
     } catch (err: any) {
       setFormError(err.message || 'Error al guardar profesor');
@@ -521,6 +558,44 @@ export function AdminProfesores() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Cursos Asignados */}
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                    Cursos Oficiales Asignados
+                  </label>
+                  <div className="max-h-48 overflow-y-auto border border-white/10 rounded-2xl p-4 bg-white/[0.01] space-y-2.5">
+                    {realCursos.map(curso => {
+                      const isChecked = form.cursosAsignados.includes(curso.id);
+                      return (
+                        <label
+                          key={curso.id}
+                          className="flex items-start gap-3 text-xs font-bold text-slate-300 hover:text-white cursor-pointer select-none py-0.5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setForm(f => ({
+                                  ...f,
+                                  cursosAsignados: f.cursosAsignados.filter(id => id !== curso.id),
+                                }));
+                              } else {
+                                setForm(f => ({
+                                  ...f,
+                                  cursosAsignados: [...f.cursosAsignados, curso.id],
+                                }));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-white/10 bg-black text-sud-turquoise focus:ring-0 accent-sud-turquoise shrink-0 mt-0.5"
+                          />
+                          <span className="leading-snug">{curso.titulo} ({curso.modalidad})</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Contraseña temporal (sólo al crear) */}

@@ -81,6 +81,19 @@ public class CursoController {
         return ResponseEntity.ok(curso.getAlumnos());
     }
 
+    @GetMapping("/profesor/{profesorId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<List<CursoDTO>> getCursosByProfesor(@PathVariable UUID profesorId) {
+        return ResponseEntity.ok(cursoService.getCursosByProfesor(profesorId));
+    }
+
+    @PutMapping("/asignar/{profesorId}")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<Void> asignarCursos(@PathVariable UUID profesorId, @RequestBody List<UUID> cursoIds) {
+        cursoService.asignarCursosAProfesor(profesorId, cursoIds);
+        return ResponseEntity.noContent().build();
+    }
+
     // ── Helpers ───────────────────────────────────────────────────
     private UUID getAuthenticatedUserId(Authentication auth) {
         String email = auth.getName();

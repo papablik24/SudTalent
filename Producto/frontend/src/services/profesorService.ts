@@ -7,6 +7,7 @@ export interface ProfesorDTO {
   email: string;
   phone: string;
   especialidad: string;
+  cursosAsignados?: string;
   active: boolean;
   role: string;
   createdAt: string;
@@ -19,6 +20,7 @@ export interface CreateProfesorRequest {
   phone?: string;
   especialidad: string;
   password?: string;
+  cursosAsignados?: string;
 }
 
 export interface UpdateProfesorRequest {
@@ -27,6 +29,7 @@ export interface UpdateProfesorRequest {
   phone?: string;
   especialidad?: string;
   active?: boolean;
+  cursosAsignados?: string;
 }
 
 // ── Helper: normalizar campo id ───────────────────────────────────────

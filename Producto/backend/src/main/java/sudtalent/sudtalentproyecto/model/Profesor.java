@@ -31,6 +31,9 @@ public class Profesor {
     @Column(nullable = false)
     private String especialidad;
 
+    @Column(name = "cursos_asignados", length = 1000)
+    private String cursosAsignados;
+
     @Column(nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

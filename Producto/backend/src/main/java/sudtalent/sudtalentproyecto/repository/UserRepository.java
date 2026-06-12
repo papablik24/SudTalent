@@ -9,6 +9,9 @@ public interface UserRepository extends SoftDeleteRepository<User> {
     
     @Query("SELECT u FROM User u WHERE u.email = ?1 AND u.deletedAt IS NULL")
     Optional<User> findByEmailActive(String email);
+
+    @Query("SELECT u FROM User u WHERE u.email = ?1")
+    Optional<User> findByEmail(String email);
     
     @Query("SELECT u FROM User u WHERE u.phone = ?1 AND u.deletedAt IS NULL")
     Optional<User> findByPhoneActive(String phone);

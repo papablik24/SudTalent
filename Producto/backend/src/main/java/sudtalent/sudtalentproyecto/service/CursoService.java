@@ -124,6 +124,33 @@ public class CursoService {
                 .collect(Collectors.toList());
     }
 
+    public List<CursoDTO> getCursosByProfesor(UUID profesorId) {
+        return cursoRepository.findByProfesorId(profesorId).stream()
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void asignarCursosAProfesor(UUID profesorId, List<UUID> cursoIds) {
+        User profesor = userRepository.findById(profesorId)
+                .orElseThrow(() -> new RuntimeException("Profesor no encontrado"));
+
+        List<Curso> todosLosCursos = cursoRepository.findAll();
+
+        for (Curso curso : todosLosCursos) {
+            boolean debeEstarAsignado = cursoIds.contains(curso.getId());
+            boolean estaAsignadoAEsteProfesor = curso.getProfesor() != null && curso.getProfesor().getId().equals(profesorId);
+
+            if (debeEstarAsignado && !estaAsignadoAEsteProfesor) {
+                curso.setProfesor(profesor);
+                cursoRepository.save(curso);
+            } else if (!debeEstarAsignado && estaAsignadoAEsteProfesor) {
+                curso.setProfesor(null);
+                cursoRepository.save(curso);
+            }
+        }
+    }
+
     // ── Mapper ───────────────────────────────────────────────────────
 
     private CursoDTO toDTO(Curso c) {

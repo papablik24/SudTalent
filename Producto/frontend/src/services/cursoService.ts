@@ -56,4 +56,15 @@ export const cursoService = {
   async unenroll(cursoId: string): Promise<CursoDTO> {
     return fetchAPI<CursoDTO>(`/cursos/${cursoId}/enroll`, { method: 'DELETE' });
   },
+
+  async getByProfesor(profesorId: string): Promise<CursoDTO[]> {
+    return fetchAPI<CursoDTO[]>(`/cursos/profesor/${profesorId}`);
+  },
+
+  async asignarCursos(profesorId: string, cursoIds: string[]): Promise<void> {
+    return fetchAPI<void>(`/cursos/asignar/${profesorId}`, {
+      method: 'PUT',
+      body: JSON.stringify(cursoIds),
+    });
+  },
 };

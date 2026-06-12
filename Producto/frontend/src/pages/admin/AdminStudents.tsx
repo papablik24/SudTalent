@@ -207,15 +207,33 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
     setEditPhone(n.slice(0, 8));
   };
 
-  const handleSaveEdit = () => {
+  const handleSaveEdit = async () => {
     if (!editingEntry) return;
     const fullPhone = editPhone.length === 8 ? `569${editPhone}` : editingEntry.phone;
+
+    // 1. Actualizar whitelist (nombre, email, phone, categoría)
     onUpdate(editingEntry.phone, {
       name: editName,
       email: editEmail,
       phone: fullPhone,
       category: editCategory,
     });
+
+    // 2. Si el alumno tiene cuenta registrada, actualizar también la tabla users
+    if (editingEntry.uid) {
+      try {
+        await fetchAPI(`/users/${editingEntry.uid}`, {
+          method: 'PUT',
+          body: JSON.stringify({
+            name: editName,
+            phone: fullPhone.replace(/\D/g, ''), // solo dígitos
+          }),
+        });
+      } catch (err) {
+        console.error('Error al actualizar usuario en BD:', err);
+      }
+    }
+
     setEditingEntry(null);
   };
 

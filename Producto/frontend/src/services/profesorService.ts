@@ -29,29 +29,38 @@ export interface UpdateProfesorRequest {
   active?: boolean;
 }
 
+// ── Helper: normalizar campo id ───────────────────────────────────────
+function normalize(raw: any): ProfesorDTO {
+  return { ...raw, id: raw.id ?? raw.usuarioId ?? '' };
+}
+
 // ── Service ───────────────────────────────────────────────────────────
 export const profesorService = {
 
   async getAll(): Promise<ProfesorDTO[]> {
-    return fetchAPI<ProfesorDTO[]>('/profesores');
+    const data = await fetchAPI<any[]>('/profesores');
+    return data.map(normalize);
   },
 
   async getById(id: string): Promise<ProfesorDTO> {
-    return fetchAPI<ProfesorDTO>(`/profesores/${id}`);
+    const data = await fetchAPI<any>(`/profesores/${id}`);
+    return normalize(data);
   },
 
   async create(data: CreateProfesorRequest): Promise<ProfesorDTO> {
-    return fetchAPI<ProfesorDTO>('/profesores', {
+    const raw = await fetchAPI<any>('/profesores', {
       method: 'POST',
       body: JSON.stringify(data),
     });
+    return normalize(raw);
   },
 
   async update(id: string, data: UpdateProfesorRequest): Promise<ProfesorDTO> {
-    return fetchAPI<ProfesorDTO>(`/profesores/${id}`, {
+    const raw = await fetchAPI<any>(`/profesores/${id}`, {
       method: 'PUT',
       body: JSON.stringify(data),
     });
+    return normalize(raw);
   },
 
   async remove(id: string): Promise<void> {

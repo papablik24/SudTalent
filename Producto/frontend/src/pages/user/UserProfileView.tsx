@@ -668,7 +668,7 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
               className="w-full sud-btn-primary py-5 rounded-[2rem] text-sm font-black uppercase tracking-widest flex items-center justify-center gap-3 shadow-2xl shadow-sud-turquoise/10 hover:scale-[1.02] transition-all"
             >
               <Sparkles size={18} />
-              Postularme Ahora
+              Ver Convocatorias
             </button>
           )}
         </div>

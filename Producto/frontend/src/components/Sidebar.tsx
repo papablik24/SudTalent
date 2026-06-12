@@ -13,6 +13,7 @@ import {
   ClipboardList,
   Bot,
   GraduationCap,
+  BookOpen,
   Sun,
   Moon
 } from 'lucide-react';
@@ -90,6 +91,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               onClick={() => onNavigate('/admin/profesores')}
             />
             <NavItem 
+              icon={<BookOpen size={20} />} 
+              label="Cursos" 
+              active={currentPath === '/admin/cursos'}
+              onClick={() => onNavigate('/admin/cursos')}
+            />
+            <NavItem 
               icon={<Bot size={20} />} 
               label="Asistente IA" 
               active={currentPath === '/admin/asistente-ia'}
@@ -127,6 +134,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               label="Mis Postulaciones" 
               active={currentPath === '/mis-postulaciones'}
               onClick={() => onNavigate('/mis-postulaciones')}
+            />
+            <NavItem 
+              icon={<BookOpen size={20} />} 
+              label="Cursos" 
+              active={currentPath === '/cursos'}
+              onClick={() => onNavigate('/cursos')}
             />
             <NavItem 
               icon={<Bot size={20} />} 

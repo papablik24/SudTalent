@@ -70,15 +70,45 @@ public class UserController {
                 try { user.setStatus(User.ProfileStatus.valueOf((String) updates.get("status"))); }
                 catch (IllegalArgumentException ignored) {}
             }
-            if (updates.containsKey("name")) user.setName((String) updates.get("name"));
+            if (updates.containsKey("name")) {
+                String name = (String) updates.get("name");
+                if (name != null && !name.isBlank()) user.setName(name.trim());
+            }
             if (updates.containsKey("active")) user.setActive((Boolean) updates.get("active"));
-            User saved = userRepository.save(user);
-            return ResponseEntity.ok(Map.of(
-                "id", saved.getId(),
-                "name", saved.getName() != null ? saved.getName() : "",
-                "status", saved.getStatus() != null ? saved.getStatus().name() : "PENDING",
-                "active", saved.isActive()
-            ));
+            if (updates.containsKey("phone")) {
+                String phone = (String) updates.get("phone");
+                if (phone != null) {
+                    String digits = phone.replaceAll("[^0-9]", "");
+                    // Normalizar a formato chileno: siempre 56XXXXXXXXX
+                    if (digits.startsWith("56") && digits.length() == 11) {
+                        // ya está completo: 56951485319
+                        user.setPhone(digits);
+                    } else if (digits.startsWith("9") && digits.length() == 9) {
+                        // 9XXXXXXXX → 569XXXXXXXX
+                        user.setPhone("56" + digits);
+                    } else if (digits.length() == 8) {
+                        // XXXXXXXX → 569XXXXXXXX
+                        user.setPhone("569" + digits);
+                    } else if (!digits.isEmpty()) {
+                        // Cualquier otro formato con dígitos válidos
+                        user.setPhone(digits);
+                    }
+                }
+            }
+            try {
+                User saved = userRepository.saveAndFlush(user);
+                System.out.println("✅ Usuario actualizado: " + saved.getId() + " phone=" + saved.getPhone());
+                return ResponseEntity.ok(Map.of(
+                    "id", saved.getId(),
+                    "name", saved.getName() != null ? saved.getName() : "",
+                    "phone", saved.getPhone() != null ? saved.getPhone() : "",
+                    "status", saved.getStatus() != null ? saved.getStatus().name() : "PENDING",
+                    "active", saved.isActive()
+                ));
+            } catch (Exception e) {
+                System.err.println("❌ Error al guardar usuario: " + e.getMessage());
+                return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            }
         }).orElse(ResponseEntity.notFound().build());
     }
 

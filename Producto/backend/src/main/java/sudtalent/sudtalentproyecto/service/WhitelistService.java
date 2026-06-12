@@ -83,10 +83,30 @@ public class WhitelistService {
         if(updates.getStatus() != null) {
             number.setStatus(WhitelistNumber.Status.valueOf(updates.getStatus()));
         }
+        // Actualizar teléfono en whitelist si es diferente y no existe ya
+        if(updates.getPhone() != null && !updates.getPhone().equals(phone)) {
+            String newPhone = updates.getPhone().replaceAll("[^0-9]", "");
+            if (!newPhone.isEmpty() && repository.findByPhone(newPhone).isEmpty()) {
+                number.setPhone(newPhone);
+            }
+        }
         number.setUpdatedAt(LocalDateTime.now());
-        
-        // Intentar vincular con un usuario si no está vinculado
-        if(number.getUser() == null) {
+
+        // Si tiene usuario vinculado, sincronizar nombre y teléfono en users también
+        if (number.getUser() != null) {
+            var user = number.getUser();
+            if (updates.getName() != null && !updates.getName().isBlank()) {
+                user.setName(updates.getName());
+            }
+            if (updates.getPhone() != null) {
+                String newPhone = updates.getPhone().replaceAll("[^0-9]", "");
+                if (!newPhone.isEmpty()) {
+                    user.setPhone(newPhone);
+                    user.setUpdatedAt(LocalDateTime.now());
+                }
+            }
+            userRepository.save(user);
+        } else {
             linkUserToWhitelist(number);
         }
         

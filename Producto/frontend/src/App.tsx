@@ -9,6 +9,8 @@ import { AdminSettings } from './pages/admin/AdminSettings';
 import { ConvocatoriasAdmin } from './pages/admin/ConvocatoriasAdmin';
 import { AdminPostulaciones } from './pages/admin/AdminPostulaciones';
 import { AdminProfesores } from './pages/admin/AdminProfesores';
+import { AdminCursos } from './pages/admin/AdminCursos';
+import { UserCursosView } from './pages/user/UserCursosView';
 import { ConvocatoriasUser } from './pages/user/ConvocatoriasUser';
 import { UserPostulacionesView } from './pages/user/UserPostulacionesView';
 import { UserProfileView } from './pages/user/UserProfileView';
@@ -222,6 +224,14 @@ function AppRoutes() {
             </ProtectedRoute>
           } />
 
+          <Route path="/admin/cursos" element={
+            <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
+              <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
+                <AdminCursos />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+
           <Route path="/admin/settings" element={
             <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
               <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
@@ -299,6 +309,16 @@ function AppRoutes() {
               <ProtectedRoute user={currentUser} role={role} allowedRoles={['USER']} loading={loading}>
                 <MainLayout user={currentUser} role="USER" onLogout={logout}>
                   <AsistenteIA />
+                </MainLayout>
+              </ProtectedRoute>
+            )
+          } />
+
+          <Route path="/cursos" element={
+            needsOnboarding ? <Navigate to="/onboarding" replace /> : (
+              <ProtectedRoute user={currentUser} role={role} allowedRoles={['USER']} loading={loading}>
+                <MainLayout user={currentUser} role="USER" onLogout={logout}>
+                  <UserCursosView user={currentUser!} />
                 </MainLayout>
               </ProtectedRoute>
             )

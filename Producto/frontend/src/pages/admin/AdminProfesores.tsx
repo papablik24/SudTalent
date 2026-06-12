@@ -323,7 +323,7 @@ export function AdminProfesores() {
         <AnimatePresence mode="popLayout">
           {filtered.map((prof, i) => (
             <motion.div
-              key={prof.id}
+              key={prof.id || `prof-${i}`}
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}

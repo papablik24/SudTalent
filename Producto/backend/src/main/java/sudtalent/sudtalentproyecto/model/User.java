@@ -39,7 +39,6 @@ public class User {
     @Column(nullable = false)
     private String password;
 
-    @Pattern(regexp = "^[0-9]{8,15}$", message = "El teléfono debe contener entre 8 y 15 dígitos")
     @Column(unique = true, length = 20)
     private String phone;
 

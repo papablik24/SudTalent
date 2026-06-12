@@ -47,7 +47,7 @@ public class ProfesorController {
      * GET /api/profesores/{id}
      */
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PROFESOR')")
     public ResponseEntity<?> getProfesorById(@PathVariable UUID id) {
         return profesorRepository.findById(id)
             .filter(p -> p.getDeletedAt() == null)
@@ -68,6 +68,7 @@ public class ProfesorController {
             String email = body.getOrDefault("email", "").trim().toLowerCase();
             String rawPhone = body.getOrDefault("phone", "").trim();
             String especialidad = body.getOrDefault("especialidad", "General").trim();
+            String cursosAsignados = body.getOrDefault("cursosAsignados", "").trim();
 
             String password = body.getOrDefault("password", "").trim();
 
@@ -124,6 +125,7 @@ public class ProfesorController {
             Profesor profesor = Profesor.builder()
                 .usuarioId(user.getId())
                 .especialidad(especialidad)
+                .cursosAsignados(cursosAsignados)
                 .build();
             profesor = profesorRepository.saveAndFlush(profesor);
 
@@ -228,6 +230,9 @@ public class ProfesorController {
             if (body.containsKey("especialidad")) {
                 profesor.setEspecialidad((String) body.get("especialidad"));
             }
+            if (body.containsKey("cursosAsignados")) {
+                profesor.setCursosAsignados((String) body.get("cursosAsignados"));
+            }
             profesor.setUpdatedAt(LocalDateTime.now());
             profesorRepository.saveAndFlush(profesor);
 
@@ -281,6 +286,7 @@ public class ProfesorController {
         Map<String, Object> map = new LinkedHashMap<>();
         map.put("id", p.getUsuarioId());
         map.put("especialidad", p.getEspecialidad());
+        map.put("cursosAsignados", p.getCursosAsignados() != null ? p.getCursosAsignados() : "");
         map.put("createdAt", p.getCreatedAt());
         map.put("updatedAt", p.getUpdatedAt());
 

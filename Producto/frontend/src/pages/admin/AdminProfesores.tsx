@@ -29,6 +29,17 @@ const ESPECIALIDADES = [
   'General',
 ] as const;
 
+export const CURSOS_OFICIALES = [
+  'INTERPRETACION PARA DOBLAJE DE VOZ (PRESENCIAL)',
+  'INTERPRETACION PARA DOBLAJE DE VOZ (ONLINE)',
+  'DOBLAJE MUSICAL (PRESENCIAL)',
+  'LOCUCIÓN PUBLICITARIA Y CORPORATIVA (PRESENCIAL)',
+  'CANTO: ESTUDIO Y PERFORMANCE',
+  'CURSO INTENSIVO 360 DOBLAJE ONLINE',
+  'DOBLAJE ADVANCE',
+  'OPENING LAB: ACTUACIÓN FRENTE A CÁMARA',
+] as const;
+
 // ── Form State ──────────────────────────────────────────────────────
 interface ProfesorForm {
   name: string;
@@ -37,6 +48,7 @@ interface ProfesorForm {
   especialidad: string;
   password?: string;
   confirmPassword?: string;
+  cursosAsignados: string[];
 }
 
 const EMPTY_FORM: ProfesorForm = {
@@ -46,6 +58,7 @@ const EMPTY_FORM: ProfesorForm = {
   especialidad: 'General',
   password: '',
   confirmPassword: '',
+  cursosAsignados: [],
 };
 
 export function AdminProfesores() {
@@ -144,6 +157,7 @@ export function AdminProfesores() {
       especialidad: p.especialidad || 'General',
       password: '',
       confirmPassword: '',
+      cursosAsignados: p.cursosAsignados ? p.cursosAsignados.split(',').map(x => x.trim()).filter(Boolean) : [],
     });
     setFormError(null);
     setShowModal(true);
@@ -197,6 +211,8 @@ export function AdminProfesores() {
     setFormError(null);
 
     try {
+      const cursosString = form.cursosAsignados.join(',');
+
       if (editingId) {
         // Update
         const updated = await profesorService.update(editingId, {
@@ -204,6 +220,7 @@ export function AdminProfesores() {
           email: form.email.trim(),
           phone: form.phone.trim() || undefined,
           especialidad: form.especialidad,
+          cursosAsignados: cursosString,
         });
         setProfesores(prev => prev.map(p => (p.id === editingId ? updated : p)));
       } else {
@@ -214,6 +231,7 @@ export function AdminProfesores() {
           phone: form.phone.trim() || undefined,
           especialidad: form.especialidad,
           password: form.password,
+          cursosAsignados: cursosString,
         });
         setProfesores(prev => [...prev, created]);
       }
@@ -373,6 +391,16 @@ export function AdminProfesores() {
                       {prof.createdAt ? new Date(prof.createdAt).toLocaleDateString() : ''}
                     </span>
                   </div>
+
+                  {prof.cursosAsignados && (
+                    <div className="flex flex-wrap gap-1.5 mt-2 max-w-full">
+                      {prof.cursosAsignados.split(',').map(c => c.trim()).filter(Boolean).map(c => (
+                        <span key={c} className="text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-400">
+                          {c}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -521,6 +549,44 @@ export function AdminProfesores() {
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Cursos Asignados */}
+                <div className="space-y-2">
+                  <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
+                    Cursos Oficiales Asignados
+                  </label>
+                  <div className="max-h-48 overflow-y-auto border border-white/10 rounded-2xl p-4 bg-white/[0.01] space-y-2.5">
+                    {CURSOS_OFICIALES.map(curso => {
+                      const isChecked = form.cursosAsignados.includes(curso);
+                      return (
+                        <label
+                          key={curso}
+                          className="flex items-start gap-3 text-xs font-bold text-slate-300 hover:text-white cursor-pointer select-none py-0.5"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              if (isChecked) {
+                                setForm(f => ({
+                                  ...f,
+                                  cursosAsignados: f.cursosAsignados.filter(c => c !== curso),
+                                }));
+                              } else {
+                                setForm(f => ({
+                                  ...f,
+                                  cursosAsignados: [...f.cursosAsignados, curso],
+                                }));
+                              }
+                            }}
+                            className="w-4 h-4 rounded border-white/10 bg-black text-sud-turquoise focus:ring-0 accent-sud-turquoise shrink-0 mt-0.5"
+                          />
+                          <span className="leading-snug">{curso}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 {/* Contraseña temporal (sólo al crear) */}

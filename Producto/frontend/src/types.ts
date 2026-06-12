@@ -200,3 +200,15 @@ export const DEFAULT_CATALOGS: Omit<CatalogItem, 'id' | 'createdAt' | 'updatedAt
   { type: 'COURSE_LEVEL', name: 'Avanzado', active: true },
 ];
 
+export interface CursoDTO {
+  id: string;
+  cursoKey: string;
+  descripcion?: string;
+  modalidad?: string;
+  titulo: string;
+  profesorId?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+

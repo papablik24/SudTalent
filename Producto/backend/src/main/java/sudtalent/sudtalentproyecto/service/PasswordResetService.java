@@ -38,7 +38,8 @@ public class PasswordResetService {
     /**
      * Solicita un OTP para el email dado.
      * Siempre retorna sin revelar si el email existe o no (anti-enumeración).
-     * Aplica cooldown de 3 minutos: si ya existe un token activo enviado hace menos de 3 min,
+     * Aplica cooldown de 3 minutos: si ya existe un token activo enviado hace menos
+     * de 3 min,
      * lanza CooldownException con los segundos restantes.
      * Requirements: 1.1, 1.2, 1.4, 1.5, 1.7, 2.1, 2.2, 2.3, 5.2
      */
@@ -47,7 +48,8 @@ public class PasswordResetService {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime windowStart = now.minusMinutes(15);
 
-        // 1. Cooldown de 3 minutos: si hay un token activo creado hace menos de 3 min, rechazar
+        // 1. Cooldown de 3 minutos: si hay un token activo creado hace menos de 3 min,
+        // rechazar
         tokenRepository.findTopByEmailAndUsedFalseOrderByCreatedAtDesc(email)
                 .ifPresent(latest -> {
                     long secondsSinceCreation = ChronoUnit.SECONDS.between(latest.getCreatedAt(), now);
@@ -62,7 +64,8 @@ public class PasswordResetService {
         long recentCount = tokenRepository.countByEmailAndCreatedAtAfter(email, windowStart);
 
         if (recentCount >= 3) {
-            // 3. Calcular minutos restantes hasta que la solicitud más antigua salga de la ventana
+            // 3. Calcular minutos restantes hasta que la solicitud más antigua salga de la
+            // ventana
             int minutosRestantes = tokenRepository
                     .findTopByEmailAndCreatedAtAfterOrderByCreatedAtAsc(email, windowStart)
                     .map(oldest -> {
@@ -90,7 +93,8 @@ public class PasswordResetService {
         int otpValue = 100000 + secureRandom.nextInt(900000);
         String otp = String.valueOf(otpValue);
 
-        // 7. Persistir el nuevo PasswordResetToken con expiresAt = now + 15 min (Req 1.2)
+        // 7. Persistir el nuevo PasswordResetToken con expiresAt = now + 15 min (Req
+        // 1.2)
         PasswordResetToken token = PasswordResetToken.builder()
                 .email(email)
                 .otp(otp)
@@ -98,7 +102,8 @@ public class PasswordResetService {
                 .build();
         token = tokenRepository.save(token);
 
-        // 8. Enviar el correo; si falla: eliminar el token, log, lanzar excepción (Req 1.7, 6.4)
+        // 8. Enviar el correo; si falla: eliminar el token, log, lanzar excepción (Req
+        // 1.7, 6.4)
         try {
             emailService.sendOtpEmail(email, otp);
         } catch (Exception e) {

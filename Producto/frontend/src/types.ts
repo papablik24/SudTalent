@@ -53,6 +53,8 @@ export interface UserProfile {
   status?: ProfileStatus;
   primaryCategory?: DemoCategory;
   lastDemoUpdate?: any;
+  profileAudioUrl?: string;   // URL del audio de perfil o enlace externo (Drive, etc.)
+  profileImageUrl?: string;
 }
 
 export interface TalentProfile {

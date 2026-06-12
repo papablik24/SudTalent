@@ -45,6 +45,18 @@ public class PostulacionService {
             throw new RuntimeException("Ya existe una postulación activa para esta convocatoria");
         }
 
+        // Verificar que la convocatoria no haya vencido
+        Convocatoria convCheck = entityManager.find(Convocatoria.class, request.getConvocatoriaId());
+        if (convCheck == null) {
+            throw new RuntimeException("Convocatoria no encontrada");
+        }
+        if (convCheck.getFechaLimite() != null && LocalDate.now().isAfter(convCheck.getFechaLimite())) {
+            throw new RuntimeException("El plazo de postulación para esta convocatoria ha vencido");
+        }
+        if (!"ACTIVA".equals(convCheck.getEstado())) {
+            throw new RuntimeException("Esta convocatoria no está activa");
+        }
+
         // Usar getReference para evitar cargar entidades completas
         User userRef = entityManager.getReference(User.class, userUUID);
         Convocatoria convRef = entityManager.getReference(Convocatoria.class, request.getConvocatoriaId());

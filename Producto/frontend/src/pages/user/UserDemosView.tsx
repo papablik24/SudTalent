@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Upload, AudioLines, Film, X, ChevronDown, Loader } from 'lucide-react';
+import { Plus, Upload, AudioLines, Film, X, ChevronDown, Loader, Link2, ExternalLink, Save, AlertCircle } from 'lucide-react';
 import { UserProfile, VoiceDemo, DemoCategory, VisualGenre, MediaType, FileFormat, VISUAL_GENRES, DEMO_CATEGORIES } from '../../types';
 import { DemoItem } from '../../components/ui/DemoItem';
 import { AudioDropZone } from '../../components/ui/AudioDropZone';
 import { demoService, DemoDTO } from '../../services/demoService';
 import { postulacionService, Postulacion } from '../../services/postulacionService';
+import { fetchAPI } from '../../services/backendService';
 
-// ─── Allowed formats ────────────────────────────────────────────────
-const AUDIO_FORMATS = ['MP3', 'WAV'] as const;
-const ACCEPT_STRING = '.mp3,.wav,audio/mpeg,audio/wav';
+const MAX_DEMOS = 3;
 
 function detectFormat(file: File): { mediaType: MediaType; fileFormat: FileFormat } | null {
   const name = file.name.toLowerCase();
@@ -49,6 +48,12 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   const [form, setForm] = useState<DemoForm>(DEFAULT_FORM);
   const [fileError, setFileError] = useState<string | null>(null);
 
+  // ── Link externo ────────────────────────────────────────────────────
+  const [externalLink, setExternalLink] = useState('');
+  const [externalLinkSaved, setExternalLinkSaved] = useState('');
+  const [savingLink, setSavingLink] = useState(false);
+  const [linkError, setLinkError] = useState<string | null>(null);
+
   // ── Cargar demos desde backend ──────────────────────────────────────
   useEffect(() => {
     const loadDemos = async () => {
@@ -66,6 +71,15 @@ export function UserDemosView({ user }: { user: UserProfile }) {
           demoService.getUserDemos(token),
           postulacionService.getPostulacionesByUser(user.uid)
         ]);
+        
+        // Cargar link externo desde perfil del usuario autenticado
+        try {
+          const profile = await fetchAPI<any>(`/profile`);
+          if (profile?.profileAudioUrl) {
+            setExternalLink(profile.profileAudioUrl);
+            setExternalLinkSaved(profile.profileAudioUrl);
+          }
+        } catch { /* no forzar error por esto */ }
         
         // Convertir DemoDTO a VoiceDemo para compatibilidad con DemoItem
         const mappedDemos = demoData.map((demo: DemoDTO) => {
@@ -115,10 +129,38 @@ export function UserDemosView({ user }: { user: UserProfile }) {
     setForm(f => ({ ...f, file, mediaType: detected.mediaType, fileFormat: detected.fileFormat }));
   };
 
+  // ── Guardar link externo ────────────────────────────────────────────
+  const handleSaveLink = async () => {
+    setLinkError(null);
+    if (externalLink && !/^https?:\/\/.+/.test(externalLink)) {
+      setLinkError('Ingresa una URL válida (debe comenzar con https://)');
+      return;
+    }
+    setSavingLink(true);
+    try {
+      // Usar /profile (autenticado como el usuario actual) en lugar de /users/{id} (solo admin)
+      await fetchAPI(`/profile`, {
+        method: 'PUT',
+        body: JSON.stringify({ profileAudioUrl: externalLink.trim() }),
+      });
+      setExternalLinkSaved(externalLink.trim());
+    } catch (err: any) {
+      setLinkError(err.message || 'Error al guardar el enlace');
+    } finally {
+      setSavingLink(false);
+    }
+  };
+
   // ── Submit ──────────────────────────────────────────────────────────
   const handleUploadDemo = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.title || !form.file) return;
+
+    // Límite de 3 demos
+    if (demos.length >= MAX_DEMOS) {
+      setFileError(`Solo puedes tener un máximo de ${MAX_DEMOS} demos subidas. Elimina una para agregar otra.`);
+      return;
+    }
 
     try {
       setIsUploading(true);
@@ -245,10 +287,30 @@ export function UserDemosView({ user }: { user: UserProfile }) {
         {/* ── Upload Panel ──────────────────────────────────────────── */}
         <div className="lg:col-span-4 space-y-6">
           <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6 sticky top-8">
-            <h4 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
-              <Plus className="text-sud-turquoise" size={20} />
-              Añadir Nueva Demo
-            </h4>
+            <div className="flex items-center justify-between">
+              <h4 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
+                <Plus className="text-sud-turquoise" size={20} />
+                Añadir Nueva Demo
+              </h4>
+              {/* Contador */}
+              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border ${
+                demos.length >= MAX_DEMOS
+                  ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                  : 'bg-white/5 border-white/10 text-slate-400'
+              }`}>
+                {demos.length}/{MAX_DEMOS}
+              </span>
+            </div>
+
+            {/* Aviso límite alcanzado */}
+            {demos.length >= MAX_DEMOS && (
+              <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
+                <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
+                <p className="text-[10px] text-amber-400 font-black uppercase tracking-widest leading-relaxed">
+                  Límite de {MAX_DEMOS} demos alcanzado. Elimina una para poder subir otra.
+                </p>
+              </div>
+            )}
 
             {/* Format info banner */}
             <div className="p-4 bg-white/[0.02] border border-white/10 rounded-2xl space-y-3">
@@ -352,8 +414,8 @@ export function UserDemosView({ user }: { user: UserProfile }) {
 
               <button
                 type="submit"
-                disabled={isUploading || !form.title || !form.file}
-                className="w-full sud-btn-primary py-5 text-sm shadow-xl shadow-sud-orange/10 transition-all hover:scale-[1.02]"
+                disabled={isUploading || !form.title || !form.file || demos.length >= MAX_DEMOS}
+                className="w-full sud-btn-primary py-5 text-sm shadow-xl shadow-sud-orange/10 transition-all hover:scale-[1.02] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {isUploading ? (
                   <div className="flex items-center justify-center gap-2">
@@ -368,6 +430,54 @@ export function UserDemosView({ user }: { user: UserProfile }) {
                 )}
               </button>
             </form>
+
+            {/* ── Cajón: Enlace externo ───────────────────────── */}
+            <div className="pt-6 border-t border-white/10 space-y-4">
+              <div>
+                <h5 className="text-[11px] font-black uppercase tracking-[0.2em] text-slate-400 flex items-center gap-2">
+                  <Link2 size={13} className="text-sud-turquoise" />
+                  Enlace a Carpeta Externa
+                </h5>
+                <p className="text-[9px] text-slate-600 mt-1 uppercase tracking-widest">
+                  Drive, Dropbox, YouTube, etc.
+                </p>
+              </div>
+
+              {linkError && (
+                <p className="text-[10px] text-red-400 font-bold flex items-center gap-1.5">
+                  <AlertCircle size={12} /> {linkError}
+                </p>
+              )}
+
+              <div className="flex gap-2">
+                <input
+                  type="url"
+                  value={externalLink}
+                  onChange={e => { setExternalLink(e.target.value); setLinkError(null); }}
+                  placeholder="https://drive.google.com/..."
+                  className="sud-input flex-1 text-sm"
+                />
+                <button
+                  onClick={handleSaveLink}
+                  disabled={savingLink || externalLink === externalLinkSaved}
+                  className="px-4 py-3 rounded-2xl bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise hover:bg-sud-turquoise/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed shrink-0"
+                  title="Guardar enlace"
+                >
+                  {savingLink ? <Loader size={16} className="animate-spin" /> : <Save size={16} />}
+                </button>
+              </div>
+
+              {externalLinkSaved && (
+                <a
+                  href={externalLinkSaved}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sud-turquoise hover:text-sud-turquoise/80 transition-colors"
+                >
+                  <ExternalLink size={12} /> Ver enlace guardado
+                </a>
+              )}
+            </div>
           </section>
         </div>
 

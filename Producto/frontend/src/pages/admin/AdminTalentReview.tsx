@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Search, 
@@ -25,6 +25,8 @@ import {
   MapPin
 } from 'lucide-react';
 import { UserProfile, TalentProfile, VoiceDemo, DemoCategory, ProfileStatus, ProfileType, VisualGenre, MediaType, VISUAL_GENRES } from '../../types';
+import { fetchAPI } from '../../services/backendService';
+import { AudioPlayer } from '../../components/ui/AudioPlayer';
 
 interface AdminTalentReviewProps {
   users: UserProfile[];
@@ -46,7 +48,97 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [playingDemoId, setPlayingDemoId] = useState<string | null>(null);
 
-  // Filtered Users
+  // Demos cargados dinámicamente al seleccionar un usuario
+  const [loadedDemos, setLoadedDemos] = useState<VoiceDemo[]>([]);
+  const [loadingDemos, setLoadingDemos] = useState(false);
+  const [externalLink, setExternalLink] = useState('');
+
+  // Conteo de demos por usuario (para la tabla)
+  const [demoCounts, setDemoCounts] = useState<Record<string, number>>({});
+
+  // Cargar conteos de demos para todos los usuarios visibles
+  useEffect(() => {
+    const nonAdmins = users.filter(u => u.role !== 'ADMIN' && u.uid);
+    if (nonAdmins.length === 0) return;
+    const missing = nonAdmins.filter(u => demoCounts[u.uid] === undefined);
+    if (missing.length === 0) return;
+
+    Promise.allSettled(
+      missing.map(u =>
+        fetchAPI<any[]>(`/voice-audios/user/${u.uid}`)
+          .then(data => ({ uid: u.uid, count: (data || []).filter((d: any) => d.category === 'demo').length }))
+          .catch(() => ({ uid: u.uid, count: 0 }))
+      )
+    ).then(results => {
+      const counts: Record<string, number> = {};
+      results.forEach(r => {
+        if (r.status === 'fulfilled') counts[r.value.uid] = r.value.count;
+      });
+      setDemoCounts(prev => ({ ...prev, ...counts }));
+    });
+  }, [users]);
+
+  // Cargar demos y link externo cuando se selecciona un usuario
+  useEffect(() => {
+    if (!selectedUserId) { setLoadedDemos([]); setExternalLink(''); return; }
+    setLoadingDemos(true);
+    Promise.all([
+      fetchAPI<any[]>(`/voice-audios/user/${selectedUserId}`),
+      fetchAPI<any>(`/users/${selectedUserId}`),
+    ])
+      .then(([demosData, userData]) => {
+        const mapped: VoiceDemo[] = (demosData || [])
+          .filter((d: any) => d.category === 'demo') // solo demos, no perfil de audio
+          .map((d: any) => ({
+          id: d.id,
+          userId: selectedUserId,
+          title: d.title,
+          category: d.category || 'Doblaje',
+          fileUrl: d.fileUrl,
+          duration: d.durationSeconds
+            ? `${Math.floor(d.durationSeconds / 60)}:${String(d.durationSeconds % 60).padStart(2, '0')}`
+            : '—',
+          createdAt: d.createdAt,
+          mediaType: (d.mediaType || '').toLowerCase().includes('video') ? 'VIDEO' : 'AUDIO',
+          fileFormat: d.fileFormat,
+        }));
+        setLoadedDemos(mapped);
+        setExternalLink(userData?.profileAudioUrl || '');
+      })
+      .catch(() => { setLoadedDemos([]); setExternalLink(''); })
+      .finally(() => setLoadingDemos(false));
+  }, [selectedUserId]);
+
+  // Edición inline de especialidad
+  const [editingSpecialtyId, setEditingSpecialtyId] = useState<string | null>(null);
+  // Overrides locales de especialidad (para reflejar cambios sin recargar)
+  const [specialtyOverrides, setSpecialtyOverrides] = useState<Record<string, string>>({});
+
+  const handleSpecialtyChange = async (userId: string, specialty: string) => {
+    setEditingSpecialtyId(null);
+    // Actualizar localmente de inmediato
+    setSpecialtyOverrides(prev => ({ ...prev, [userId]: specialty }));
+    try {
+      await fetchAPI(`/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ specialties: specialty }),
+      });
+    } catch (err) {
+      // Revertir si falla
+      setSpecialtyOverrides(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      console.error('Error actualizando especialidad:', err);
+    }
+  };
+
+  // Helper: obtener especialidad actual (override local o del prop)
+  const getSpecialty = (user: UserProfile) =>
+    specialtyOverrides[user.uid] !== undefined
+      ? specialtyOverrides[user.uid]
+      : user.primaryCategory || '';
   const filteredUsers = useMemo(() => {
     let result = users.filter(u => u.role !== 'ADMIN');
 
@@ -71,27 +163,8 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
       result = result.filter(u => u.profileType === selectedProfileType);
     }
 
-    // Filter by visual genre: keep users who have at least one demo with this genre
-    if (selectedVisualGenre !== 'TODOS') {
-      result = result.filter(u =>
-        (allDemos[u.uid] || []).some(d => d.visualGenre === selectedVisualGenre)
-      );
-    }
-
-    // Filter by media type: keep users who have at least one demo of this type
-    if (selectedMediaType !== 'TODOS') {
-      result = result.filter(u =>
-        (allDemos[u.uid] || []).some(d =>
-          selectedMediaType === 'AUDIO'
-            ? (!d.mediaType || d.mediaType === 'AUDIO')
-            : d.mediaType === 'VIDEO'
-        )
-      );
-    }
-
-    if (hasDemosOnly) {
-      result = result.filter(u => allDemos[u.uid]?.length > 0);
-    }
+    // Filtros por género visual y tipo de medio omitidos (requieren demos precargadas)
+    // Se mantienen en la UI pero no filtran hasta tener datos
 
     if (sortBy === 'name') {
       result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -104,11 +177,11 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
     }
 
     return result;
-  }, [users, searchTerm, selectedCategory, selectedStatus, selectedProfileType, selectedVisualGenre, selectedMediaType, hasDemosOnly, sortBy, allDemos]);
+  }, [users, searchTerm, selectedCategory, selectedStatus, selectedProfileType, selectedVisualGenre, selectedMediaType, hasDemosOnly, sortBy]);
 
   const selectedUser = users.find(u => u.uid === selectedUserId);
   const selectedTalentProfile = selectedUserId ? talentProfiles[selectedUserId] : null;
-  const userDemos = selectedUserId ? (allDemos[selectedUserId] || []) : [];
+  const userDemos = loadedDemos;
 
   const handleToggleDemo = (demoId: string) => {
     if (playingDemoId === demoId) {
@@ -273,7 +346,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-4 px-8 py-5 bg-white/[0.02] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
               <div className="col-span-4">Nombre / Talento</div>
-              <div className="col-span-2">Categoría</div>
+              <div className="col-span-2">Especialidad</div>
               <div className="col-span-2">Tipo</div>
               <div className="col-span-2">Estado</div>
               <div className="col-span-2 text-right">Demos</div>
@@ -283,7 +356,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
             <div className="flex-1 overflow-y-auto custom-scrollbar">
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => {
-                  const demos = allDemos[user.uid] || [];
+                  const selectedUserDemoCount = selectedUserId === user.uid ? loadedDemos.length : (demoCounts[user.uid] ?? null);
                   const isSelected = selectedUserId === user.uid;
                   
                   return (
@@ -314,12 +387,44 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                         </div>
                       </div>
                       
-                      <div className="col-span-2">
-                        <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                          user.primaryCategory ? 'bg-sud-orange/10 text-sud-orange' : 'bg-slate-500/10 text-slate-500'
-                        }`}>
-                          {user.primaryCategory || 'Sin Cat.'}
-                        </span>
+                      <div className="col-span-2" onClick={e => e.stopPropagation()}>
+                        {editingSpecialtyId === user.uid ? (
+                          <select
+                            autoFocus
+                            defaultValue={getSpecialty(user).split(',')[0].trim()}
+                            onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
+                            onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
+                            className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
+                          >
+                            <option value="">Sin Cat.</option>
+                            <option value="Doblaje">Doblaje</option>
+                            <option value="Locución">Locución</option>
+                            <option value="Podcast">Podcast</option>
+                            <option value="Presentación">Presentación</option>
+                            <option value="Narración">Narración</option>
+                            <option value="Actuación Vocal">Actuación Vocal</option>
+                            <option value="Producción Vocal">Producción Vocal</option>
+                            <option value="Canto">Canto</option>
+                          </select>
+                        ) : (
+                          <button
+                            onClick={() => setEditingSpecialtyId(user.uid)}
+                            title="Clic para editar especialidad"
+                            className="flex flex-wrap gap-1"
+                          >
+                            {getSpecialty(user)
+                              ? getSpecialty(user).split(',').map((s, i) => (
+                                  <span
+                                    key={i}
+                                    className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange hover:bg-sud-orange/20 transition-all"
+                                  >
+                                    {s.trim()}
+                                  </span>
+                                ))
+                              : <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500">Sin Cat.</span>
+                            }
+                          </button>
+                        )}
                       </div>
 
                       <div className="col-span-2">
@@ -342,15 +447,12 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                       </div>
 
                       <div className="col-span-2 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <div className="flex -space-x-2">
-                            {demos.slice(0, 3).map((_, i) => (
-                              <div key={i} className="w-6 h-6 rounded-full bg-white/5 border border-white/10 flex items-center justify-center">
-                                <FileAudio size={10} className="text-sud-turquoise" />
-                              </div>
-                            ))}
-                          </div>
-                          <span className="text-[10px] font-black text-slate-500">{demos.length}</span>
+                        <div className="flex items-center justify-end">
+                          <span className={`text-[10px] font-black font-mono ${
+                            (selectedUserDemoCount ?? 0) > 0 ? 'text-sud-turquoise' : 'text-slate-600'
+                          }`}>
+                            {selectedUserDemoCount === null ? '…' : selectedUserDemoCount}
+                          </span>
                         </div>
                       </div>
                     </button>
@@ -435,13 +537,24 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                   </div>
                   <div className="space-y-6">
                     <div>
-                      <h2 className="text-4xl font-black text-white uppercase tracking-tighter italic">
+                      <h2 className="text-4xl font-black text-white uppercase tracking-tighter">
                         {selectedUser.name || 'Sin Nombre'}
                       </h2>
                       <div className="flex flex-wrap gap-3 mt-4">
-                        <span className="px-4 py-1.5 rounded-full bg-sud-turquoise/10 text-sud-turquoise text-[10px] font-black uppercase tracking-widest border border-sud-turquoise/20">
-                          {selectedUser.profileType === 'PARENT' ? 'Apoderado' : 'Perfil Personal'}
-                        </span>
+                        {selectedUser.profileType === 'PARENT' ? (
+                          <>
+                            <span className="px-4 py-1.5 rounded-full bg-sud-turquoise/10 text-sud-turquoise text-[10px] font-black uppercase tracking-widest border border-sud-turquoise/20">
+                              Apoderado
+                            </span>
+                            <span className="px-4 py-1.5 rounded-full bg-pink-500/10 text-pink-400 text-[10px] font-black uppercase tracking-widest border border-pink-500/20">
+                              Alumno Menor
+                            </span>
+                          </>
+                        ) : (
+                          <span className="px-4 py-1.5 rounded-full bg-sud-turquoise/10 text-sud-turquoise text-[10px] font-black uppercase tracking-widest border border-sud-turquoise/20">
+                            Perfil Personal
+                          </span>
+                        )}
                         <span className="px-4 py-1.5 rounded-full bg-sud-orange/10 text-sud-orange text-[10px] font-black uppercase tracking-widest border border-sud-orange/20">
                           {selectedUser.primaryCategory || 'Sin Categoría'}
                         </span>
@@ -486,25 +599,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                    </div>
                 </section>
 
-                {/* Talent Sheet / Minor Data */}
-                {selectedUser.profileType === 'PARENT' && (
-                  <section className="space-y-6">
-                    <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sud-orange">Ficha Técnica del Menor</h4>
-                      <div className="h-[1px] flex-1 bg-sud-orange/10 ml-6" />
-                    </div>
-                    <div className="grid grid-cols-2 gap-6">
-                      <div className="p-6 rounded-[1.8rem] bg-white/[0.02] border border-white/5">
-                        <p className="text-[8px] uppercase font-black text-slate-600 tracking-widest mb-2">Nombre del Alumno</p>
-                        <p className="text-lg font-black text-white uppercase">{selectedTalentProfile?.childName || 'N/A'}</p>
-                      </div>
-                      <div className="p-6 rounded-[1.8rem] bg-white/[0.02] border border-white/5">
-                        <p className="text-[8px] uppercase font-black text-slate-600 tracking-widest mb-2">Edad / Categoría</p>
-                        <p className="text-lg font-black text-white uppercase">{selectedTalentProfile?.childAge ? `${selectedTalentProfile.childAge} Años` : 'N/A'}</p>
-                      </div>
-                    </div>
-                  </section>
-                )}
+
 
                 {/* Biography & Locations */}
                 <section className="space-y-6">
@@ -514,16 +609,15 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                    </div>
                    <div className="p-8 rounded-[2rem] bg-white/[0.01] border border-white/5 space-y-6">
                       <p className="text-xs text-slate-400 leading-relaxed italic">
-                        "{selectedTalentProfile?.bio || 'Este talento aún no ha actualizado su biografía profesional.'}"
+                        "{selectedUser.bio || selectedTalentProfile?.bio || 'Este talento aún no ha actualizado su biografía profesional.'}"
                       </p>
                       <div className="flex gap-10">
-                        <div>
-                          <p className="text-[8px] uppercase font-black text-slate-600 tracking-widest mb-1">Ubicación</p>
-                          <div className="flex items-center gap-2 text-white font-black text-[10px] uppercase">
-                            <MapPin size={12} className="text-sud-turquoise" />
-                            {selectedTalentProfile?.location || 'Santiago, CL'}
+                        {selectedUser.age && (
+                          <div>
+                            <p className="text-[8px] uppercase font-black text-slate-600 tracking-widest mb-1">Edad</p>
+                            <div className="text-white font-black text-[10px] uppercase">{selectedUser.age} años</div>
                           </div>
-                        </div>
+                        )}
                         <div>
                           <p className="text-[8px] uppercase font-black text-slate-600 tracking-widest mb-1">Miembro desde</p>
                           <div className="flex items-center gap-2 text-white font-black text-[10px] uppercase">
@@ -538,73 +632,62 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                 {/* Demo Playlist */}
                 <section className="space-y-6">
                    <div className="flex items-center justify-between">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sud-turquoise">Playlist de Demos</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sud-turquoise">
+                        Playlist de Demos
+                        {loadingDemos && <span className="ml-2 text-slate-600 font-mono text-xs">cargando...</span>}
+                      </h4>
                       <div className="h-[1px] flex-1 bg-sud-turquoise/10 ml-6" />
                    </div>
-                   <div className="space-y-4 pb-12">
+
+                   <div className="space-y-4 pb-4">
                       {userDemos.length > 0 ? (
                         userDemos.map(demo => (
-                          <div 
-                            key={demo.id} 
-                            className="p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-sud-turquoise/20 transition-all flex items-center justify-between group"
+                          <div
+                            key={demo.id}
+                            className="p-5 rounded-[1.5rem] bg-white/[0.03] border border-white/5 space-y-3"
                           >
-                            <div className="flex items-center gap-6">
-                              <button 
-                                onClick={() => handleToggleDemo(demo.id)}
-                                className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all ${
-                                  playingDemoId === demo.id 
-                                    ? 'bg-sud-turquoise text-black' 
-                                    : 'bg-white/5 text-sud-turquoise group-hover:bg-white/10'
-                                } shadow-xl shadow-black/40`}
-                              >
-                                {playingDemoId === demo.id
-                                  ? <Pause size={24} />
-                                  : demo.mediaType === 'VIDEO'
-                                    ? <Film size={22} className="ml-0.5" />
-                                    : <Play size={24} className="ml-1" />
-                                }
-                              </button>
-                              <div>
-                                <div className="flex flex-wrap items-center gap-2 mb-1">
-                                  {/* Media type */}
-                                  <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${
-                                    demo.mediaType === 'VIDEO'
-                                      ? 'bg-sud-turquoise/10 text-sud-turquoise'
-                                      : 'bg-sud-orange/10 text-sud-orange'
-                                  }`}>
-                                    {demo.mediaType === 'VIDEO' ? '🎬 Video' : '🎙 Audio'}
-                                  </span>
-                                  {/* Category */}
-                                  <span className="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[7px] font-black uppercase tracking-widest">
-                                    {demo.category}
-                                  </span>
-                                  {/* Visual genre */}
-                                  {demo.visualGenre && (
-                                    <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-400 text-[7px] font-black uppercase tracking-widest border border-purple-500/20">
-                                      {demo.visualGenre}
-                                    </span>
-                                  )}
-                                  <p className="text-sm font-black text-white uppercase tracking-tight">{demo.title}</p>
-                                </div>
-                                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                                  {demo.fileFormat && <span className="mr-3">{demo.fileFormat}</span>}
-                                  Duración: {demo.duration}
-                                </p>
-                              </div>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange">
+                                🎙 Audio
+                              </span>
+                              <span className="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[7px] font-black uppercase tracking-widest">
+                                {demo.category}
+                              </span>
+                              <p className="text-sm font-black text-white uppercase tracking-tight">{demo.title}</p>
                             </div>
-                            <button className="p-4 rounded-xl bg-white/5 text-slate-500 hover:text-white transition-colors">
-                              <ExternalLink size={18} />
-                            </button>
+                            <AudioPlayer src={demo.fileUrl} showVolume />
                           </div>
                         ))
                       ) : (
                         <div className="p-12 border-2 border-dashed border-white/5 rounded-[2.5rem] text-center space-y-4">
                            <Mic2 size={32} className="mx-auto text-slate-800" />
-                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">Este alumno no ha subido demos aún</p>
+                           <p className="text-[10px] font-black uppercase tracking-widest text-slate-600">
+                             {loadingDemos ? 'Cargando demos...' : 'Este alumno no ha subido demos aún'}
+                           </p>
                         </div>
-                      )}
-                   </div>
+                      )}                   </div>
                 </section>
+
+                {/* Enlace externo — solo desde la carga dinámica */}
+                {externalLink && (
+                  <section className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-sud-turquoise flex items-center gap-2">
+                        <ExternalLink size={13} /> Carpeta externa
+                      </h4>
+                      <div className="h-px flex-1 bg-sud-turquoise/10 ml-4" />
+                    </div>
+                    <a
+                      href={externalLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 rounded-2xl bg-sud-turquoise/5 border border-sud-turquoise/20 hover:bg-sud-turquoise/10 transition-all group"
+                    >
+                      <ExternalLink size={16} className="text-sud-turquoise shrink-0" />
+                      <p className="text-xs text-sud-turquoise truncate group-hover:underline">{externalLink}</p>
+                    </a>
+                  </section>
+                )}
               </div>
 
               {/* Sticky Footer Actions */}

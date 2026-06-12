@@ -34,6 +34,7 @@ public class UserController {
             map.put("active", u.isActive());
             map.put("onboarded", u.isOnboarded());
             map.put("profileType", u.getProfileType() != null ? u.getProfileType().name() : "");
+            map.put("profileAudioUrl", u.getProfileAudioUrl() != null ? u.getProfileAudioUrl() : "");
             return ResponseEntity.ok((Object) map);
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -56,6 +57,8 @@ public class UserController {
             map.put("bio", u.getBio() != null ? u.getBio() : "");
             map.put("profileType", u.getProfileType() != null ? u.getProfileType().name() : "");
             map.put("createdAt", u.getCreatedAt());
+            map.put("profileAudioUrl", u.getProfileAudioUrl() != null ? u.getProfileAudioUrl() : "");
+            map.put("specialties", u.getSpecialties() != null ? u.getSpecialties() : "");
             return map;
         }).toList();
         return ResponseEntity.ok(users);
@@ -75,8 +78,13 @@ public class UserController {
                 if (name != null && !name.isBlank()) user.setName(name.trim());
             }
             if (updates.containsKey("active")) user.setActive((Boolean) updates.get("active"));
-            if (updates.containsKey("phone")) {
-                String phone = (String) updates.get("phone");
+            if (updates.containsKey("profileAudioUrl")) {
+                user.setProfileAudioUrl((String) updates.get("profileAudioUrl"));
+            }
+            if (updates.containsKey("specialties")) {
+                user.setSpecialties((String) updates.get("specialties"));
+            }
+            if (updates.containsKey("phone")) {                String phone = (String) updates.get("phone");
                 if (phone != null) {
                     String digits = phone.replaceAll("[^0-9]", "");
                     // Normalizar a formato chileno: siempre 56XXXXXXXXX
@@ -103,7 +111,8 @@ public class UserController {
                     "name", saved.getName() != null ? saved.getName() : "",
                     "phone", saved.getPhone() != null ? saved.getPhone() : "",
                     "status", saved.getStatus() != null ? saved.getStatus().name() : "PENDING",
-                    "active", saved.isActive()
+                    "active", saved.isActive(),
+                    "specialties", saved.getSpecialties() != null ? saved.getSpecialties() : ""
                 ));
             } catch (Exception e) {
                 System.err.println("❌ Error al guardar usuario: " + e.getMessage());

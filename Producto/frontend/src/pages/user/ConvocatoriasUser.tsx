@@ -104,6 +104,11 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       setError('No se pudo identificar al usuario. Por favor, cierra sesión y vuelve a ingresar.');
       return;
     }
+    // Verificar fecha límite en el frontend
+    if (daysRemaining(conv.fechaLimite) <= 0) {
+      setError('El plazo de postulación para esta convocatoria ha vencido.');
+      return;
+    }
     setApplyingId(conv.id);
     setApplySuccess(null);
     try {
@@ -187,7 +192,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       {/* Header */}
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <h2 className="text-3xl font-black tracking-tighter text-white uppercase italic">Oportunidades <span className="sud-vibrant-text-gradient tracking-tight">Laborales</span></h2>
+          <h2 className="text-3xl font-black tracking-tighter text-white uppercase tracking-widest">Oportunidades <span className="sud-vibrant-text-gradient tracking-tight">Laborales</span></h2>
           <p className="text-slate-500 mt-1 font-bold text-[10px] tracking-[0.3em] uppercase">Castings exclusivos para la comunidad SUD</p>
         </div>
       </header>
@@ -298,6 +303,11 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                     <span className="text-xs font-black uppercase tracking-widest">Postulación Enviada</span>
                     <StatusBadge status={myPostulaciones[conv.id].estado} />
                   </div>
+                ) : days <= 0 ? (
+                  <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400/70">
+                    <Clock size={16} />
+                    <span className="text-xs font-black uppercase tracking-widest">Plazo Vencido</span>
+                  </div>
                 ) : (
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleApply(conv); }}
@@ -388,6 +398,14 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                         <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Estado:</span>
                         <StatusBadge status={myPostulaciones[selectedConv.id].estado} size="md" />
                       </div>
+                    </div>
+                  </div>
+                ) : daysRemaining(selectedConv.fechaLimite) <= 0 ? (
+                  <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-center gap-4">
+                    <Clock size={24} className="text-red-400" />
+                    <div>
+                      <p className="text-red-300 font-bold text-sm">El plazo de postulación ha vencido</p>
+                      <p className="text-[10px] text-slate-500 mt-1">Esta convocatoria cerró el {formatFecha(selectedConv.fechaLimite)}</p>
                     </div>
                   </div>
                 ) : (

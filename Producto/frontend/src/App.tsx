@@ -6,7 +6,7 @@ import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { AdminStudents } from './pages/admin/AdminStudents';
 import { AdminTalentReview } from './pages/admin/AdminTalentReview';
 import { AdminSettings } from './pages/admin/AdminSettings';
-import { ConvocatoriasAdmin } from './pages/admin/ConvocatoriasAdmin';
+import { ConvocatoriasAdmin } from './pages/admin/AdminConvocatorias';
 import { AdminPostulaciones } from './pages/admin/AdminPostulaciones';
 import { AdminProfesores } from './pages/admin/AdminProfesores';
 import { AdminCursos } from './pages/admin/AdminCursos';

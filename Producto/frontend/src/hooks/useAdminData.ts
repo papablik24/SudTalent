@@ -27,20 +27,35 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
       ]);
 
       // Mapear usuarios primero
-      const mappedUsers: UserProfile[] = usuariosData.map((u: any) => ({
-        uid: String(u.id),
-        phone: u.phone || '',
-        role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
-        onboarded: u.onboarded,
-        name: u.name || '',
-        email: u.email || '',
-        status: u.status || 'PENDING',
-        profileType: u.profileType || undefined,
-        avatar: u.profileImageUrl || undefined,
-        age: u.age,
-        bio: u.bio || '',
-        createdAt: u.createdAt,
-      }));
+      const mappedUsers: UserProfile[] = usuariosData.map((u: any) => {
+        // Buscar categoría en whitelist por email o teléfono
+        const wMatch = whitelistData.find((w: any) => {
+          const wEmail = (w.email || '').toLowerCase();
+          const uEmail = (u.email || '').toLowerCase();
+          const wPhone = (w.phone || '').replace(/\D/g, '');
+          const uPhone = (u.phone || '').replace(/\D/g, '');
+          return (uEmail && wEmail && uEmail === wEmail) ||
+                 (uPhone.length >= 8 && wPhone.length >= 8 && uPhone.slice(-8) === wPhone.slice(-8));
+        });
+        return {
+          uid: String(u.id),
+          phone: u.phone || '',
+          role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
+          onboarded: u.onboarded,
+          name: u.name || '',
+          email: u.email || '',
+          status: u.status || 'PENDING',
+          profileType: u.profileType || undefined,
+          avatar: u.profileImageUrl || undefined,
+          age: u.age,
+          bio: u.bio || '',
+          createdAt: u.createdAt,
+          profileAudioUrl: u.profileAudioUrl || undefined,
+          profileImageUrl: u.profileImageUrl || undefined,
+          category: wMatch?.category || 'NONE',
+          primaryCategory: u.specialties || undefined,
+        } as any;
+      });
       setAllUsers(mappedUsers);
 
       // Mapear whitelist — ahora el backend incluye userId y userStatus directamente

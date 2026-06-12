@@ -43,6 +43,7 @@ public class ProfileController {
             map.put("profileImageUrl", user.getProfileImageUrl() != null ? user.getProfileImageUrl() : "");
             map.put("profileType", user.getProfileType() != null ? user.getProfileType().name() : "");
             map.put("status", user.getStatus() != null ? user.getStatus().name() : "PENDING");
+            map.put("profileAudioUrl", user.getProfileAudioUrl() != null ? user.getProfileAudioUrl() : "");
             return ResponseEntity.ok((Object) map);
         }).orElse(ResponseEntity.notFound().build());
     }
@@ -85,6 +86,9 @@ public class ProfileController {
                 String name = (String) updates.get("name");
                 if (name != null && !name.isBlank()) user.setName(name);
             }
+            if (updates.containsKey("profileAudioUrl")) {
+                user.setProfileAudioUrl((String) updates.get("profileAudioUrl"));
+            }
             User saved = userRepository.save(user);
             return ResponseEntity.ok(Map.of(
                     "id", saved.getId(),
@@ -93,7 +97,8 @@ public class ProfileController {
                     "phone", saved.getPhone() != null ? saved.getPhone() : "",
                     "age", saved.getAge() != null ? saved.getAge() : 0,
                     "bio", saved.getBio() != null ? saved.getBio() : "",
-                    "profileImageUrl", saved.getProfileImageUrl() != null ? saved.getProfileImageUrl() : ""
+                    "profileImageUrl", saved.getProfileImageUrl() != null ? saved.getProfileImageUrl() : "",
+                    "profileAudioUrl", saved.getProfileAudioUrl() != null ? saved.getProfileAudioUrl() : ""
             ));
         }).orElse(ResponseEntity.notFound().build());
     }

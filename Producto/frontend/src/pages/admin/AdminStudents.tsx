@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen } from 'lucide-react';
+import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen, FileText } from 'lucide-react';
 import { UserProfile, WhitelistEntry, ProfileCategory, ProfileStatus } from '../../types';
 import { generateAlumnosPDF, generateAlumnosExcel } from '../../services/reportService';
 import { fetchAPI } from '../../services/backendService';
@@ -212,14 +212,22 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
   const [userDemos, setUserDemos] = useState<any[]>([]);
   const [loadingDemos, setLoadingDemos] = useState(false);
+  const [externalLink, setExternalLink] = useState<string>('');
 
-  // Cargar demos cuando se selecciona un usuario
+  // Cargar demos y link externo cuando se selecciona un usuario
   useEffect(() => {
-    if (!selectedEntry?.uid) { setUserDemos([]); return; }
+    if (!selectedEntry?.uid) { setUserDemos([]); setExternalLink(''); return; }
     setLoadingDemos(true);
-    fetchAPI<any[]>(`/voice-audios/user/${selectedEntry.uid}`)
-      .then(data => setUserDemos(data || []))
-      .catch(() => setUserDemos([]))
+    setExternalLink('');
+    Promise.all([
+      fetchAPI<any[]>(`/voice-audios/user/${selectedEntry.uid}`),
+      fetchAPI<any>(`/users/${selectedEntry.uid}`),
+    ])
+      .then(([demosData, userData]) => {
+        setUserDemos(demosData || []);
+        setExternalLink(userData?.profileAudioUrl || '');
+      })
+      .catch(() => { setUserDemos([]); setExternalLink(''); })
       .finally(() => setLoadingDemos(false));
   }, [selectedEntry?.uid]);
 
@@ -696,6 +704,26 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                     </div>
                   </div>
                 )}
+                {/* Enlace externo (Drive, etc.) */}
+                {(() => {
+                  const fullUser = users.find(u => u.uid === selectedEntry.uid);
+                  const link = (fullUser as any)?.profileAudioUrl;
+                  if (!link) return null;
+                  return (
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-3 bg-sud-turquoise/5 rounded-xl border border-sud-turquoise/20 hover:bg-sud-turquoise/10 transition-all group"
+                    >
+                      <FileText size={14} className="text-sud-turquoise shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest">Carpeta externa</p>
+                        <p className="text-xs text-sud-turquoise truncate group-hover:underline">{link}</p>
+                      </div>
+                    </a>
+                  );
+                })()}
               </div>
 
               {/* Cambiar estado */}
@@ -789,6 +817,24 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                   </div>
                 )}
               </div>
+
+              {/* Enlace externo (Drive, YouTube, etc.) */}
+              {externalLink && (
+                <div className="space-y-2 pt-1">
+                  <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest flex items-center gap-2">
+                    <FileText size={13} className="text-sud-turquoise" /> Carpeta externa
+                  </p>
+                  <a
+                    href={externalLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-3 p-3 bg-sud-turquoise/5 rounded-2xl border border-sud-turquoise/20 hover:bg-sud-turquoise/10 transition-all group"
+                  >
+                    <FileText size={14} className="text-sud-turquoise shrink-0" />
+                    <p className="text-xs text-sud-turquoise truncate group-hover:underline">{externalLink}</p>
+                  </a>
+                </div>
+              )}
             </div>
           </div>
         </>

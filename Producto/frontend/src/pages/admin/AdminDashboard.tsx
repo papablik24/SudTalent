@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Sparkles, ChevronRight, X, User, Phone, Mail, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { Plus, Sparkles, ChevronRight, X, User, Phone, Mail, Calendar, CheckCircle, XCircle, Clock, ExternalLink } from 'lucide-react';
 import { StatCard } from '../../components/ui/StatCard';
 import { UserProfile, WhitelistEntry, ProfileStatus } from '../../types';
 
@@ -245,6 +245,26 @@ export function AdminDashboard({ whitelist, users, onNavigate, onUpdateStatus }:
                     </div>
                   </div>
                 )}
+                {/* Enlace externo (Drive, YouTube, etc.) */}
+                {(() => {
+                  const fullUser = users.find(u => u.uid === selectedUser.uid);
+                  const link = (fullUser as any)?.profileAudioUrl;
+                  if (!link) return null;
+                  return (
+                    <a
+                      href={link}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 p-4 bg-sud-turquoise/5 rounded-2xl border border-sud-turquoise/20 hover:bg-sud-turquoise/10 transition-all group"
+                    >
+                      <ExternalLink size={16} className="text-sud-turquoise shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[9px] text-slate-600 uppercase font-black tracking-widest mb-0.5">Carpeta externa</p>
+                        <p className="text-xs text-sud-turquoise truncate group-hover:underline">{link}</p>
+                      </div>
+                    </a>
+                  );
+                })()}
                 {selectedUser.age && (
                   <div className="flex items-center gap-3 p-4 bg-white/[0.03] rounded-2xl border border-white/5">
                     <Calendar size={16} className="text-sud-turquoise shrink-0" />

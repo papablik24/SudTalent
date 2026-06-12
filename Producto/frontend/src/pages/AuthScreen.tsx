@@ -240,14 +240,6 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                   </button>
                 </form>
 
-                {/* Forgot password link */}
-                <div className="mt-4 text-center">
-                  <button onClick={() => switchMode('forgot-password')}
-                    className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-sud-turquoise transition-colors flex items-center gap-2 mx-auto">
-                    <KeyRound size={13} /> ¿Olvidaste tu contraseña?
-                  </button>
-                </div>
-
                 {/* Switch to register */}
                 <div className="mt-4 text-center">
                   <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mb-2">¿No tienes cuenta?</p>
@@ -256,22 +248,12 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                     <UserPlus size={14} /> Crear cuenta nueva
                   </button>
                 </div>
-
-                {/* Dev credentials */}
-                <div className="mt-6 p-4 rounded-2xl bg-white/[0.02] border border-white/5">
-                  <p className="text-[8px] text-slate-600 font-black uppercase tracking-[0.2em] text-center mb-3">Cuentas de prueba</p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                      <p className="text-[8px] font-black text-sud-turquoise uppercase tracking-widest mb-1">Admin</p>
-                      <p className="text-[8px] text-slate-500 font-mono">admin@sudamericanvoices.com</p>
-                      <p className="text-[8px] text-slate-600 font-mono">admin123</p>
-                    </div>
-                    <div className="p-3 rounded-xl bg-white/[0.02] border border-white/5">
-                      <p className="text-[8px] font-black text-sud-orange uppercase tracking-widest mb-1">Alumno</p>
-                      <p className="text-[8px] text-slate-500 font-mono">alumno@sudtalent.cl</p>
-                      <p className="text-[8px] text-slate-600 font-mono">alumno123</p>
-                    </div>
-                  </div>
+                {/* Forgot password link */}
+                <div className="mt-4 text-center">
+                  <button onClick={() => switchMode('forgot-password')}
+                    className="text-[10px] font-black text-slate-500 uppercase tracking-widest hover:text-sud-turquoise transition-colors flex items-center gap-2 mx-auto">
+                    <KeyRound size={13} /> ¿Olvidaste tu contraseña?
+                  </button>
                 </div>
               </motion.div>
 

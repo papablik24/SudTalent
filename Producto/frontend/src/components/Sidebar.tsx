@@ -36,12 +36,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
       <div className="flex flex-col">
         <button 
           onClick={() => onNavigate('/')}
-          className="group/logo transition-all duration-300 hover:scale-[1.03] active:scale-95 cursor-pointer"
+          className="cursor-pointer text-left"
         >
           <img 
             src="/logos/SUD_LOGO_4.png" 
             alt="Sudamerican Voices" 
-            className="h-10 w-auto object-contain drop-shadow-[0_0_12px_rgba(45,212,191,0.15)] group-hover/logo:drop-shadow-[0_0_20px_rgba(45,212,191,0.3)] transition-all duration-500"
+            className={`h-10 w-auto object-contain${theme === 'light' ? ' logo-light-outline' : ''}`}
           />
         </button>
         <span className="text-[10px] text-slate-500 tracking-[0.2em] uppercase font-black mt-2">

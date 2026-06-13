@@ -10,6 +10,7 @@ import lombok.*;
 @NoArgsConstructor
 public class VoiceAudioDTO {
     private UUID id;
+    private UUID userId;
     private String title;
     private String fileUrl;
     private String storagePath;
@@ -18,6 +19,7 @@ public class VoiceAudioDTO {
     private String mediaType;
     private String fileFormat;  // Calculado desde mediaType o storagePath
     private String category;
+    private String visualGenre;
     private boolean isPublic;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

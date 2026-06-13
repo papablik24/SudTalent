@@ -56,7 +56,8 @@ function AppRoutes() {
     addToWhitelist,
     removeFromWhitelist,
     updateStudent,
-    updateUserStatus
+    updateUserStatus,
+    updateDemoVisualGenre
   } = useAdminData(role, currentUser);
 
   // ── Onboarding handler ────────────────────────────────────────────
@@ -195,6 +196,7 @@ function AppRoutes() {
                   talentProfiles={talentProfiles}
                   allDemos={allDemos}
                   onUpdateStatus={updateUserStatus}
+                  onUpdateDemoGenre={updateDemoVisualGenre}
                 />
               </MainLayout>
             </ProtectedRoute>

@@ -13,6 +13,7 @@ export interface DemoUploadResult {
   durationSeconds: number | null;
   fileSizeMb: number;
   createdAt: string;
+  visualGenre?: string;
 }
 
 export interface DemoDTO extends DemoUploadResult {
@@ -31,13 +32,15 @@ export const demoService = {
     file: File,
     category: string = 'Doblaje',
     title?: string,
-    token?: string
+    token?: string,
+    visualGenre?: string
   ): Promise<DemoUploadResult> {
     try {
       console.log('1️⃣ Iniciando uploadDemo...');
       console.log('   - Archivo:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
       console.log('   - Tipo:', file.type);
       console.log('   - Categoría:', category);
+      console.log('   - Género Visual:', visualGenre);
       console.log('   - Token present:', !!token);
 
       if (!token) {
@@ -48,6 +51,7 @@ export const demoService = {
       formData.append('file', file);
       formData.append('category', category);
       if (title) formData.append('title', title);
+      if (visualGenre) formData.append('visualGenre', visualGenre);
 
       const uploadUrl = `${API_URL}/upload`;
       console.log('2️⃣ URL de upload:', uploadUrl);

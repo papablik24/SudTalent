@@ -31,11 +31,13 @@ public class DemoController {
     public ResponseEntity<?> uploadDemo(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "category", defaultValue = "Doblaje") String category,
-            @RequestParam(value = "title", required = false) String title) {
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "visualGenre", required = false) String visualGenre) {
 
         try {
             System.out.println("📤 [DEMO] Upload iniciado");
             System.out.println("   Categoría: " + category);
+            System.out.println("   Género Visual: " + visualGenre);
             System.out.println("   Archivo: " + file.getOriginalFilename() + " (" + file.getSize() + " bytes)");
 
             // Obtener usuario autenticado
@@ -75,7 +77,8 @@ public class DemoController {
                 user,
                 file,
                 demoTitle,
-                "demo"  // Categoría interna diferente
+                "demo",  // Categoría interna diferente
+                visualGenre
             );
 
             System.out.println("✅ [DEMO] Subido exitosamente");

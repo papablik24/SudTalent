@@ -112,6 +112,17 @@
     color: #334155 !important;
   }
 
+  /* ── Colores de marca con legibilidad en modo claro ──────── */
+  :root.light .text-sud-turquoise {
+    color: #0d9488 !important; /* teal-600 */
+  }
+  :root.light .text-sud-orange {
+    color: #ea580c !important; /* orange-600 */
+  }
+  :root.light .text-sud-yellow {
+    color: #d97706 !important; /* amber-600 */
+  }
+
   /* ── Fondos oscuros → claros ─────────────────────────────── */
   :root.light .bg-black\/60,
   :root.light .bg-black\/40,
@@ -123,19 +134,28 @@
   :root.light .bg-white\/\[0\.01\],
   :root.light .bg-white\/\[0\.02\],
   :root.light .bg-white\/\[0\.03\],
-  :root.light .bg-white\/\[0\.05\] {
-    background-color: rgba(255, 255, 255, 0.9) !important;
-  }
-
+  :root.light .bg-white\/\[0\.04\],
+  :root.light .bg-white\/\[0\.05\],
   :root.light .bg-white\/5 {
     background-color: #f1f5f9 !important;
   }
 
+  /* ── Hover de elementos interactivos claros ──────────────── */
+  :root.light .hover\:bg-white\/\[0\.05\]:hover,
+  :root.light .hover\:bg-white\/\[0\.03\]:hover,
+  :root.light .hover\:bg-white\/\[0\.04\]:hover,
+  :root.light .hover\:bg-white\/5:hover {
+    background-color: #e2e8f0 !important;
+  }
+
+  /* ── Bordes en modo claro ────────────────────────────────── */
   :root.light .border-white\/5,
   :root.light .border-white\/\[0\.05\],
   :root.light .border-white\/10,
-  :root.light .border-white\/\[0\.02\] {
-    border-color: #e2e8f0 !important;
+  :root.light .border-white\/20,
+  :root.light .border-white\/\[0\.02\],
+  :root.light .border-white\/\[0\.1\] {
+    border-color: #cbd5e1 !important;
   }
 
   /* ── Fondos sud-black ────────────────────────────────────── */
@@ -160,4 +180,23 @@
   :root.light .rounded-\[1\.4rem\].bg-black {
     background-color: #f1f5f9 !important;
   }
+
+  /* ── Checkbox oscuro → claro ──────────────────────────────── */
+  :root.light input[type="checkbox"].bg-black,
+  :root.light input[type="checkbox"] {
+    background-color: #ffffff !important;
+    border-color: #cbd5e1 !important;
+  }
 }
+
+/* Contorno oscuro para el logo en modo claro (sigue la transparencia del PNG) */
+.logo-light-outline {
+  filter:
+    drop-shadow(0 0 1px rgba(2, 6, 23, 1))
+    drop-shadow(1px 0 0 rgba(2, 6, 23, 0.95))
+    drop-shadow(-1px 0 0 rgba(2, 6, 23, 0.95))
+    drop-shadow(0 1px 0 rgba(2, 6, 23, 0.95))
+    drop-shadow(0 -1px 0 rgba(2, 6, 23, 0.95))
+    drop-shadow(0 1px 2px rgba(2, 6, 23, 0.75));
+}
+

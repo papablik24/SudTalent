@@ -65,7 +65,8 @@ public class VoiceAudioController {
     public ResponseEntity<?> uploadAudio(
             @RequestParam("file") MultipartFile file,
             @RequestParam(value = "category", defaultValue = "profile") String category,
-            @RequestParam(value = "title", required = false) String title) {
+            @RequestParam(value = "title", required = false) String title,
+            @RequestParam(value = "visualGenre", required = false) String visualGenre) {
 
         try {
             System.out.println("📤 [uploadAudio] Iniciando upload...");
@@ -93,14 +94,15 @@ public class VoiceAudioController {
                         .body(Map.of("error", "Archivo muy grande. Máximo 10MB"));
             }
 
-            System.out.println("✅ Validaciones pasadas. Archivo: " + file.getOriginalFilename());
+            System.out.println("✅ Validaciones pasadas. Archivo: " + file.getOriginalFilename() + ", Género: " + visualGenre);
 
             // Subir audio
             VoiceAudioDTO audio = voiceAudioService.uploadAudio(
                     user,
                     file,
                     title != null ? title : file.getOriginalFilename(),
-                    category
+                    category,
+                    visualGenre
             );
 
             System.out.println("✅ Audio subido exitosamente: " + audio.getId());
@@ -132,6 +134,22 @@ public class VoiceAudioController {
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error obteniendo audios: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * 📋 Admin: Obtener todas las demos de todos los usuarios
+     * GET /api/voice-audios/all-demos
+     */
+    @GetMapping("/all-demos")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> getAllDemos() {
+        try {
+            List<VoiceAudioDTO> demos = voiceAudioService.getAllDemos();
+            return ResponseEntity.ok(demos);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error obteniendo todas las demos: " + e.getMessage()));
         }
     }
 
@@ -222,6 +240,33 @@ public class VoiceAudioController {
             e.printStackTrace();
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
                     .body(Map.of("error", "No permitido eliminar este audio"));
+        }
+    }
+
+    /**
+     * 🔄 Admin: Actualizar el género visual de una demo
+     * PUT /api/voice-audios/{audioId}/visual-genre
+     */
+    @PutMapping("/{audioId}/visual-genre")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<?> updateVisualGenre(
+            @PathVariable UUID audioId,
+            @RequestBody Map<String, String> body) {
+        try {
+            System.out.println("🔄 [updateVisualGenre] Actualizando género de audio: " + audioId);
+            String visualGenre = body.get("visualGenre");
+            
+            // Si viene vacío o "Sin género", lo guardamos como null en BD
+            if (visualGenre == null || "Sin género".equalsIgnoreCase(visualGenre) || visualGenre.trim().isEmpty()) {
+                visualGenre = null;
+            }
+            
+            VoiceAudioDTO updated = voiceAudioService.updateVisualGenre(audioId, visualGenre);
+            return ResponseEntity.ok(updated);
+        } catch (Exception e) {
+            System.err.println("❌ Error actualizando género visual: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error actualizando género visual: " + e.getMessage()));
         }
     }
 

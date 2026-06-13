@@ -28,15 +28,27 @@ import { UserProfile, TalentProfile, VoiceDemo, DemoCategory, ProfileStatus, Pro
 import { fetchAPI } from '../../services/backendService';
 import { AudioPlayer } from '../../components/ui/AudioPlayer';
 
+const AVAILABLE_SPECIALTIES = [
+  'Doblaje',
+  'Locución',
+  'Podcast',
+  'Presentación',
+  'Narración',
+  'Actuación Vocal',
+  'Producción Vocal',
+  'Canto'
+];
+
 interface AdminTalentReviewProps {
   users: UserProfile[];
   talentProfiles: Record<string, TalentProfile>;
   allDemos: Record<string, VoiceDemo[]>;
   onClose?: () => void;
   onUpdateStatus?: (userId: string, status: ProfileStatus) => void;
+  onUpdateDemoGenre?: (demoId: string, userId: string, genre: string) => Promise<void>;
 }
 
-export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, onUpdateStatus }: AdminTalentReviewProps) {
+export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, onUpdateStatus, onUpdateDemoGenre }: AdminTalentReviewProps) {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<DemoCategory | 'TODOS'>('TODOS');
   const [selectedStatus, setSelectedStatus] = useState<ProfileStatus | 'TODOS'>('TODOS');
@@ -58,7 +70,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
 
   // Cargar conteos de demos para todos los usuarios visibles
   useEffect(() => {
-    const nonAdmins = users.filter(u => u.role !== 'ADMIN' && u.uid);
+    const nonAdmins = users.filter(u => u.role !== 'ADMIN' && u.role !== 'PROFESOR' && u.uid);
     if (nonAdmins.length === 0) return;
     const missing = nonAdmins.filter(u => demoCounts[u.uid] === undefined);
     if (missing.length === 0) return;
@@ -101,6 +113,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
           createdAt: d.createdAt,
           mediaType: (d.mediaType || '').toLowerCase().includes('video') ? 'VIDEO' : 'AUDIO',
           fileFormat: d.fileFormat,
+          visualGenre: d.visualGenre || undefined,
         }));
         setLoadedDemos(mapped);
         setExternalLink(userData?.profileAudioUrl || '');
@@ -114,14 +127,23 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
   // Overrides locales de especialidad (para reflejar cambios sin recargar)
   const [specialtyOverrides, setSpecialtyOverrides] = useState<Record<string, string>>({});
 
+  const getCleanSpecialties = (u: UserProfile): string[] => {
+    const raw = specialtyOverrides[u.uid] !== undefined
+      ? specialtyOverrides[u.uid]
+      : u.primaryCategory || '';
+    if (!raw) return [];
+    const split = raw.split(',').map(s => s.trim()).filter(Boolean);
+    return Array.from(new Set(split));
+  };
+
   const handleSpecialtyChange = async (userId: string, specialty: string) => {
     setEditingSpecialtyId(null);
-    // Actualizar localmente de inmediato
-    setSpecialtyOverrides(prev => ({ ...prev, [userId]: specialty }));
+    const cleanSpec = specialty ? specialty.trim() : '';
+    setSpecialtyOverrides(prev => ({ ...prev, [userId]: cleanSpec }));
     try {
       await fetchAPI(`/users/${userId}`, {
         method: 'PUT',
-        body: JSON.stringify({ specialties: specialty }),
+        body: JSON.stringify({ specialties: cleanSpec }),
       });
     } catch (err) {
       // Revertir si falla
@@ -134,13 +156,39 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
     }
   };
 
-  // Helper: obtener especialidad actual (override local o del prop)
-  const getSpecialty = (user: UserProfile) =>
-    specialtyOverrides[user.uid] !== undefined
-      ? specialtyOverrides[user.uid]
-      : user.primaryCategory || '';
+  // State y handlers para modificar especialidades desde el panel de detalle
+  const [isEditingPanelSpecialties, setIsEditingPanelSpecialties] = useState(false);
+  const [panelSpecialties, setPanelSpecialties] = useState<string[]>([]);
+
+  const handleTogglePanelSpecialty = (spec: string) => {
+    setPanelSpecialties(prev =>
+      prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]
+    );
+  };
+
+  const handleSavePanelSpecialties = async () => {
+    if (!selectedUserId) return;
+    const specialtiesString = panelSpecialties.join(', ');
+    setSpecialtyOverrides(prev => ({ ...prev, [selectedUserId]: specialtiesString }));
+    setIsEditingPanelSpecialties(false);
+    try {
+      await fetchAPI(`/users/${selectedUserId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ specialties: specialtiesString }),
+      });
+    } catch (err) {
+      setSpecialtyOverrides(prev => {
+        const next = { ...prev };
+        delete next[selectedUserId];
+        return next;
+      });
+      console.error('Error actualizando especialidades en panel:', err);
+      alert('Error al actualizar especialidades');
+    }
+  };
+
   const filteredUsers = useMemo(() => {
-    let result = users.filter(u => u.role !== 'ADMIN');
+    let result = users.filter(u => u.role !== 'ADMIN' && u.role !== 'PROFESOR');
 
     if (searchTerm) {
       const lowSearch = searchTerm.toLowerCase();
@@ -152,7 +200,10 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
     }
 
     if (selectedCategory !== 'TODOS') {
-      result = result.filter(u => u.primaryCategory === selectedCategory);
+      result = result.filter(u => {
+        const specs = getCleanSpecialties(u);
+        return specs.some(s => s.toLowerCase() === selectedCategory.toLowerCase());
+      });
     }
 
     if (selectedStatus !== 'TODOS') {
@@ -163,8 +214,37 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
       result = result.filter(u => u.profileType === selectedProfileType);
     }
 
-    // Filtros por género visual y tipo de medio omitidos (requieren demos precargadas)
-    // Se mantienen en la UI pero no filtran hasta tener datos
+    // 1. Filtrar por "Con demos subidas" (hasDemosOnly)
+    if (hasDemosOnly) {
+      result = result.filter(u => {
+        const uDemos = allDemos[u.uid] || [];
+        return uDemos.length > 0;
+      });
+    }
+
+    // 2. Filtrar por "Tipo de medio" (selectedMediaType)
+    if (selectedMediaType !== 'TODOS') {
+      result = result.filter(u => {
+        const uDemos = allDemos[u.uid] || [];
+        return uDemos.some(d => {
+          const mType = (d.mediaType || '').toUpperCase();
+          if (selectedMediaType === 'AUDIO') {
+            return mType === 'AUDIO' || mType.includes('AUDIO') || mType.includes('MPEG') || mType.includes('WAV');
+          } else if (selectedMediaType === 'VIDEO') {
+            return mType === 'VIDEO' || mType.includes('VIDEO') || mType.includes('MP4') || mType.includes('QUICKTIME') || mType.includes('MOV');
+          }
+          return false;
+        });
+      });
+    }
+
+    // 3. Filtrar por "Género Visual / Escena" (selectedVisualGenre)
+    if (selectedVisualGenre !== 'TODOS') {
+      result = result.filter(u => {
+        const uDemos = allDemos[u.uid] || [];
+        return uDemos.some(d => d.visualGenre === selectedVisualGenre);
+      });
+    }
 
     if (sortBy === 'name') {
       result.sort((a, b) => (a.name || '').localeCompare(b.name || ''));
@@ -177,9 +257,18 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
     }
 
     return result;
-  }, [users, searchTerm, selectedCategory, selectedStatus, selectedProfileType, selectedVisualGenre, selectedMediaType, hasDemosOnly, sortBy]);
+  }, [users, allDemos, searchTerm, selectedCategory, selectedStatus, selectedProfileType, selectedVisualGenre, selectedMediaType, hasDemosOnly, sortBy, specialtyOverrides]);
 
   const selectedUser = users.find(u => u.uid === selectedUserId);
+
+  useEffect(() => {
+    if (selectedUser) {
+      const currentSpecs = getCleanSpecialties(selectedUser);
+      setPanelSpecialties(currentSpecs);
+      setIsEditingPanelSpecialties(false);
+    }
+  }, [selectedUserId, selectedUser]);
+
   const selectedTalentProfile = selectedUserId ? talentProfiles[selectedUserId] : null;
   const userDemos = loadedDemos;
 
@@ -345,9 +434,10 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
           <div className="sud-glass-panel flex-1 flex flex-col p-0 overflow-hidden relative">
             {/* Table Header */}
             <div className="grid grid-cols-12 gap-4 px-8 py-5 bg-white/[0.02] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              <div className="col-span-4">Nombre / Talento</div>
+              <div className="col-span-3">Nombre / Talento</div>
               <div className="col-span-2">Especialidad</div>
-              <div className="col-span-2">Tipo</div>
+              <div className="col-span-2">Género / Escena</div>
+              <div className="col-span-1">Tipo</div>
               <div className="col-span-2">Estado</div>
               <div className="col-span-2 text-right">Demos</div>
             </div>
@@ -359,6 +449,9 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                   const selectedUserDemoCount = selectedUserId === user.uid ? loadedDemos.length : (demoCounts[user.uid] ?? null);
                   const isSelected = selectedUserId === user.uid;
                   
+                  const uDemos = allDemos[user.uid] || [];
+                  const genres = Array.from(new Set(uDemos.map(d => d.visualGenre).filter((g): g is VisualGenre => !!g)));
+
                   return (
                     <button
                       key={user.uid}
@@ -367,7 +460,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                         isSelected ? 'bg-white/5 border-l-4 border-l-sud-turquoise' : ''
                       }`}
                     >
-                      <div className="col-span-4 flex items-center gap-4">
+                      <div className="col-span-3 flex items-center gap-4">
                         <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] shrink-0">
                           <div className="w-full h-full rounded-[0.9rem] bg-black flex items-center justify-center overflow-hidden">
                             {user.avatar ? (
@@ -391,12 +484,12 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                         {editingSpecialtyId === user.uid ? (
                           <select
                             autoFocus
-                            defaultValue={getSpecialty(user).split(',')[0].trim()}
+                            defaultValue={getCleanSpecialties(user)[0] || ''}
                             onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
                             onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
                             className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
                           >
-                            <option value="">Sin Cat.</option>
+                            <option value="">Sin especialidad definida</option>
                             <option value="Doblaje">Doblaje</option>
                             <option value="Locución">Locución</option>
                             <option value="Podcast">Podcast</option>
@@ -409,25 +502,43 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                         ) : (
                           <button
                             onClick={() => setEditingSpecialtyId(user.uid)}
-                            title="Clic para editar especialidad"
+                            title="Clic para editar especialidad principal"
                             className="flex flex-wrap gap-1"
                           >
-                            {getSpecialty(user)
-                              ? getSpecialty(user).split(',').map((s, i) => (
+                            {getCleanSpecialties(user).length > 0
+                              ? getCleanSpecialties(user).map((s, i) => (
                                   <span
                                     key={i}
                                     className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange hover:bg-sud-orange/20 transition-all"
                                   >
-                                    {s.trim()}
+                                    {s}
                                   </span>
                                 ))
-                              : <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500">Sin Cat.</span>
+                              : <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500">Sin especialidad definida</span>
                             }
                           </button>
                         )}
                       </div>
 
-                      <div className="col-span-2">
+                      {/* Género / Escena */}
+                      <div className="col-span-2 flex flex-wrap gap-1">
+                        {genres.length > 0 ? (
+                          genres.map((g, idx) => (
+                            <span
+                              key={idx}
+                              className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20"
+                            >
+                              {g.toUpperCase()}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest">
+                            Sin género
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="col-span-1">
                         <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
                           {user.profileType === 'PARENT' ? '👶 Menor' : '👤 Adulto'}
                         </span>
@@ -503,9 +614,9 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
               animate={{ x: 0 }}
               exit={{ x: '100%' }}
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed inset-y-0 right-0 w-full md:w-[600px] bg-sud-black border-l border-white/10 z-[100] shadow-[-20px_0_40px_rgba(0,0,0,0.5)] flex flex-col p-10"
+              className="fixed inset-y-0 right-0 w-full md:w-[600px] bg-sud-black border-l border-white/10 z-[100] shadow-[-20px_0_40px_rgba(0,0,0,0.5)] flex flex-col h-screen max-h-screen overflow-hidden"
             >
-              <div className="flex items-center justify-between mb-12">
+              <div className="flex items-center justify-between p-10 pb-6 shrink-0">
                 <div className="flex items-center gap-4">
                   <div className="p-3 rounded-full bg-white/5 text-slate-400">
                     <Shield size={20} />
@@ -523,7 +634,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto custom-scrollbar pr-4 space-y-12">
+              <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar px-10 pb-10 space-y-12">
                 {/* Profile Main Info */}
                 <section className="flex flex-col md:flex-row gap-10 items-start">
                   <div className="w-32 h-32 rounded-[2.5rem] bg-sud-gradient p-[1px] shrink-0">
@@ -555,9 +666,20 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                             Perfil Personal
                           </span>
                         )}
-                        <span className="px-4 py-1.5 rounded-full bg-sud-orange/10 text-sud-orange text-[10px] font-black uppercase tracking-widest border border-sud-orange/20">
-                          {selectedUser.primaryCategory || 'Sin Categoría'}
-                        </span>
+                        {getCleanSpecialties(selectedUser).length > 0 ? (
+                          getCleanSpecialties(selectedUser).map((s, idx) => (
+                            <span 
+                              key={idx}
+                              className="px-4 py-1.5 rounded-full bg-sud-orange/10 text-sud-orange text-[10px] font-black uppercase tracking-widest border border-sud-orange/20"
+                            >
+                              {s}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="px-4 py-1.5 rounded-full bg-slate-500/10 text-slate-500 text-[10px] font-black uppercase tracking-widest border border-slate-500/20">
+                            Sin especialidad definida
+                          </span>
+                        )}
                       </div>
                     </div>
                     
@@ -601,7 +723,87 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
 
 
 
-                {/* Biography & Locations */}
+                 {/* Especialidades de Casting */}
+                 <section className="space-y-6">
+                    <div className="flex items-center justify-between">
+                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Especialidades de Casting</h4>
+                       <div className="h-[1px] flex-1 bg-white/5 ml-6" />
+                    </div>
+                    <div className="p-8 rounded-[2rem] bg-white/[0.01] border border-white/5 space-y-6">
+                       {!isEditingPanelSpecialties ? (
+                         <div className="space-y-4">
+                           <div className="flex flex-wrap gap-2">
+                             {getCleanSpecialties(selectedUser).length > 0 ? (
+                               getCleanSpecialties(selectedUser).map((s, i) => (
+                                 <span
+                                   key={i}
+                                   className="px-4 py-1.5 rounded-full bg-sud-orange/10 text-sud-orange text-[10px] font-black uppercase tracking-widest border border-sud-orange/20"
+                                 >
+                                   {s}
+                                 </span>
+                               ))
+                             ) : (
+                               <span className="text-xs text-slate-500 italic">Sin especialidad definida</span>
+                             )}
+                           </div>
+                           <button
+                             onClick={() => {
+                               const current = getCleanSpecialties(selectedUser);
+                               setPanelSpecialties(current);
+                               setIsEditingPanelSpecialties(true);
+                             }}
+                             className="text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-slate-300 border border-white/10 transition-all"
+                           >
+                             Modificar Especialidades
+                           </button>
+                         </div>
+                       ) : (
+                         <div className="space-y-6">
+                           <div className="grid grid-cols-2 gap-3">
+                             {AVAILABLE_SPECIALTIES.map(spec => {
+                               const isChecked = panelSpecialties.includes(spec);
+                               return (
+                                 <button
+                                   key={spec}
+                                   onClick={() => handleTogglePanelSpecialty(spec)}
+                                   className={`flex items-center justify-between px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all ${
+                                     isChecked
+                                       ? 'bg-sud-orange/10 border-sud-orange/30 text-sud-orange'
+                                       : 'bg-white/[0.02] border-white/5 text-slate-500 hover:bg-white/[0.04]'
+                                   }`}
+                                 >
+                                   <span>{spec}</span>
+                                   <span className={`w-3.5 h-3.5 rounded border flex items-center justify-center text-[8px] font-black ${
+                                     isChecked
+                                       ? 'border-sud-orange bg-sud-orange text-black'
+                                       : 'border-white/20'
+                                   }`}>
+                                     {isChecked && '✓'}
+                                   </span>
+                                 </button>
+                               );
+                             })}
+                           </div>
+                           <div className="flex gap-3 justify-end pt-2">
+                             <button
+                               onClick={() => setIsEditingPanelSpecialties(false)}
+                               className="px-4 py-2 text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-slate-300"
+                             >
+                               Cancelar
+                             </button>
+                             <button
+                               onClick={handleSavePanelSpecialties}
+                               className="px-5 py-2.5 rounded-xl bg-sud-orange text-black text-[9px] font-black uppercase tracking-widest hover:bg-sud-orange/80 transition-all"
+                             >
+                               Guardar Cambios
+                             </button>
+                           </div>
+                         </div>
+                       )}
+                    </div>
+                 </section>
+
+                 {/* Biography & Locations */}
                 <section className="space-y-6">
                    <div className="flex items-center justify-between">
                       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Acerca del Talento</h4>
@@ -647,8 +849,10 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                             className="p-5 rounded-[1.5rem] bg-white/[0.03] border border-white/5 space-y-3"
                           >
                             <div className="flex items-center gap-2 flex-wrap">
-                              <span className="px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange">
-                                🎙 Audio
+                              <span className={`px-2 py-0.5 rounded text-[7px] font-black uppercase tracking-widest ${
+                                demo.mediaType === 'VIDEO' ? 'bg-sud-turquoise/10 text-sud-turquoise' : 'bg-sud-orange/10 text-sud-orange'
+                              }`}>
+                                {demo.mediaType === 'VIDEO' ? '🎥 Video' : '🎙 Audio'}
                               </span>
                               <span className="px-2 py-0.5 rounded bg-white/5 text-slate-400 text-[7px] font-black uppercase tracking-widest">
                                 {demo.category}
@@ -656,6 +860,50 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                               <p className="text-sm font-black text-white uppercase tracking-tight">{demo.title}</p>
                             </div>
                             <AudioPlayer src={demo.fileUrl} showVolume />
+                            
+                            <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9px] uppercase font-black text-slate-500 tracking-widest">Género / Escena:</span>
+                                <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest ${
+                                  demo.visualGenre 
+                                    ? 'bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20' 
+                                    : 'bg-slate-500/10 text-slate-500'
+                                }`}>
+                                  {demo.visualGenre || 'Sin género'}
+                                </span>
+                              </div>
+                              
+                              <select
+                                value={demo.visualGenre || 'Sin género'}
+                                onChange={async (e) => {
+                                  const val = e.target.value;
+                                  if (onUpdateDemoGenre && selectedUserId) {
+                                    try {
+                                      await onUpdateDemoGenre(demo.id, selectedUserId, val);
+                                      // Actualizar localmente el estado de loadedDemos
+                                      setLoadedDemos(prev => prev.map(d => d.id === demo.id ? { ...d, visualGenre: val === 'Sin género' ? undefined : val as any } : d));
+                                    } catch (err) {
+                                      console.error("Error al actualizar género de demo:", err);
+                                      alert("Error al actualizar género de la demo");
+                                    }
+                                  }
+                                }}
+                                className="bg-black border border-white/10 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none focus:border-sud-turquoise/40"
+                              >
+                                <option value="Sin género">Sin género</option>
+                                <option value="Acción">Acción</option>
+                                <option value="Drama">Drama</option>
+                                <option value="Romántico">Romántico</option>
+                                <option value="Musical">Musical</option>
+                                <option value="Trágico">Trágico</option>
+                                <option value="Cómico">Cómico</option>
+                                <option value="Suspenso">Suspenso</option>
+                                <option value="Fantasía">Fantasía</option>
+                                <option value="Terror">Terror</option>
+                                <option value="Infantil">Infantil</option>
+                                <option value="Otro">Otro</option>
+                              </select>
+                            </div>
                           </div>
                         ))
                       ) : (
@@ -688,16 +936,16 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                     </a>
                   </section>
                 )}
-              </div>
 
-              {/* Sticky Footer Actions */}
-              <div className="pt-8 border-t border-white/5 flex gap-4 bg-sud-black z-10 mt-auto">
-                 <button className="flex-1 sud-btn-secondary">
-                    Contactar Alumno
-                 </button>
-                 <button className="flex-1 sud-btn-primary">
-                    Generar Reportería
-                 </button>
+                {/* Footer Actions inside the scroll */}
+                <div className="pt-6 pb-12 border-t border-white/5 flex gap-4">
+                   <button className="flex-1 sud-btn-secondary">
+                      Contactar Alumno
+                   </button>
+                   <button className="flex-1 sud-btn-primary">
+                      Generar Reportería
+                   </button>
+                </div>
               </div>
             </motion.div>
           </>

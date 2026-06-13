@@ -41,7 +41,15 @@ export function useAuth() {
       const savedUser = localStorage.getItem('sud_current_user');
       const token = localStorage.getItem('sud_jwt_token');
 
-      if (savedUser && token) {
+      // Validar token: debe ser un JWT real de 3 partes, no un token mock local
+      const isTokenValid = token && 
+                           token !== 'null' && 
+                           token !== 'undefined' && 
+                           token.trim() !== '' && 
+                           !token.startsWith('mock_jwt_token_') &&
+                           token.split('.').length === 3;
+
+      if (savedUser && isTokenValid) {
         try {
           const user = JSON.parse(savedUser);
           if (user.role && user.role !== 'ADMIN' && user.role !== 'USER' && user.role !== 'PROFESOR') {
@@ -92,6 +100,13 @@ export function useAuth() {
           authService.clearLocalAuth();
           localStorage.removeItem('sud_current_user');
         }
+      } else if (savedUser || token) {
+        // Si hay una sesión vieja inconsistente (usuario guardado pero sin token, o viceversa)
+        console.warn('Inconsistent session detected on mount, clearing auth');
+        authService.clearLocalAuth();
+        localStorage.removeItem('sud_current_user');
+        setCurrentUser(null);
+        setRole(null);
       }
 
       setLoading(false);
@@ -316,6 +331,9 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
       return false;
     }
 
+    const mockToken = `mock_jwt_token_${acc.user.role.toLowerCase()}_${acc.user.uid}`;
+    localStorage.setItem('sud_jwt_token', mockToken);
+
     localStorage.setItem('sud_current_user', JSON.stringify(acc.user));
     setCurrentUser(acc.user);
     setRole(acc.user.role);
@@ -406,6 +424,8 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
       status: 'PENDING',
     };
 
+    const mockToken = `mock_jwt_token_user_reg_${uid}`;
+    localStorage.setItem('sud_jwt_token', mockToken);
     registeredUsers[email.toLowerCase()] = { password: _password, user: userData };
     localStorage.setItem('sud_registered_users', JSON.stringify(registeredUsers));
     localStorage.setItem('sud_current_user', JSON.stringify(userData));
@@ -560,6 +580,8 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
       localStorage.setItem(`user_${phoneId}`, JSON.stringify(userData));
     }
 
+    const mockToken = `mock_jwt_token_user_phone_${phoneId}`;
+    localStorage.setItem('sud_jwt_token', mockToken);
     localStorage.setItem('sud_current_user', JSON.stringify(userData));
     setCurrentUser(userData);
     setRole('USER');
@@ -576,7 +598,11 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
     setCurrentUser(null);
   };
 
-  const getToken = () => localStorage.getItem('sud_jwt_token') || null;
+  const getToken = () => {
+    const token = localStorage.getItem('sud_jwt_token');
+    if (!token || token === 'null' || token === 'undefined' || token.trim() === '') return null;
+    return token;
+  };
 
   return {
     currentUser,

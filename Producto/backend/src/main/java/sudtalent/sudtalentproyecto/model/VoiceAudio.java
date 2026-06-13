@@ -44,6 +44,9 @@ public class VoiceAudio {
     @Builder.Default
     private String category = "profile";  // 'profile' o 'demo'
 
+    @Column(name = "visual_genre", length = 50)
+    private String visualGenre;
+
     @Builder.Default
     private boolean isPublic = true;
 

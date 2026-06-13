@@ -182,16 +182,41 @@ export function AdminPostulaciones() {
                 </div>
                 <div className="flex items-center gap-3 flex-wrap mt-1">
                   <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20">
-                    {post.convocatoriaTitulo || 'Convocatoria'}
+                    Convocatoria: {post.convocatoriaTitulo || 'Sin título'}
                   </span>
-                  {post.convocatoriaCategoria && (
-                    <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-sud-orange/10 text-sud-orange border border-sud-orange/20">
-                      {post.convocatoriaCategoria}
+                  {post.convocatoriaCategoria ? (
+                    <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-sky-400/10 text-sky-400 border border-sky-400/20">
+                      Requerido: {post.convocatoriaCategoria}
+                    </span>
+                  ) : (
+                    <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-slate-500/10 text-slate-500 border border-white/10">
+                      Sin categoría asociada
                     </span>
                   )}
                   <span className="text-[9px] text-slate-600 font-bold">
                     {new Date(post.createdAt).toLocaleDateString()}
                   </span>
+                </div>
+
+                {/* Especialidades del postulante */}
+                <div className="flex items-center gap-2 flex-wrap mt-2">
+                  <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">
+                    Especialidades del Postulante:
+                  </span>
+                  {post.alumnoSpecialties ? (
+                    post.alumnoSpecialties.split(',').map((spec, sIdx) => (
+                      <span
+                        key={sIdx}
+                        className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-sud-orange/10 text-sud-orange border border-sud-orange/20"
+                      >
+                        {spec.trim()}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-500/10 text-slate-500 border border-white/5 italic">
+                      Sin especialidad definida
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

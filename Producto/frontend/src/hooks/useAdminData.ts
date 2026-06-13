@@ -1,4 +1,4 @@
-﻿import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { UserProfile, TalentProfile, VoiceDemo, WhitelistEntry, ProfileStatus, ProfileCategory } from '../types';
 import { backendService } from '../services/backendService';
 
@@ -20,27 +20,35 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     setLoading(true);
     setError(null);
     try {
-      // Cargar whitelist y usuarios en paralelo
-      const [whitelistData, usuariosData] = await Promise.all([
+      // Cargar whitelist, usuarios y demos en paralelo
+      const [whitelistData, usuariosData, demosData] = await Promise.all([
         backendService.getWhitelist(),
         backendService.getAllUsers(),
+        backendService.getAllDemos().catch((err) => {
+          console.warn('⚠️ No se pudieron cargar las demos de casting:', err);
+          return [] as any[];
+        }),
       ]);
 
       // Mapear usuarios primero
       const mappedUsers: UserProfile[] = usuariosData.map((u: any) => {
-        // Buscar categoría en whitelist por email o teléfono
-        const wMatch = whitelistData.find((w: any) => {
-          const wEmail = (w.email || '').toLowerCase();
-          const uEmail = (u.email || '').toLowerCase();
-          const wPhone = (w.phone || '').replace(/\D/g, '');
-          const uPhone = (u.phone || '').replace(/\D/g, '');
-          return (uEmail && wEmail && uEmail === wEmail) ||
-                 (uPhone.length >= 8 && wPhone.length >= 8 && uPhone.slice(-8) === wPhone.slice(-8));
-        });
+        // Extraer primera especialidad para asignarla como primaryCategory
+        let primCat: any = undefined;
+        if (u.specialties && typeof u.specialties === 'string') {
+          const splitList = u.specialties.split(',');
+          if (splitList.length > 0) {
+            const firstSp = splitList[0].trim();
+            // Validar que coincida con DemoCategory
+            if (['Doblaje', 'Locución', 'Podcast', 'Presentación'].includes(firstSp)) {
+              primCat = firstSp;
+            }
+          }
+        }
+
         return {
           uid: String(u.id),
           phone: u.phone || '',
-          role: u.role === 'ADMIN' ? 'ADMIN' : 'USER',
+          role: u.role === 'ADMIN' ? 'ADMIN' : (u.role === 'PROFESOR' ? 'PROFESOR' : 'USER'),
           onboarded: u.onboarded,
           name: u.name || '',
           email: u.email || '',
@@ -50,23 +58,70 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
           age: u.age,
           bio: u.bio || '',
           createdAt: u.createdAt,
-          profileAudioUrl: u.profileAudioUrl || undefined,
-          profileImageUrl: u.profileImageUrl || undefined,
-          category: wMatch?.category || 'NONE',
-          primaryCategory: u.specialties || undefined,
-        } as any;
+          primaryCategory: primCat,
+        };
       });
       setAllUsers(mappedUsers);
+
+      // Mapear perfiles de talentos desde los datos de usuarios
+      const profilesMap: Record<string, TalentProfile> = {};
+      usuariosData.forEach((u: any) => {
+        profilesMap[String(u.id)] = {
+          userId: String(u.id),
+          type: u.profileType === 'PARENT' ? 'PARENT' : 'PERSONAL',
+          childName: u.childName || '',
+          childAge: u.childAge || undefined,
+          age: u.age || undefined,
+          specialties: u.specialties ? u.specialties.split(',').map((s: string) => s.trim()) : [],
+          bio: u.bio || '',
+          location: 'Santiago, CL' // Ubicación default
+        };
+      });
+      setTalentProfiles(profilesMap);
+
+      // Mapear demos agrupadas por userId
+      const demosMap: Record<string, VoiceDemo[]> = {};
+      demosData.forEach((d: any) => {
+        const uId = String(d.userId);
+        if (!demosMap[uId]) {
+          demosMap[uId] = [];
+        }
+
+        // Formatear duración de segundos a mm:ss
+        const formatDuration = (seconds?: number) => {
+          if (!seconds) return '0:00';
+          const mins = Math.floor(seconds / 60);
+          const secs = seconds % 60;
+          return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+        };
+
+        const mediaType = (d.mediaType || '').toLowerCase().includes('video') ? 'VIDEO' : 'AUDIO';
+
+        demosMap[uId].push({
+          id: String(d.id),
+          userId: uId,
+          title: d.title || 'Demo sin título',
+          category: (d.category === 'demo' ? 'Doblaje' : d.category) || 'Doblaje',
+          fileUrl: d.fileUrl || '',
+          duration: formatDuration(d.durationSeconds),
+          createdAt: d.createdAt,
+          mediaType,
+          fileFormat: d.fileFormat || 'MP3',
+          visualGenre: d.visualGenre || undefined,
+          description: d.description || ''
+        });
+      });
+      setAllDemos(demosMap);
 
       // Mapear whitelist — ahora el backend incluye userId y userStatus directamente
       const mapped: WhitelistEntry[] = whitelistData.map((w: any) => {
         // Preferir userId del backend; si no viene, intentar match por email como fallback
         const matchedByEmail = !w.userId
           ? mappedUsers.find(u => {
-              const uEmail = (u.email || '').toLowerCase().trim();
-              const wEmail = (w.email || '').toLowerCase().trim();
-              return uEmail && wEmail && uEmail === wEmail;
-            })
+               const uEmail = (u.email || '').toLowerCase().trim();
+               const wEmail = (w.email || '').toLowerCase().trim();
+               return uEmail && wEmail && uEmail === wEmail;
+             })
           : null;
 
         const uid = w.userId ? String(w.userId) : matchedByEmail?.uid;
@@ -176,6 +231,29 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     }
   };
 
+  const updateDemoVisualGenre = async (demoId: string, userId: string, genre: string) => {
+    try {
+      setError(null);
+      // Si el género es "Sin género", lo guardamos como cadena vacía o nula para el backend
+      const apiGenre = genre === 'Sin género' ? '' : genre;
+      await backendService.updateDemoVisualGenre(demoId, apiGenre);
+      
+      // Actualizar el estado local de allDemos de manera reactiva e inmediata
+      setAllDemos(prev => {
+        const userDemos = prev[userId] || [];
+        const updatedDemos = userDemos.map(d => 
+          d.id === demoId 
+            ? { ...d, visualGenre: genre === 'Sin género' ? undefined : (genre as any) } 
+            : d
+        );
+        return { ...prev, [userId]: updatedDemos };
+      });
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar género visual');
+      throw err;
+    }
+  };
+
   return {
     whitelist,
     allUsers,
@@ -185,6 +263,7 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     removeFromWhitelist,
     updateStudent,
     updateUserStatus,
+    updateDemoVisualGenre,
     loading,
     error,
     refreshData: loadData

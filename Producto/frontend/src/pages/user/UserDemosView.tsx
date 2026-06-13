@@ -99,6 +99,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
             createdAt: demo.createdAt,
             mediaType: normalizedType,
             fileFormat: demo.fileFormat as FileFormat | undefined,
+            visualGenre: demo.visualGenre as VisualGenre | undefined,
           };
         });
 
@@ -178,7 +179,8 @@ export function UserDemosView({ user }: { user: UserProfile }) {
         form.file,
         form.category,
         form.title,
-        token
+        token,
+        form.visualGenre || undefined
       );
 
       // Añadir a la lista

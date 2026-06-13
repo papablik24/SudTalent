@@ -28,6 +28,7 @@ public class PostulacionDTO {
     private String userName;
     private String userEmail;
     private String userPhone;
+    private String alumnoSpecialties;
     
     // Convocatoria info
     private String convocatoriaTitulo;

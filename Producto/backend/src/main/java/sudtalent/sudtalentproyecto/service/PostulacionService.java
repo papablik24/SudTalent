@@ -201,6 +201,7 @@ public class PostulacionService {
                 .userName(user != null ? user.getName() : null)
                 .userEmail(user != null ? user.getEmail() : null)
                 .userPhone(user != null ? user.getPhone() : null)
+                .alumnoSpecialties(user != null ? user.getSpecialties() : null)
                 .convocatoriaTitulo(conv != null ? conv.getTitulo() : null)
                 .convocatoriaCategoria(conv != null ? conv.getCategoria() : null)
                 .fechaPostulacion(p.getFechaPostulacion())

@@ -34,6 +34,15 @@ public class VoiceAudioService {
             MultipartFile file,
             String title,
             String category) throws IOException {
+        return uploadAudio(user, file, title, category, null);
+    }
+
+    public VoiceAudioDTO uploadAudio(
+            User user,
+            MultipartFile file,
+            String title,
+            String category,
+            String visualGenre) throws IOException {
 
         // 1️⃣ Subir archivo a Supabase Storage
         String storagePath = supabaseStorageService.uploadFile(
@@ -54,6 +63,7 @@ public class VoiceAudioService {
                 .fileSizeMb((double) file.getSize() / (1024 * 1024))
                 .mediaType(file.getContentType() != null ? file.getContentType() : "audio/mpeg")
                 .category(category)
+                .visualGenre(visualGenre)
                 .isPublic(true)
                 .build();
 
@@ -126,11 +136,39 @@ public class VoiceAudioService {
     }
 
     /**
+     * 🔄 Actualizar el género visual de una demo
+     */
+    public VoiceAudioDTO updateVisualGenre(UUID audioId, String visualGenre) {
+        VoiceAudio audio = voiceAudioRepository.findById(audioId)
+                .orElseThrow(() -> new RuntimeException("Audio no encontrado"));
+
+        if (audio.isDeleted()) {
+            throw new RuntimeException("El audio ha sido eliminado");
+        }
+
+        audio.setVisualGenre(visualGenre);
+        audio.setUpdatedAt(java.time.LocalDateTime.now());
+        VoiceAudio saved = voiceAudioRepository.save(audio);
+        return toDTO(saved);
+    }
+
+    /**
+     * Obtener todas las demos de todos los usuarios (no eliminadas y categoría 'demo')
+     */
+    public List<VoiceAudioDTO> getAllDemos() {
+        return voiceAudioRepository.findAll().stream()
+                .filter(v -> v.getDeletedAt() == null && "demo".equals(v.getCategory()))
+                .map(this::toDTO)
+                .collect(Collectors.toList());
+    }
+
+    /**
      * 🔄 Convertir VoiceAudio Entity a DTO
      */
     private VoiceAudioDTO toDTO(VoiceAudio audio) {
         return VoiceAudioDTO.builder()
                 .id(audio.getId())
+                .userId(audio.getUser() != null ? audio.getUser().getId() : null)
                 .title(audio.getTitle())
                 .fileUrl(audio.getFileUrl())
                 .storagePath(audio.getStoragePath())
@@ -138,6 +176,7 @@ public class VoiceAudioService {
                 .fileSizeMb(audio.getFileSizeMb())
                 .mediaType(audio.getMediaType())
                 .category(audio.getCategory())
+                .visualGenre(audio.getVisualGenre())
                 .isPublic(audio.isPublic())
                 .createdAt(audio.getCreatedAt())
                 .updatedAt(audio.getUpdatedAt())

@@ -6,7 +6,11 @@ const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080/api';
 const TOKEN_KEY = 'sud_jwt_token';
 
 function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (!token || token === 'null' || token === 'undefined' || token.trim() === '') {
+    return null;
+  }
+  return token;
 }
 
 function setToken(token: string): void {
@@ -59,6 +63,10 @@ export async function fetchAPI<T>(
   if (requireAuth) {
     const token = getToken();
     if (token) {
+      if (token.startsWith('mock_jwt_token_')) {
+        console.warn('⚠️ Intento de usar un token mock para una llamada protegida real');
+        throw new Error('Sesión en modo local/desconectado. Por favor, inicie sesión con el servidor activo.');
+      }
       headers['Authorization'] = `Bearer ${token}`;
       console.log('✅ Token enviado en header Authorization');
     } else {
@@ -69,41 +77,49 @@ export async function fetchAPI<T>(
 
   console.log(`📡 Enviando ${options.method || 'GET'} a ${API_URL}${endpoint}`);
   
-  const response = await fetch(`${API_URL}${endpoint}`, {
-    ...options,
-    headers,
-    credentials: 'include', // Send cookies too
-  });
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include', // Send cookies too
+    });
 
-  if (!response.ok) {
-    let errorMessage = `HTTP Error: ${response.status}`;
-    let errorExtra: Record<string, any> = {};
-    
-    // Provide more specific error messages
-    if (response.status === 401) {
-      errorMessage = 'Unauthorized: Your session has expired. Please log in again.';
-    } else if (response.status === 403) {
-      errorMessage = 'Forbidden: You do not have permission to access this resource. Make sure you are logged in as an admin.';
+    if (!response.ok) {
+      let errorMessage = `HTTP Error: ${response.status}`;
+      let errorExtra: Record<string, any> = {};
+      
+      // Provide more specific error messages
+      if (response.status === 401) {
+        errorMessage = 'Unauthorized: Your session has expired. Please log in again.';
+      } else if (response.status === 403) {
+        errorMessage = 'Forbidden: You do not have permission to access this resource. Make sure you are logged in as an admin.';
+      }
+      
+      try {
+        const error = await response.json();
+        errorMessage = error.message || error.error || errorMessage;
+        if (error.cooldown) errorExtra = { cooldown: true, secondsRemaining: error.secondsRemaining };
+      } catch {
+        // Response body is not JSON
+      }
+      console.error(`❌ Error ${response.status}:`, errorMessage);
+      const err = Object.assign(new Error(errorMessage), errorExtra);
+      throw err;
     }
-    
-    try {
-      const error = await response.json();
-      errorMessage = error.message || error.error || errorMessage;
-      if (error.cooldown) errorExtra = { cooldown: true, secondsRemaining: error.secondsRemaining };
-    } catch {
-      // Response body is not JSON
+
+    // Handle 204 No Content
+    if (response.status === 204) {
+      return undefined as T;
     }
-    console.error(`❌ Error ${response.status}:`, errorMessage);
-    const err = Object.assign(new Error(errorMessage), errorExtra);
-    throw err;
-  }
 
-  // Handle 204 No Content
-  if (response.status === 204) {
-    return undefined as T;
+    return response.json();
+  } catch (netErr: any) {
+    if (netErr.message === 'Failed to fetch' || netErr.name === 'TypeError') {
+      console.error('❌ Error de conexión al backend:', netErr);
+      throw new Error(`No se pudo conectar con el servidor backend (${API_URL}${endpoint}). Asegúrese de que el backend esté corriendo en el puerto 8080.`);
+    }
+    throw netErr;
   }
-
-  return response.json();
 }
 
 // ==================== AUTH ENDPOINTS ====================
@@ -239,6 +255,17 @@ export const backendService = {
     return fetchAPI<any>(`/users/${encodeURIComponent(userId)}`, {
       method: 'PUT',
       body: JSON.stringify({ status }),
+    });
+  },
+
+  async getAllDemos(): Promise<any[]> {
+    return fetchAPI<any[]>('/voice-audios/all-demos', { method: 'GET' });
+  },
+
+  async updateDemoVisualGenre(demoId: string, visualGenre: string): Promise<any> {
+    return fetchAPI<any>(`/voice-audios/${encodeURIComponent(demoId)}/visual-genre`, {
+      method: 'PUT',
+      body: JSON.stringify({ visualGenre }),
     });
   },
 };

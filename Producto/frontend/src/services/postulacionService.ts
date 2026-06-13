@@ -23,6 +23,7 @@ export interface Postulacion {
   userName?: string;
   userEmail?: string;
   userPhone?: string;
+  alumnoSpecialties?: string;
   estado?: PostulacionEstado;
   mensaje?: string;
   voiceAudioId?: string;

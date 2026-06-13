@@ -82,8 +82,18 @@ public class CursoController {
     }
 
     @GetMapping("/profesor/{profesorId}")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<List<CursoDTO>> getCursosByProfesor(@PathVariable UUID profesorId) {
+    @PreAuthorize("hasAnyAuthority('ROLE_ADMIN', 'ROLE_PROFESOR')")
+    public ResponseEntity<List<CursoDTO>> getCursosByProfesor(
+            @PathVariable UUID profesorId,
+            Authentication auth) {
+        boolean isAdmin = auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        if (!isAdmin) {
+            UUID authUserId = getAuthenticatedUserId(auth);
+            if (!authUserId.equals(profesorId)) {
+                return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN).build();
+            }
+        }
         return ResponseEntity.ok(cursoService.getCursosByProfesor(profesorId));
     }
 

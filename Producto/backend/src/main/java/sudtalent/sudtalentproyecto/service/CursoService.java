@@ -10,6 +10,9 @@ import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.repository.CursoRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
 
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.Authentication;
+
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -182,15 +185,34 @@ public class CursoService {
 
     // ── Mapper ───────────────────────────────────────────────────────
 
+    private User getAuthenticatedUser() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated() || auth.getName().equals("anonymousUser")) {
+            return null;
+        }
+        return userRepository.findByEmailActive(auth.getName()).orElse(null);
+    }
+
     private CursoDTO toDTO(Curso c) {
-        List<CursoDTO.AlumnoResumenDTO> alumnos = c.getAlumnos().stream()
-                .map(a -> CursoDTO.AlumnoResumenDTO.builder()
-                        .id(a.getAlumnoId())
-                        .nombre(a.getNombreAlumno())
-                        .email(a.getEmailAlumno())
-                        .profileImageUrl(a.getProfileImageUrl())
-                        .build())
-                .collect(Collectors.toList());
+        User currentUser = getAuthenticatedUser();
+        List<CursoDTO.AlumnoResumenDTO> alumnosList = Collections.emptyList();
+
+        if (currentUser != null) {
+            boolean isProfessor = currentUser.getRole() == User.Role.PROFESOR;
+            boolean isAdmin = currentUser.getRole() == User.Role.ADMIN;
+            boolean isAssignedProfessor = isProfessor && c.getProfesor() != null && c.getProfesor().getId().equals(currentUser.getId());
+
+            if (isAdmin || isAssignedProfessor) {
+                alumnosList = c.getAlumnos().stream()
+                        .map(a -> CursoDTO.AlumnoResumenDTO.builder()
+                                .id(a.getAlumnoId())
+                                .nombre(a.getNombreAlumno())
+                                .email(a.getEmailAlumno())
+                                .profileImageUrl(a.getProfileImageUrl())
+                                .build())
+                        .collect(Collectors.toList());
+            }
+        }
 
         boolean hasActiveProfesor = c.getProfesor() != null && c.getProfesor().getDeletedAt() == null && c.getProfesor().isActive();
 
@@ -202,8 +224,8 @@ public class CursoService {
                 .modalidad(c.getModalidad())
                 .profesorId(hasActiveProfesor ? c.getProfesor().getId() : null)
                 .profesorNombre(hasActiveProfesor ? c.getProfesor().getName() : null)
-                .alumnos(alumnos)
-                .totalAlumnos(alumnos.size())
+                .alumnos(alumnosList)
+                .totalAlumnos(c.getAlumnos().size())
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .build();

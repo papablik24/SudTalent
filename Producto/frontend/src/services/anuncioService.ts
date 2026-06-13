@@ -46,4 +46,16 @@ export const anuncioService = {
       method: 'DELETE',
     });
   },
+
+  async update(cursoId: string, anuncioId: string, data: CreateAnuncioRequest): Promise<AnuncioDTO> {
+    return fetchAPI<AnuncioDTO>(`/anuncios/curso/${cursoId}/${anuncioId}`, {
+      method: 'PUT',
+      body: JSON.stringify({
+        tipo: data.tipo,
+        titulo: data.titulo,
+        contenido: data.contenido,
+        urlRecurso: data.urlRecurso ?? '',
+      }),
+    });
+  },
 };

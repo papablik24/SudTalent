@@ -54,6 +54,18 @@ public class AnuncioController {
         return ResponseEntity.noContent().build();
     }
 
+    /** Solo el autor o admin pueden editar */
+    @PutMapping("/{cursoId}/{anuncioId}")
+    @PreAuthorize("hasAnyAuthority('ROLE_PROFESOR', 'ROLE_ADMIN')")
+    public ResponseEntity<AnuncioDTO> updateAnuncio(
+            @PathVariable UUID cursoId,
+            @PathVariable UUID anuncioId,
+            @RequestBody Map<String, String> body,
+            Authentication auth) {
+        UUID autorId = getAuthenticatedUserId(auth);
+        return ResponseEntity.ok(anuncioService.updateAnuncio(anuncioId, autorId, body));
+    }
+
     private UUID getAuthenticatedUserId(Authentication auth) {
         User user = userRepository.findByEmailActive(auth.getName())
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));

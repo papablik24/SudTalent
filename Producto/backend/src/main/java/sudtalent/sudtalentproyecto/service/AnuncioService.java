@@ -60,11 +60,42 @@ public class AnuncioService {
     public void deleteAnuncio(UUID anuncioId, UUID autorId) {
         Anuncio anuncio = anuncioRepository.findById(anuncioId)
                 .orElseThrow(() -> new RuntimeException("Anuncio no encontrado"));
+        User executor = userRepository.findById(autorId)
+                .orElseThrow(() -> new RuntimeException("Usuario ejecutor no encontrado"));
         // Solo el autor o admin puede eliminar
-        if (!anuncio.getAutor().getId().equals(autorId)) {
+        if (!anuncio.getAutor().getId().equals(autorId) && executor.getRole() != User.Role.ADMIN) {
             throw new SecurityException("No tienes permiso para eliminar este anuncio");
         }
         anuncioRepository.deleteById(anuncioId);
+    }
+
+    public AnuncioDTO updateAnuncio(UUID anuncioId, UUID autorId, Map<String, String> body) {
+        Anuncio anuncio = anuncioRepository.findById(anuncioId)
+                .orElseThrow(() -> new RuntimeException("Anuncio no encontrado"));
+        User executor = userRepository.findById(autorId)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        // Solo el autor o admin puede editar
+        if (!anuncio.getAutor().getId().equals(autorId) && executor.getRole() != User.Role.ADMIN) {
+            throw new SecurityException("No tienes permiso para editar este anuncio");
+        }
+
+        String tipo = body.get("tipo");
+        String titulo = body.get("titulo");
+        String contenido = body.get("contenido");
+        String urlRecurso = body.get("urlRecurso");
+
+        if (titulo == null || titulo.isBlank()) throw new IllegalArgumentException("El título es obligatorio");
+        if (contenido == null || contenido.isBlank()) throw new IllegalArgumentException("El contenido es obligatorio");
+
+        if (tipo != null && !tipo.isBlank()) {
+            anuncio.setTipo(tipo.trim());
+        }
+        anuncio.setTitulo(titulo.trim());
+        anuncio.setContenido(contenido.trim());
+        anuncio.setUrlRecurso(urlRecurso != null && !urlRecurso.isBlank() ? urlRecurso.trim() : null);
+        anuncio.setUpdatedAt(java.time.LocalDateTime.now());
+
+        return toDTO(anuncioRepository.save(anuncio));
     }
 
     private AnuncioDTO toDTO(Anuncio a) {

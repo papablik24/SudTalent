@@ -60,6 +60,7 @@ export function AdminCursos() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 
   // Modal de alumnos
   const [alumnosModal, setAlumnosModal] = useState<{ curso: CursoDTO; alumnos: AlumnoResumen[] } | null>(null);
@@ -76,13 +77,25 @@ export function AdminCursos() {
       .finally(() => setLoading(false));
   }, []);
 
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 3500);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
   const handleAssign = async (cursoId: string, profesorId: string) => {
     setSaving(cursoId);
     try {
       const updated = await cursoService.assignProfesor(cursoId, profesorId || null);
       setCursos(prev => prev.map(c => (c.id === cursoId ? updated : c)));
+      if (profesorId) {
+        setToast({ message: 'Profesor asignado correctamente.', type: 'success' });
+      } else {
+        setToast({ message: 'Curso dejado sin profesor.', type: 'success' });
+      }
     } catch (err: any) {
-      setError(err.message || 'Error al asignar profesor');
+      setToast({ message: 'No se pudo actualizar el profesor del curso.', type: 'error' });
     } finally {
       setSaving(null);
     }
@@ -320,6 +333,37 @@ export function AdminCursos() {
                 )}
               </div>
             </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Toast de Feedback */}
+      <AnimatePresence>
+        {toast && (
+          <motion.div
+            initial={{ opacity: 0, y: 50, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.95 }}
+            className={`fixed bottom-6 right-6 z-[99999] p-4 rounded-2xl border flex items-center gap-3 shadow-2xl backdrop-blur-md max-w-sm ${
+              toast.type === 'success'
+                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                : 'bg-red-500/10 border-red-500/20 text-red-400'
+            }`}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle2 size={18} className="shrink-0" />
+            ) : (
+              <AlertCircle size={18} className="shrink-0" />
+            )}
+            <span className="text-xs font-black uppercase tracking-widest leading-relaxed">
+              {toast.message}
+            </span>
+            <button
+              onClick={() => setToast(null)}
+              className="ml-2 p-1 rounded-lg hover:bg-white/5 text-slate-400 hover:text-white transition-all shrink-0"
+            >
+              <X size={14} />
+            </button>
           </motion.div>
         )}
       </AnimatePresence>

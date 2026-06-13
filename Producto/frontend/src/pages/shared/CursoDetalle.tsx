@@ -7,6 +7,7 @@ import {
   BookOpen,
   Plus,
   Trash2,
+  Pencil,
   Link2,
   Loader,
   AlertCircle,
@@ -45,7 +46,7 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Form
+  // Form & Editing States
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState<CreateAnuncioRequest>({
     tipo: 'ANUNCIO',
@@ -55,6 +56,8 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
   });
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  const [editingAnuncio, setEditingAnuncio] = useState<AnuncioDTO | null>(null);
+  const [deleteConfirmAnuncio, setDeleteConfirmAnuncio] = useState<AnuncioDTO | null>(null);
 
   const canPublish = userRole === 'ADMIN' || userRole === 'PROFESOR';
 
@@ -65,23 +68,52 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
       .finally(() => setLoading(false));
   }, [curso.id]);
 
+  const handleStartEdit = (a: AnuncioDTO) => {
+    setEditingAnuncio(a);
+    setForm({
+      tipo: a.tipo,
+      titulo: a.titulo,
+      contenido: a.contenido,
+      urlRecurso: a.urlRecurso || '',
+    });
+    setFormError(null);
+    setShowForm(true);
+  };
+
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setEditingAnuncio(null);
+    setForm({ tipo: 'ANUNCIO', titulo: '', contenido: '', urlRecurso: '' });
+    setFormError(null);
+  };
+
   const handleSubmit = async () => {
     if (!form.titulo.trim()) { setFormError('El título es obligatorio'); return; }
     if (!form.contenido.trim()) { setFormError('El contenido es obligatorio'); return; }
     setSaving(true);
     setFormError(null);
     try {
-      const created = await anuncioService.create(curso.id, {
-        tipo: form.tipo,
-        titulo: form.titulo.trim(),
-        contenido: form.contenido.trim(),
-        urlRecurso: form.urlRecurso?.trim() || undefined,
-      });
-      setAnuncios(prev => [created, ...prev]);
-      setForm({ tipo: 'ANUNCIO', titulo: '', contenido: '', urlRecurso: '' });
-      setShowForm(false);
+      if (editingAnuncio) {
+        const updated = await anuncioService.update(curso.id, editingAnuncio.id, {
+          tipo: form.tipo,
+          titulo: form.titulo.trim(),
+          contenido: form.contenido.trim(),
+          urlRecurso: form.urlRecurso?.trim() || undefined,
+        });
+        setAnuncios(prev => prev.map(x => x.id === updated.id ? updated : x));
+        handleCancelForm();
+      } else {
+        const created = await anuncioService.create(curso.id, {
+          tipo: form.tipo,
+          titulo: form.titulo.trim(),
+          contenido: form.contenido.trim(),
+          urlRecurso: form.urlRecurso?.trim() || undefined,
+        });
+        setAnuncios(prev => [created, ...prev]);
+        handleCancelForm();
+      }
     } catch (err: any) {
-      setFormError(err.message || 'Error al publicar');
+      setFormError(err.message || 'Error al guardar');
     } finally {
       setSaving(false);
     }
@@ -158,11 +190,16 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
         </div>
 
         {/* Lista de alumnos */}
-        {curso.alumnos.length > 0 && (
-          <div className="pt-2 border-t border-white/5">
-            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 mb-3">
+        <div className="pt-2 border-t border-white/5">
+          <div className="flex flex-col gap-1 mb-3">
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600">
               Alumnos ({curso.alumnos.length})
             </p>
+            <p className="text-[10px] text-slate-500">
+              Los alumnos se asignan desde Gestión Alumnos.
+            </p>
+          </div>
+          {curso.alumnos.length > 0 ? (
             <div className="space-y-2">
               {curso.alumnos.map(a => (
                 <div key={a.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.02] border border-white/5">
@@ -190,8 +227,10 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          ) : (
+            <p className="text-slate-500 text-xs italic py-2">Sin alumnos inscritos.</p>
+          )}
+        </div>
       </div>
 
       {/* ── Tablón de anuncios y cápsulas ────────────────────────── */}
@@ -202,11 +241,17 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
           </h3>
           {canPublish && (
             <button
-              onClick={() => setShowForm(v => !v)}
+              onClick={() => {
+                if (showForm) {
+                  handleCancelForm();
+                } else {
+                  setShowForm(true);
+                }
+              }}
               className="flex items-center gap-2 px-4 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-sud-orange/10 border border-sud-orange/20 text-sud-orange hover:bg-sud-orange/20 transition-all"
             >
               {showForm ? <X size={14} /> : <Plus size={14} />}
-              {showForm ? 'Cancelar' : 'Publicar'}
+              {showForm ? (editingAnuncio ? 'Cancelar Edición' : 'Cancelar') : 'Publicar'}
             </button>
           )}
         </div>
@@ -283,7 +328,7 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                   className="sud-btn-primary px-6 py-3 text-xs font-black uppercase tracking-widest flex items-center gap-2 disabled:opacity-50"
                 >
                   {saving ? <Loader size={14} className="animate-spin" /> : <Send size={14} />}
-                  {saving ? 'Publicando...' : 'Publicar'}
+                  {saving ? (editingAnuncio ? 'Guardando...' : 'Publicando...') : (editingAnuncio ? 'Guardar Cambios' : 'Publicar')}
                 </button>
               </div>
             </motion.div>
@@ -303,11 +348,13 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
         ) : anuncios.length === 0 ? (
           <div className="py-16 text-center border-2 border-dashed border-white/5 rounded-[3rem]">
             <Megaphone size={36} className="mx-auto text-slate-700 mb-4" />
-            <p className="text-slate-500 font-black text-[10px] uppercase tracking-widest">
-              No hay publicaciones aún
+            <p className="text-slate-300 font-bold text-sm">
+              Este curso aún no tiene anuncios ni recursos publicados.
             </p>
             {canPublish && (
-              <p className="text-slate-600 text-xs mt-1">Usa el botón "Publicar" para crear el primer anuncio</p>
+              <p className="text-slate-500 text-xs mt-2">
+                Usa Publicar para compartir información con los alumnos inscritos.
+              </p>
             )}
           </div>
         ) : (
@@ -350,12 +397,20 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                         {meta.icon} {meta.label}
                       </span>
                       {(canPublish && isOwn) || userRole === 'ADMIN' ? (
-                        <button
-                          onClick={() => handleDelete(a)}
-                          className="p-1.5 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleStartEdit(a)}
+                            className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            onClick={() => setDeleteConfirmAnuncio(a)}
+                            className="p-1.5 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
                       ) : null}
                     </div>
                   </div>
@@ -381,6 +436,46 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
           </div>
         )}
       </section>
+
+      {/* ── Modal de Confirmación de Eliminación ─────────────────── */}
+      <AnimatePresence>
+        {deleteConfirmAnuncio && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="sud-glass-panel max-w-sm w-full p-6 space-y-6 text-center border border-white/10"
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto animate-pulse">
+                <Trash2 size={24} />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-lg font-black text-white uppercase tracking-tight">¿Eliminar esta publicación?</h4>
+                <p className="text-slate-400 text-xs leading-relaxed">Esta acción no se puede deshacer.</p>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  onClick={() => setDeleteConfirmAnuncio(null)}
+                  className="px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 transition-all"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={async () => {
+                    const toDelete = deleteConfirmAnuncio;
+                    setDeleteConfirmAnuncio(null);
+                    await handleDelete(toDelete);
+                  }}
+                  className="px-5 py-2.5 rounded-2xl text-[10px] font-black uppercase tracking-widest bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

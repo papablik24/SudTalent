@@ -168,7 +168,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
         <div className="text-center mb-10 flex flex-col items-center">
           <motion.img src="/logos/SUD_ISO_1.png" alt="Sudamerican Voices" className="h-20 w-20 object-contain mb-6 drop-shadow-[0_0_30px_rgba(45,212,191,0.2)]"
             animate={{ scale: [1, 1.04, 1], rotate: [0, 2, -2, 0] }} transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }} />
-          <img src="/logos/SUD_LOGO_4.png" alt="Sudamerican Voices" className="h-10 w-auto object-contain mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]" />
+          <img src="/logos/SUD_LOGO_4.png" alt="Sudamerican Voices" className={`h-10 w-auto object-contain mb-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)] ${theme === 'light' ? 'logo-light-outline' : ''}`} />
           <p className="text-slate-400 font-black text-[10px] uppercase tracking-[0.4em] leading-relaxed opacity-80">
             Gestión Profesional de Voz<br /><span className="text-[9px] opacity-40">Ingeniería para Artistas © 2026</span>
           </p>

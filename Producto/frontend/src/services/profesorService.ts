@@ -71,4 +71,26 @@ export const profesorService = {
       method: 'DELETE',
     });
   },
+
+  async getMyAlumnos(): Promise<ProfesorAlumnoDTO[]> {
+    return fetchAPI<ProfesorAlumnoDTO[]>('/profesores/me/alumnos');
+  },
 };
+
+export interface ProfesorAlumnoDTO {
+  id: string;
+  name: string;
+  email: string;
+  phone?: string;
+  profileType?: string;
+  status?: string;
+  age?: number;
+  childName?: string;
+  childAge?: number;
+  cursos: {
+    id: string;
+    titulo: string;
+    cursoKey: string;
+  }[];
+}
+

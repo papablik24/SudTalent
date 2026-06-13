@@ -192,14 +192,16 @@ public class CursoService {
                         .build())
                 .collect(Collectors.toList());
 
+        boolean hasActiveProfesor = c.getProfesor() != null && c.getProfesor().getDeletedAt() == null && c.getProfesor().isActive();
+
         return CursoDTO.builder()
                 .id(c.getId())
                 .cursoKey(c.getCursoKey())
                 .titulo(c.getTitulo())
                 .descripcion(c.getDescripcion())
                 .modalidad(c.getModalidad())
-                .profesorId(c.getProfesor() != null ? c.getProfesor().getId() : null)
-                .profesorNombre(c.getProfesor() != null ? c.getProfesor().getName() : null)
+                .profesorId(hasActiveProfesor ? c.getProfesor().getId() : null)
+                .profesorNombre(hasActiveProfesor ? c.getProfesor().getName() : null)
                 .alumnos(alumnos)
                 .totalAlumnos(alumnos.size())
                 .createdAt(c.getCreatedAt())

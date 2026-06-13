@@ -2,13 +2,17 @@ package sudtalent.sudtalentproyecto.controller;
 
 import sudtalent.sudtalentproyecto.model.Profesor;
 import sudtalent.sudtalentproyecto.model.User;
+import sudtalent.sudtalentproyecto.model.Curso;
 import sudtalent.sudtalentproyecto.repository.ProfesorRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.repository.CursoRepository;
+import sudtalent.sudtalentproyecto.dto.ProfesorAlumnoDTO;
 import sudtalent.sudtalentproyecto.service.SoftDeleteService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
@@ -26,6 +30,7 @@ public class ProfesorController {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final SoftDeleteService softDeleteService;
+    private final CursoRepository cursoRepository;
 
     /**
      * GET /api/profesores — Lista todos los profesores con datos del usuario
@@ -335,10 +340,83 @@ public class ProfesorController {
         if (user != null) {
             user.softDelete();
             userRepository.save(user);
+
+            // Limpiar la asignación de este profesor en todos sus cursos
+            List<Curso> cursosAsignados = cursoRepository.findByProfesorId(user.getId());
+            for (Curso curso : cursosAsignados) {
+                curso.setProfesor(null);
+                curso.setUpdatedAt(LocalDateTime.now());
+                cursoRepository.save(curso);
+            }
         }
 
         System.out.println("✅ Profesor eliminado (soft): " + id);
         return ResponseEntity.ok(Map.of("message", "Profesor eliminado correctamente"));
+    }
+
+    /**
+     * GET /api/profesores/me/alumnos — Obtiene los alumnos inscritos en los cursos del profesor autenticado
+     */
+    @GetMapping("/me/alumnos")
+    @PreAuthorize("hasAnyAuthority('ROLE_PROFESOR', 'PROFESOR')")
+    public ResponseEntity<List<ProfesorAlumnoDTO>> getMyAlumnos(Authentication auth) {
+        UUID profesorId = getAuthenticatedUserId(auth);
+        
+        // 1. Obtener cursos del profesor
+        List<Curso> cursos = cursoRepository.findByProfesorId(profesorId);
+        
+        // 2. Extraer todos los IDs únicos de alumnos
+        Set<UUID> studentIds = cursos.stream()
+                .flatMap(c -> c.getAlumnos().stream())
+                .map(Curso.CursoAlumno::getAlumnoId)
+                .collect(Collectors.toSet());
+                
+        if (studentIds.isEmpty()) {
+            return ResponseEntity.ok(Collections.emptyList());
+        }
+        
+        // 3. Obtener los perfiles completos de los alumnos
+        List<User> students = userRepository.findAllById(studentIds);
+        Map<UUID, User> studentMap = students.stream()
+                .collect(Collectors.toMap(User::getId, s -> s));
+                
+        // 4. Mapear a ProfesorAlumnoDTO con los cursos comunes
+        List<ProfesorAlumnoDTO> result = new ArrayList<>();
+        for (UUID studentId : studentIds) {
+            User s = studentMap.get(studentId);
+            if (s == null) continue;
+            
+            List<ProfesorAlumnoDTO.CursoResumenDTO> sharedCourses = cursos.stream()
+                    .filter(c -> c.getAlumnos().stream().anyMatch(a -> a.getAlumnoId().equals(studentId)))
+                    .map(c -> ProfesorAlumnoDTO.CursoResumenDTO.builder()
+                            .id(c.getId())
+                            .titulo(c.getTitulo())
+                            .cursoKey(c.getCursoKey())
+                            .build())
+                    .collect(Collectors.toList());
+                    
+            result.add(ProfesorAlumnoDTO.builder()
+                    .id(s.getId())
+                    .name(s.getName())
+                    .email(s.getEmail())
+                    .phone(s.getPhone())
+                    .profileType(s.getProfileType() != null ? s.getProfileType().name() : null)
+                    .status(s.getStatus() != null ? s.getStatus().name() : null)
+                    .age(s.getAge())
+                    .childName(s.getChildName())
+                    .childAge(s.getChildAge())
+                    .cursos(sharedCourses)
+                    .build());
+        }
+        
+        return ResponseEntity.ok(result);
+    }
+
+    private UUID getAuthenticatedUserId(Authentication auth) {
+        String email = auth.getName();
+        User user = userRepository.findByEmailActive(email)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
+        return user.getId();
     }
 
     // ── Helper ─────────────────────────────────────────────────────────

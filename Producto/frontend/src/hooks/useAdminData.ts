@@ -126,6 +126,7 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
 
         const uid = w.userId ? String(w.userId) : matchedByEmail?.uid;
         const userStatus = w.userStatus || matchedByEmail?.status;
+        const matchedRole = matchedByEmail?.role || (uid ? mappedUsers.find(u => u.uid === uid)?.role : null);
 
         return {
           phone: w.phone,
@@ -137,6 +138,7 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
           status: userStatus || w.status,
           uid,
           userStatus,
+          role: matchedRole || w.role || 'ALUMNO',
         } as any;
       });
       setWhitelist(mapped);

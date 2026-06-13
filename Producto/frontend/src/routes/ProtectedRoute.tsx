@@ -33,8 +33,8 @@ export function ProtectedRoute({
     return <Navigate to="/" replace />;
   }
 
-  // Solo forzar onboarding para usuarios USER, nunca para ADMIN
-  if (role !== 'ADMIN' && !user.onboarded && window.location.pathname !== '/onboarding') {
+  // Solo forzar onboarding para usuarios USER, nunca para ADMIN o PROFESOR
+  if (role === 'USER' && !user.onboarded && window.location.pathname !== '/onboarding') {
     return <Navigate to="/onboarding" replace />;
   }
 

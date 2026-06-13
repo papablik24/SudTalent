@@ -44,15 +44,16 @@ public class AuthService {
     // ========== EMAIL/PASSWORD AUTH ==========
 
     public AuthResponse login(LoginRequest request, HttpServletResponse response) {
+        String email = request.email() != null ? request.email().trim().toLowerCase() : "";
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.email(), request.password())
+                new UsernamePasswordAuthenticationToken(email, request.password())
         );
 
-        var userDetails = userDetailsService.loadUserByUsername(request.email());
+        var userDetails = userDetailsService.loadUserByUsername(email);
         String token = jwtUtils.generateToken(userDetails);
         setJwtCookie(response, token);
 
-        var user = userRepository.findByEmailActive(request.email()).orElseThrow();
+        var user = userRepository.findByEmailActive(email).orElseThrow();
         autoFixOnboarding(user);
         return toResponse(user, token);
     }

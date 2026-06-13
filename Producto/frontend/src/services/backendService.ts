@@ -92,7 +92,7 @@ export async function fetchAPI<T>(
       if (response.status === 401) {
         errorMessage = 'Unauthorized: Your session has expired. Please log in again.';
       } else if (response.status === 403) {
-        errorMessage = 'Forbidden: You do not have permission to access this resource. Make sure you are logged in as an admin.';
+        errorMessage = 'Forbidden: You do not have permission to access this resource.';
       }
       
       try {
@@ -103,7 +103,7 @@ export async function fetchAPI<T>(
         // Response body is not JSON
       }
       console.error(`❌ Error ${response.status}:`, errorMessage);
-      const err = Object.assign(new Error(errorMessage), errorExtra);
+      const err = Object.assign(new Error(errorMessage), { status: response.status }, errorExtra);
       throw err;
     }
 

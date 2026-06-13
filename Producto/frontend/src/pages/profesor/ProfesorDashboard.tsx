@@ -16,7 +16,7 @@ import {
   X
 } from 'lucide-react';
 import { UserProfile, CursoDTO } from '../../types';
-import { profesorService, ProfesorDTO } from '../../services/profesorService';
+import { profesorService, ProfesorDTO, ProfesorAlumnoDTO } from '../../services/profesorService';
 import { cursoService } from '../../services/cursoService';
 import { anuncioService, AnuncioDTO } from '../../services/anuncioService';
 import { convocatoriaService, Convocatoria } from '../../services/convocatoriaService';
@@ -49,6 +49,15 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [loadingConvocatorias, setLoadingConvocatorias] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [anunciosError, setAnunciosError] = useState<string | null>(null);
+  
+  // Active View State ('dashboard' | 'alumnos')
+  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos'>('dashboard');
+  
+  // Alumnos State
+  const [alumnos, setAlumnos] = useState<ProfesorAlumnoDTO[]>([]);
+  const [loadingAlumnos, setLoadingAlumnos] = useState(false);
+  const [alumnosError, setAlumnosError] = useState<string | null>(null);
+  const [selectedCursoFilter, setSelectedCursoFilter] = useState<string>('todos');
 
   // Form State for new announcements
   const [anuncioTitulo, setAnuncioTitulo] = useState('');
@@ -197,15 +206,38 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
 
   // Click Handlers for Top Info Cards
   const handleMisCursosClick = () => {
+    setActiveView('dashboard');
     if (displayCursos.length === 1) {
       setSelectedCurso(displayCursos[0]);
     } else {
-      cursosRef.current?.scrollIntoView({ behavior: 'smooth' });
+      setTimeout(() => {
+        cursosRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 50);
+    }
+  };
+
+  const fetchAlumnos = async () => {
+    setLoadingAlumnos(true);
+    setAlumnosError(null);
+    try {
+      const data = await profesorService.getMyAlumnos();
+      setAlumnos(data);
+    } catch (err: any) {
+      console.error('Error al cargar alumnos:', err);
+      if (err.status === 403 || err.message?.toLowerCase().includes('forbidden') || err.message?.toLowerCase().includes('403')) {
+        setAlumnosError('No tienes permisos de profesor para ver estos alumnos.');
+      } else {
+        setAlumnosError(err.message || 'Error al cargar alumnos.');
+      }
+    } finally {
+      setLoadingAlumnos(false);
     }
   };
 
   const handleMisAlumnosClick = () => {
-    setToastMessage('La gestión de alumnos por curso estará disponible próximamente.');
+    setActiveView('alumnos');
+    setSelectedCurso(null);
+    fetchAlumnos();
   };
 
   const handleMiAgendaClick = () => {
@@ -260,7 +292,181 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
             </button>
           </div>
         )}
-        {!selectedCurso ? (
+        {activeView === 'alumnos' ? (
+          /* ========================================================
+             MIS ALUMNOS VIEW
+             ======================================================== */
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Back button */}
+            <button
+              onClick={() => setActiveView('dashboard')}
+              className="inline-flex items-center gap-2 text-[10px] text-slate-400 hover:text-white font-black uppercase tracking-widest border border-white/10 hover:border-white/20 bg-white/5 px-4 py-2 rounded-xl transition-all cursor-pointer"
+            >
+              <ChevronLeft size={14} /> Volver al Panel
+            </button>
+
+            {/* View Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <Users className="text-sud-turquoise" size={24} /> Mis Alumnos
+                </h2>
+                <p className="text-slate-400 text-xs">
+                  Listado de estudiantes inscritos en tus cursos asignados.
+                </p>
+              </div>
+
+              {/* Course Filter */}
+              {realCursos.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Filtrar por Curso:</label>
+                  <select
+                    value={selectedCursoFilter}
+                    onChange={(e) => setSelectedCursoFilter(e.target.value)}
+                    className="bg-black/50 border border-white/10 text-xs font-bold text-white px-3 py-2 rounded-xl focus:outline-none focus:border-sud-turquoise/50 cursor-pointer"
+                  >
+                    <option value="todos">Todos los cursos</option>
+                    {realCursos.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.titulo}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+
+            {/* Alumnos List/Grid */}
+            {loadingAlumnos ? (
+              <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                <div className="w-10 h-10 border-3 border-sud-turquoise/20 border-t-sud-turquoise rounded-full animate-spin" />
+                <p className="text-slate-500 font-bold uppercase tracking-widest text-[10px]">Cargando listado de alumnos...</p>
+              </div>
+            ) : alumnosError ? (
+              <div className="p-6 text-center border border-red-500/20 rounded-2xl bg-red-500/5 text-red-400 text-xs font-bold uppercase tracking-widest">
+                {alumnosError}
+              </div>
+            ) : alumnos.length === 0 ? (
+              <div className="py-16 text-center border-2 border-dashed border-white/5 rounded-3xl bg-white/[0.005]">
+                <Users size={32} className="mx-auto text-slate-700 mb-4" />
+                <p className="text-slate-500 font-black uppercase tracking-widest text-xs">
+                  Aún no hay alumnos inscritos en tus cursos.
+                </p>
+              </div>
+            ) : (
+              (() => {
+                const filteredAlumnos = selectedCursoFilter === 'todos'
+                  ? alumnos
+                  : alumnos.filter(alumno => alumno.cursos.some(c => c.id === selectedCursoFilter));
+
+                if (filteredAlumnos.length === 0) {
+                  return (
+                    <div className="py-16 text-center border-2 border-dashed border-white/5 rounded-3xl bg-white/[0.005]">
+                      <Users size={32} className="mx-auto text-slate-700 mb-4" />
+                      <p className="text-slate-500 font-black uppercase tracking-widest text-xs">
+                        No hay alumnos inscritos en este curso.
+                      </p>
+                    </div>
+                  );
+                }
+
+                return (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+                    {filteredAlumnos.map((student) => (
+                      <div key={student.id} className="sud-glass-panel p-5 border-white/5 hover:border-white/10 transition-all flex flex-col justify-between gap-4">
+                        <div className="space-y-4">
+                          {/* Student Header */}
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                              {student.childName ? (
+                                <span className="text-xs font-black text-slate-400 uppercase">
+                                  {student.childName.substring(0, 2).toUpperCase()}
+                                </span>
+                              ) : (
+                                <span className="text-xs font-black text-slate-400 uppercase">
+                                  {student.name ? student.name.substring(0, 2).toUpperCase() : 'AL'}
+                                </span>
+                              )}
+                            </div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-xs font-black text-white uppercase tracking-tight leading-snug truncate" title={student.name}>
+                                {student.name}
+                              </h3>
+                              <p className="text-[8px] text-slate-500 mt-0.5 uppercase tracking-widest">ID: {student.id.substring(0, 8)}</p>
+                            </div>
+                          </div>
+
+                          {/* Badges */}
+                          <div className="flex flex-wrap gap-1.5">
+                            {/* Profile Type Badge */}
+                            <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                              student.profileType === 'PARENT'
+                                ? 'bg-sud-orange/10 text-sud-orange border-sud-orange/20'
+                                : student.profileType === 'PERSONAL' && student.age !== undefined && student.age < 18
+                                  ? 'bg-violet-500/10 text-violet-400 border-violet-500/20'
+                                  : 'bg-sud-turquoise/10 text-sud-turquoise border-sud-turquoise/20'
+                            }`}>
+                              {student.profileType === 'PARENT' 
+                                ? `Apoderado${student.childName ? ` (Menor: ${student.childName})` : ''}` 
+                                : student.profileType === 'PERSONAL' && student.age !== undefined && student.age < 18
+                                  ? 'Menor'
+                                  : 'Adulto'}
+                            </span>
+
+                            {/* Profile Status Badge */}
+                            {student.status && (
+                              <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                student.status === 'APPROVED' || student.status === 'ACTIVO'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : student.status === 'PENDING' || student.status === 'PENDIENTE' || student.status === 'EN_REVISION'
+                                    ? 'bg-yellow-500/10 text-yellow-400 border-yellow-500/20'
+                                    : 'bg-red-500/10 text-red-400 border-red-500/20'
+                              }`}>
+                                {student.status === 'APPROVED' || student.status === 'ACTIVO'
+                                  ? 'Aprobado' 
+                                  : student.status === 'PENDING' || student.status === 'PENDIENTE' || student.status === 'EN_REVISION'
+                                    ? 'En Revisión' 
+                                    : student.status === 'INACTIVE' || student.status === 'INACTIVO'
+                                      ? 'Inactivo' 
+                                      : student.status}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Contact details */}
+                          <div className="space-y-1.5 pt-2.5 border-t border-white/5 text-[9px] text-slate-400">
+                            <div className="flex items-center gap-2">
+                              <span className="font-black uppercase tracking-widest text-[8px] text-slate-500 w-12 shrink-0">Email:</span>
+                              <span className="truncate" title={student.email}>{student.email || 'No disponible'}</span>
+                            </div>
+                            {student.phone && (
+                              <div className="flex items-center gap-2">
+                                <span className="font-black uppercase tracking-widest text-[8px] text-slate-500 w-12 shrink-0">Teléfono:</span>
+                                <span>{student.phone}</span>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Enrolled Courses under this teacher */}
+                          <div className="space-y-1.5 pt-2.5 border-t border-white/5">
+                            <span className="block text-[8px] font-black text-slate-500 uppercase tracking-widest">Cursos Inscritos:</span>
+                            <div className="flex flex-wrap gap-1">
+                              {student.cursos.map((c) => (
+                                <span key={c.id} className="text-[7px] font-bold bg-white/5 text-slate-300 border border-white/10 px-1.5 py-0.5 rounded">
+                                  {c.titulo}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()
+            )}
+          </div>
+        ) : !selectedCurso ? (
           /* ========================================================
              WELCOME & GENERAL VIEW
              ======================================================== */

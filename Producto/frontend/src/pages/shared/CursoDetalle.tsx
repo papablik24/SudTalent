@@ -157,33 +157,38 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Lista de alumnos (mini) */}
+        {/* Lista de alumnos */}
         {curso.alumnos.length > 0 && (
           <div className="pt-2 border-t border-white/5">
-            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 mb-3">Alumnos</p>
-            <div className="flex flex-wrap gap-2">
-              {curso.alumnos.slice(0, 12).map(a => (
-                <div
-                  key={a.id}
-                  title={a.nombre}
-                  className="w-8 h-8 rounded-xl bg-sud-gradient p-px shrink-0"
-                >
-                  <div className="w-full h-full rounded-[0.6rem] bg-black flex items-center justify-center overflow-hidden">
-                    {a.profileImageUrl ? (
-                      <img src={a.profileImageUrl} alt="" className="w-full h-full object-cover" />
-                    ) : (
-                      <span className="text-[10px] font-black text-sud-turquoise">
-                        {a.nombre?.[0]?.toUpperCase() ?? 'A'}
-                      </span>
+            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600 mb-3">
+              Alumnos ({curso.alumnos.length})
+            </p>
+            <div className="space-y-2">
+              {curso.alumnos.map(a => (
+                <div key={a.id} className="flex items-center gap-3 p-3 rounded-2xl bg-white/[0.02] border border-white/5">
+                  {/* Avatar */}
+                  <div className="w-9 h-9 rounded-xl bg-sud-gradient p-px shrink-0">
+                    <div className="w-full h-full rounded-[0.6rem] bg-black flex items-center justify-center overflow-hidden">
+                      {a.profileImageUrl ? (
+                        <img src={a.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] font-black text-sud-turquoise">
+                          {a.nombre?.[0]?.toUpperCase() ?? 'A'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  {/* Nombre completo y email */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-white uppercase tracking-tight truncate">
+                      {a.nombre}
+                    </p>
+                    {a.email && (
+                      <p className="text-[10px] text-slate-500 truncate">{a.email}</p>
                     )}
                   </div>
                 </div>
               ))}
-              {curso.alumnos.length > 12 && (
-                <div className="w-8 h-8 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-[9px] font-black text-slate-400">
-                  +{curso.alumnos.length - 12}
-                </div>
-              )}
             </div>
           </div>
         )}

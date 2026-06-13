@@ -170,7 +170,8 @@ export function AdminCursos() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04 }}
-              className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6 group hover:border-white/20 transition-all"
+              onClick={() => setSelectedCurso(curso)}
+              className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center gap-6 group cursor-pointer hover:border-sud-turquoise/30 hover:shadow-[0_0_24px_-8px_rgba(45,212,191,0.15)] transition-all"
             >
               {/* Icono */}
               <div className={`w-14 h-14 rounded-2xl border flex items-center justify-center shrink-0 ${meta.color}`}>
@@ -206,27 +207,24 @@ export function AdminCursos() {
                   )}
 
                   {/* Alumnos */}
-                  <button
-                    onClick={() => setAlumnosModal({ curso, alumnos: curso.alumnos })}
+                  <div
+                    onClick={e => e.stopPropagation()}
                     className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-slate-500 hover:text-sud-turquoise transition-colors"
                   >
-                    <Users size={12} />
-                    {curso.totalAlumnos} alumno{curso.totalAlumnos !== 1 ? 's' : ''}
-                  </button>
+                    <button onClick={() => setAlumnosModal({ curso, alumnos: curso.alumnos })} className="flex items-center gap-1.5">
+                      <Users size={12} />
+                      {curso.totalAlumnos} alumno{curso.totalAlumnos !== 1 ? 's' : ''}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {/* Botón ver detalle + Selector de profesor */}
-              <div className="flex items-center gap-3 shrink-0 w-full md:w-auto">
-                <button
-                  onClick={() => setSelectedCurso(curso)}
-                  className="flex items-center gap-1.5 px-4 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-white/10 bg-white/5 text-slate-400 hover:text-white hover:bg-white/10 transition-all shrink-0"
-                >
-                  Ver
-                </button>
-
-              {/* Selector de profesor */}
-              <div className="relative flex-1 md:w-64">                {isSaving ? (
+              {/* Selector de profesor — stopPropagation para no abrir el detalle */}
+              <div
+                className="relative flex-1 md:w-64"
+                onClick={e => e.stopPropagation()}
+              >
+                {isSaving ? (
                   <div className="flex items-center justify-center gap-2 h-12 px-4 rounded-2xl bg-sud-turquoise/10 border border-sud-turquoise/20 text-[10px] font-black uppercase tracking-widest text-sud-turquoise">
                     <Loader size={13} className="animate-spin" /> Guardando...
                   </div>
@@ -247,7 +245,6 @@ export function AdminCursos() {
                     <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                   </>
                 )}
-              </div>
               </div>
             </motion.div>
           );

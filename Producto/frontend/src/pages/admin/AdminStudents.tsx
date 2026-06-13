@@ -68,15 +68,17 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
 
   // ── Lista unificada ────────────────────────────────────────────
   const displayUsers = [
-    ...whitelist.map(w => ({
-      ...(w as any),
-      type: 'WHITELIST' as const,
-      category: (w as any).category || 'NONE',
-      uid: (w as any).uid,
-      status: (w as any).userStatus || (w as any).status,
-    })),
+    ...whitelist
+      .filter((w: any) => w.role !== 'ADMIN' && w.role !== 'PROFESOR' && w.role !== 'ROLE_ADMIN' && w.role !== 'ROLE_PROFESOR')
+      .map(w => ({
+        ...(w as any),
+        type: 'WHITELIST' as const,
+        category: (w as any).category || 'NONE',
+        uid: (w as any).uid,
+        status: (w as any).userStatus || (w as any).status,
+      })),
     ...users
-      .filter(u => u.role !== 'ADMIN')
+      .filter(u => u.role !== 'ADMIN' && u.role !== 'PROFESOR')
       .filter(u => {
         const uEmail = (u.email || '').toLowerCase();
         const uPhone = (u.phone || '').replace(/\D/g, '');

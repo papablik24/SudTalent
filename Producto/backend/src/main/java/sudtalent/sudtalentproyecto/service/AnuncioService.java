@@ -63,7 +63,7 @@ public class AnuncioService {
         User executor = userRepository.findById(autorId)
                 .orElseThrow(() -> new RuntimeException("Usuario ejecutor no encontrado"));
         // Solo el autor o admin puede eliminar
-        if (!anuncio.getAutor().getId().equals(autorId) && executor.getRole() != User.Role.ADMIN) {
+        if (!anuncio.getAutor().getId().toString().equals(autorId.toString()) && executor.getRole() != User.Role.ADMIN) {
             throw new SecurityException("No tienes permiso para eliminar este anuncio");
         }
         anuncioRepository.deleteById(anuncioId);
@@ -75,7 +75,7 @@ public class AnuncioService {
         User executor = userRepository.findById(autorId)
                 .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
         // Solo el autor o admin puede editar
-        if (!anuncio.getAutor().getId().equals(autorId) && executor.getRole() != User.Role.ADMIN) {
+        if (!anuncio.getAutor().getId().toString().equals(autorId.toString()) && executor.getRole() != User.Role.ADMIN) {
             throw new SecurityException("No tienes permiso para editar este anuncio");
         }
 

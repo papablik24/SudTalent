@@ -10,11 +10,13 @@ import {
   Send, 
   Link as LinkIcon, 
   Trash2, 
+  Pencil,
   Calendar, 
   FileText,
   AlertCircle,
   X
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CursoDTO } from '../../types';
 import { profesorService, ProfesorDTO, ProfesorAlumnoDTO } from '../../services/profesorService';
 import { cursoService } from '../../services/cursoService';
@@ -66,6 +68,8 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [anuncioTipo, setAnuncioTipo] = useState<'ANUNCIO' | 'CAPSULA'>('ANUNCIO');
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState<string | null>(null);
+  const [editingAnuncio, setEditingAnuncio] = useState<AnuncioDTO | null>(null);
+  const [deleteConfirmAnuncio, setDeleteConfirmAnuncio] = useState<AnuncioDTO | null>(null);
 
   // Fetch Profesor profile, courses and convocatorias
   useEffect(() => {
@@ -153,7 +157,26 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
           }))
         : []);
 
-  // Handler for publishing a new announcement
+  // Handlers for edit flow
+  const handleStartEdit = (a: AnuncioDTO) => {
+    setEditingAnuncio(a);
+    setAnuncioTitulo(a.titulo);
+    setAnuncioContenido(a.contenido);
+    setAnuncioUrl(a.urlRecurso || '');
+    setAnuncioTipo(a.tipo);
+    setPublishError(null);
+  };
+
+  const handleCancelEdit = () => {
+    setEditingAnuncio(null);
+    setAnuncioTitulo('');
+    setAnuncioContenido('');
+    setAnuncioUrl('');
+    setAnuncioTipo('ANUNCIO');
+    setPublishError(null);
+  };
+
+  // Handler for publishing or updating an announcement
   const handlePublishAnuncio = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCurso) return;
@@ -169,20 +192,32 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
     setPublishing(true);
     setPublishError(null);
     try {
-      const created = await anuncioService.create(selectedCurso.id, {
-        tipo: anuncioTipo,
-        titulo: anuncioTitulo.trim(),
-        contenido: anuncioContenido.trim(),
-        urlRecurso: anuncioUrl.trim() || undefined
-      });
-      setAnuncios(prev => [created, ...prev]);
-      setAnuncioTitulo('');
-      setAnuncioContenido('');
-      setAnuncioUrl('');
-      setAnuncioTipo('ANUNCIO');
+      if (editingAnuncio) {
+        const updated = await anuncioService.update(selectedCurso.id, editingAnuncio.id, {
+          tipo: anuncioTipo,
+          titulo: anuncioTitulo.trim(),
+          contenido: anuncioContenido.trim(),
+          urlRecurso: anuncioUrl.trim() || undefined
+        });
+        setAnuncios(prev => prev.map(a => a.id === updated.id ? updated : a));
+        handleCancelEdit();
+      } else {
+        const created = await anuncioService.create(selectedCurso.id, {
+          tipo: anuncioTipo,
+          titulo: anuncioTitulo.trim(),
+          contenido: anuncioContenido.trim(),
+          urlRecurso: anuncioUrl.trim() || undefined
+        });
+        setAnuncios(prev => [created, ...prev]);
+        handleCancelEdit();
+      }
     } catch (err: any) {
-      console.error('Error al publicar anuncio:', err);
-      setPublishError(err.message || 'No se pudo publicar el anuncio.');
+      console.error('Error al guardar anuncio:', err);
+      if (err.status === 403 || err.message?.toLowerCase().includes('forbidden') || err.message?.toLowerCase().includes('403')) {
+        setPublishError('No puedes editar una publicación que no te pertenece.');
+      } else {
+        setPublishError(err.message || 'No se pudo guardar el anuncio.');
+      }
     } finally {
       setPublishing(false);
     }
@@ -191,11 +226,14 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   // Handler for deleting an announcement (only authorized if authored by user)
   const handleDeleteAnuncio = async (anuncioId: string) => {
     if (!selectedCurso) return;
-    if (window.confirm('¿Estás seguro de que deseas eliminar este anuncio?')) {
-      try {
-        await anuncioService.delete(selectedCurso.id, anuncioId);
-        setAnuncios(prev => prev.filter(a => a.id !== anuncioId));
-      } catch (err: any) {
+    try {
+      await anuncioService.delete(selectedCurso.id, anuncioId);
+      setAnuncios(prev => prev.filter(a => a.id !== anuncioId));
+    } catch (err: any) {
+      console.error('Error al eliminar anuncio:', err);
+      if (err.status === 403 || err.message?.toLowerCase().includes('forbidden') || err.message?.toLowerCase().includes('403')) {
+        alert('No puedes eliminar una publicación que no te pertenece.');
+      } else {
         alert(err.message || 'Error al eliminar anuncio');
       }
     }
@@ -670,8 +708,18 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                   </div>
                 ) : anuncios.length > 0 ? (
                   <div className="space-y-4">
-                    {anuncios.map((anuncio) => (
-                      <div key={anuncio.id} className="sud-glass-panel p-5 border-white/5 hover:border-white/10 transition-all space-y-3 relative group">
+                    {anuncios.map((anuncio) => {
+                      const isOwn = anuncio.autorId === user.uid;
+                      return (
+                      <div
+                        key={anuncio.id}
+                        className={`sud-glass-panel p-5 border-white/5 transition-all space-y-3 relative group ${
+                          isOwn
+                            ? 'cursor-pointer hover:border-sud-turquoise/30 hover:bg-white/[0.01]'
+                            : 'hover:border-white/10'
+                        }`}
+                        onClick={() => { if (isOwn) handleStartEdit(anuncio); }}
+                      >
                         <div className="flex items-start justify-between gap-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-slate-400 text-xs font-bold">
@@ -694,14 +742,25 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                               {anuncio.tipo === 'CAPSULA' ? 'Material / Cápsula' : 'Anuncio'}
                             </span>
                             
-                            {anuncio.autorId === user.uid && (
-                              <button
-                                onClick={() => handleDeleteAnuncio(anuncio.id)}
-                                className="p-1 rounded bg-red-500/5 border border-red-500/10 text-red-400 hover:bg-red-500/20 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer"
-                                title="Eliminar anuncio"
-                              >
-                                <Trash2 size={12} />
-                              </button>
+                            {isOwn && (
+                              <div className="flex items-center gap-1.5 shrink-0">
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); handleStartEdit(anuncio); }}
+                                  className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-sud-turquoise hover:bg-sud-turquoise/5 transition-all cursor-pointer"
+                                  title="Editar publicación"
+                                >
+                                  <Pencil size={12} />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => { e.stopPropagation(); setDeleteConfirmAnuncio(anuncio); }}
+                                  className="p-1.5 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/70 hover:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
+                                  title="Eliminar publicación"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              </div>
                             )}
                           </div>
                         </div>
@@ -717,6 +776,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                               href={anuncio.urlRecurso.startsWith('http') ? anuncio.urlRecurso : `https://${anuncio.urlRecurso}`}
                               target="_blank"
                               rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-[9px] font-black text-sud-turquoise uppercase tracking-widest transition-all"
                             >
                               <LinkIcon size={12} /> Ir al Recurso Adjunto
@@ -724,7 +784,8 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                           </div>
                         )}
                       </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 ) : (
                   <div className="py-12 text-center border border-dashed border-white/5 rounded-2xl bg-white/[0.005]">
@@ -738,11 +799,46 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
 
               {/* Formulario de Publicacion */}
               <div className="space-y-6">
-                <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center gap-2">
-                  <Send className="text-sud-orange" size={18} /> Publicar Nuevo
+                <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Send className={editingAnuncio ? "text-sud-turquoise animate-pulse" : "text-sud-orange"} size={18} />
+                    {editingAnuncio ? 'Editar publicación' : 'Publicar nuevo'}
+                  </span>
+                  {editingAnuncio && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEdit}
+                      className="px-3 py-1.5 rounded-lg border border-sud-turquoise/30 bg-sud-turquoise/10 text-sud-turquoise hover:bg-sud-turquoise/20 text-[9px] font-black uppercase tracking-widest transition-all cursor-pointer"
+                    >
+                      Nueva publicación
+                    </button>
+                  )}
                 </h3>
 
-                <form onSubmit={handlePublishAnuncio} className="sud-glass-panel p-5 border-white/5 space-y-4">
+                <form 
+                  onSubmit={handlePublishAnuncio} 
+                  className={`sud-glass-panel p-5 space-y-4 transition-all duration-300 ${
+                    editingAnuncio 
+                      ? 'border-sud-turquoise/30 bg-sud-turquoise/[0.01]' 
+                      : 'border-white/5'
+                  }`}
+                >
+                  {editingAnuncio && (
+                    <div className="p-3.5 rounded-xl bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise text-[10px] font-bold flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <Pencil size={14} className="shrink-0 animate-pulse" />
+                        <span>Editando: <strong className="text-white">{editingAnuncio.titulo}</strong></span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white underline cursor-pointer"
+                      >
+                        Crear nueva
+                      </button>
+                    </div>
+                  )}
+
                   {publishError && (
                     <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold flex items-center gap-2">
                       <AlertCircle size={14} className="shrink-0" />
@@ -821,18 +917,31 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                     </div>
                   </div>
 
-                  {/* Boton enviar */}
-                  <button
-                    type="submit"
-                    disabled={publishing}
-                    className="w-full sud-btn-primary py-3 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest disabled:opacity-50 cursor-pointer"
-                  >
-                    {publishing ? 'Publicando...' : (
-                      <>
-                        <Send size={12} /> Publicar
-                      </>
+                  {/* Boton enviar / guardar */}
+                  <div className="flex gap-2">
+                    {editingAnuncio && (
+                      <button
+                        type="button"
+                        onClick={handleCancelEdit}
+                        className="w-1/3 py-3 border border-white/10 hover:border-white/20 bg-white/5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
                     )}
-                  </button>
+                    <button
+                      type="submit"
+                      disabled={publishing}
+                      className={`${editingAnuncio ? 'w-2/3' : 'w-full'} sud-btn-primary py-3 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest disabled:opacity-50 cursor-pointer`}
+                    >
+                      {publishing ? (
+                        editingAnuncio ? 'Guardando...' : 'Publicando...'
+                      ) : (
+                        <>
+                          <Send size={12} /> {editingAnuncio ? 'Guardar cambios' : 'Publicar'}
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </form>
               </div>
             </div>
@@ -849,6 +958,47 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
           <img src="/logos/LIBERA TU VOZ.png" alt="Libera tu voz" className="h-4 opacity-20" />
         </div>
       </footer>
+      {/* ── Modal de Confirmación de Eliminación ─────────────────── */}
+      <AnimatePresence>
+        {deleteConfirmAnuncio && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative max-w-sm w-full bg-[#0f0f0f] border border-white/10 rounded-3xl p-6 space-y-6 text-center shadow-2xl"
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto animate-pulse">
+                <Trash2 size={24} />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-lg font-black text-white uppercase tracking-tight">¿Eliminar esta publicación?</h4>
+                <p className="text-slate-400 text-xs leading-relaxed">Esta acción no se puede deshacer.</p>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmAnuncio(null)}
+                  className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const toDelete = deleteConfirmAnuncio;
+                    setDeleteConfirmAnuncio(null);
+                    await handleDeleteAnuncio(toDelete.id);
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

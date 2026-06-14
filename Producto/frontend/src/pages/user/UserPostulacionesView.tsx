@@ -166,11 +166,11 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
         {[
-          { label: 'Total', value: stats.total, color: 'text-white', bg: 'bg-white/5', border: 'border-white/10' },
-          { label: 'Pendientes', value: stats.pendientes, color: 'text-amber-400', bg: 'bg-amber-500/5', border: 'border-amber-500/20' },
-          { label: 'En Revisión', value: stats.enRevision, color: 'text-sky-400', bg: 'bg-sky-500/5', border: 'border-sky-500/20' },
-          { label: 'Aceptadas', value: stats.aceptadas, color: 'text-emerald-400', bg: 'bg-emerald-500/5', border: 'border-emerald-500/20' },
-          { label: 'Rechazadas', value: stats.rechazadas, color: 'text-red-400', bg: 'bg-red-500/5', border: 'border-red-500/20' },
+          { label: 'Total', value: stats.total, color: 'text-white light:text-slate-800', bg: 'bg-white/5 light:bg-slate-200', border: 'border-white/10 light:border-slate-400' },
+          { label: 'Pendientes', value: stats.pendientes, color: 'text-amber-400 light:text-amber-700', bg: 'bg-amber-500/5 light:bg-amber-100', border: 'border-amber-500/20 light:border-amber-300' },
+          { label: 'En Revisión', value: stats.enRevision, color: 'text-sky-400 light:text-sky-700', bg: 'bg-sky-500/5 light:bg-sky-100', border: 'border-sky-500/20 light:border-sky-300' },
+          { label: 'Aceptadas', value: stats.aceptadas, color: 'text-emerald-400 light:text-emerald-700', bg: 'bg-emerald-500/5 light:bg-emerald-100', border: 'border-emerald-500/20 light:border-emerald-300' },
+          { label: 'Rechazadas', value: stats.rechazadas, color: 'text-red-400 light:text-red-700', bg: 'bg-red-500/5 light:bg-red-100', border: 'border-red-500/20 light:border-red-300' },
         ].map(stat => (
           <div key={stat.label} className={`p-5 rounded-2xl border ${stat.bg} ${stat.border} text-center`}>
             <p className={`text-3xl font-black ${stat.color}`}>{stat.value}</p>

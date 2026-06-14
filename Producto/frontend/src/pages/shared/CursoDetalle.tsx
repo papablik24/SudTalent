@@ -15,10 +15,34 @@ import {
   MapPin,
   Send,
   X,
+  Calendar,
+  Clock,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { CursoDTO } from '../../services/cursoService';
 import { anuncioService, AnuncioDTO, CreateAnuncioRequest } from '../../services/anuncioService';
+import { agendaService, AgendaEventoDTO } from '../../services/agendaService';
+
+function formatAgendaDateTime(fechaStr: string, horaStr?: string): string {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const meses = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+    const monthName = meses[month] || '';
+    const formattedDate = `${day} de ${monthName} de ${year}`;
+    if (horaStr) {
+      return `${formattedDate} · ${horaStr} hrs`;
+    }
+    return formattedDate;
+  }
+  return `${fechaStr}${horaStr ? ` · ${horaStr} hrs` : ''}`;
+}
 
 // ── Tipos de usuario que pueden publicar ──────────────────────────
 type UserRole = 'ADMIN' | 'PROFESOR' | 'USER';
@@ -43,8 +67,14 @@ function formatDate(iso: string) {
 // ── Vista interior del curso ──────────────────────────────────────
 export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
   const [anuncios, setAnuncios] = useState<AnuncioDTO[]>([]);
+  const [agenda, setAgenda] = useState<AgendaEventoDTO[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingAgenda, setLoadingAgenda] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Modal detail states
+  const [selectedActivity, setSelectedActivity] = useState<AgendaEventoDTO | null>(null);
+  const [selectedAnuncioDetail, setSelectedAnuncioDetail] = useState<AnuncioDTO | null>(null);
 
   // Form & Editing States
   const [showForm, setShowForm] = useState(false);
@@ -66,6 +96,14 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
       .then(setAnuncios)
       .catch(err => setError(err.message))
       .finally(() => setLoading(false));
+  }, [curso.id]);
+
+  useEffect(() => {
+    setLoadingAgenda(true);
+    agendaService.getAgendaByCurso(curso.id)
+      .then(setAgenda)
+      .catch(err => console.error("Error al cargar la agenda del curso:", err))
+      .finally(() => setLoadingAgenda(false));
   }, [curso.id]);
 
   const handleStartEdit = (a: AnuncioDTO) => {
@@ -233,6 +271,63 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
         </div>
       </div>
 
+      {/* ── Próximas actividades ────────────────────────── */}
+      {userRole === 'USER' && (
+        <section className="space-y-4">
+          <h3 className="text-lg font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <Calendar size={18} className="text-violet-400" /> Próximas Actividades
+          </h3>
+          {loadingAgenda ? (
+            <div className="flex justify-center py-6">
+              <div className="w-6 h-6 border-3 border-violet-400/20 border-t-violet-400 rounded-full animate-spin" />
+            </div>
+          ) : agenda.length === 0 ? (
+            <div className="py-10 text-center border border-dashed border-white/5 rounded-[2rem] bg-white/[0.005]">
+              <Calendar size={28} className="mx-auto text-slate-700 mb-3" />
+              <p className="text-slate-400 font-bold text-xs">
+                No hay actividades agendadas para este curso.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {agenda.map((evt) => (
+                <div
+                  key={evt.id}
+                  onClick={() => setSelectedActivity(evt)}
+                  className="sud-glass-panel p-5 border-white/5 hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.02)] transition-all space-y-3 cursor-pointer hover:scale-[1.01] active:scale-[0.99]"
+                >
+                  <div>
+                    <h4 className="text-sm font-black text-white uppercase tracking-tight">{evt.titulo}</h4>
+                    {evt.descripcion && (
+                      <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap leading-relaxed line-clamp-2">{evt.descripcion}</p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-white/5 text-[10px] text-slate-500 font-bold uppercase tracking-widest pl-1">
+                    <span className="flex items-center gap-1.5 text-slate-300">
+                      <Calendar size={12} className="text-violet-400" />
+                      {formatAgendaDateTime(evt.fecha, evt.hora)}
+                    </span>
+
+                    {evt.link && (
+                      <a
+                        href={evt.link.startsWith('http') ? evt.link : `https://${evt.link}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sud-turquoise/5 border border-sud-turquoise/20 text-sud-turquoise hover:bg-sud-turquoise/15 transition-all text-[9px]"
+                      >
+                        <Link2 size={12} /> Ir a reunión / recurso
+                      </a>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+      )}
+
       {/* ── Tablón de anuncios y cápsulas ────────────────────────── */}
       <section className="space-y-4">
         <div className="flex items-center justify-between">
@@ -358,7 +453,7 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
             )}
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {anuncios.map((a, i) => {
               const meta = TIPO_LABELS[a.tipo] ?? TIPO_LABELS['ANUNCIO'];
               const isOwn = a.autorId === userId;
@@ -368,7 +463,8 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.04 }}
-                  className="sud-glass-panel p-6 space-y-3"
+                  onClick={() => setSelectedAnuncioDetail(a)}
+                  className="sud-glass-panel p-6 space-y-3 cursor-pointer hover:border-white/20 hover:shadow-[0_0_20px_rgba(255,255,255,0.02)] transition-all hover:scale-[1.01] active:scale-[0.99]"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex items-center gap-3">
@@ -399,13 +495,13 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                       {(canPublish && isOwn) || userRole === 'ADMIN' ? (
                         <div className="flex items-center gap-1.5">
                           <button
-                            onClick={() => handleStartEdit(a)}
+                            onClick={(e) => { e.stopPropagation(); handleStartEdit(a); }}
                             className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all"
                           >
                             <Pencil size={12} />
                           </button>
                           <button
-                            onClick={() => setDeleteConfirmAnuncio(a)}
+                            onClick={(e) => { e.stopPropagation(); setDeleteConfirmAnuncio(a); }}
                             className="p-1.5 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/50 hover:text-red-400 hover:bg-red-500/10 transition-all"
                           >
                             <Trash2 size={12} />
@@ -417,7 +513,7 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
 
                   <div>
                     <h4 className="text-base font-black text-white uppercase tracking-tight">{a.titulo}</h4>
-                    <p className="text-slate-400 text-sm leading-relaxed mt-1 whitespace-pre-wrap">{a.contenido}</p>
+                    <p className="text-slate-400 text-sm leading-relaxed mt-1 whitespace-pre-wrap line-clamp-3">{a.contenido}</p>
                   </div>
 
                   {a.urlRecurso && (
@@ -425,6 +521,7 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                       href={a.urlRecurso}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
                       className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-sud-turquoise hover:text-sud-turquoise/80 transition-colors border border-sud-turquoise/20 bg-sud-turquoise/5 px-3 py-2 rounded-xl"
                     >
                       <Link2 size={12} /> Ver recurso
@@ -471,6 +568,148 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
                 >
                   Eliminar
                 </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modal Detalle de Actividad ─────────────────── */}
+      <AnimatePresence>
+        {selectedActivity && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative max-w-lg w-full bg-[#0f0f0f] border border-white/10 rounded-[2rem] p-6 md:p-8 space-y-6 shadow-2xl"
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedActivity(null)}
+                className="absolute right-5 top-5 p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <span className="inline-flex items-center text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded bg-sud-orange/15 text-sud-orange border border-sud-orange/20">
+                    Actividad Programada
+                  </span>
+                  <h4 className="text-xl font-black text-white uppercase tracking-tight leading-snug">{selectedActivity.titulo}</h4>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-4 text-[10px] text-slate-400 font-bold uppercase tracking-widest py-2 border-y border-white/5">
+                  <span className="flex items-center gap-1.5 text-slate-300">
+                    <Calendar size={13} className="text-violet-400" />
+                    {formatAgendaDateTime(selectedActivity.fecha, selectedActivity.hora)}
+                  </span>
+                  {curso.titulo && (
+                    <span className="flex items-center gap-1.5 text-slate-300">
+                      <GraduationCap size={13} className="text-sud-turquoise" />
+                      {curso.titulo}
+                    </span>
+                  )}
+                </div>
+
+                {selectedActivity.descripcion ? (
+                  <div className="space-y-1">
+                    <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Descripción</h5>
+                    <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{selectedActivity.descripcion}</p>
+                  </div>
+                ) : (
+                  <p className="text-slate-500 text-xs italic">Sin descripción adicional.</p>
+                )}
+
+                {selectedActivity.link && (
+                  <div className="pt-4 border-t border-white/5 flex justify-end">
+                    <a
+                      href={selectedActivity.link.startsWith('http') ? selectedActivity.link : `https://${selectedActivity.link}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-[1.8rem] bg-gradient-to-r from-sud-yellow via-sud-orange to-sud-turquoise text-black font-black uppercase tracking-widest text-[10px] transition-all hover:scale-[1.02]"
+                    >
+                      <Link2 size={14} /> Abrir enlace
+                    </a>
+                  </div>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Modal Detalle de Publicación ─────────────────── */}
+      <AnimatePresence>
+        {selectedAnuncioDetail && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative max-w-lg w-full bg-[#0f0f0f] border border-white/10 rounded-[2rem] p-6 md:p-8 space-y-6 shadow-2xl"
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedAnuncioDetail(null)}
+                className="absolute right-5 top-5 p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-white transition-all cursor-pointer"
+              >
+                <X size={16} />
+              </button>
+
+              <div className="space-y-4">
+                <div className="flex items-center gap-3">
+                  {/* Avatar autor */}
+                  <div className="w-9 h-9 rounded-xl bg-sud-gradient p-px shrink-0">
+                    <div className="w-full h-full rounded-[0.6rem] bg-black flex items-center justify-center overflow-hidden">
+                      {selectedAnuncioDetail.autorImageUrl ? (
+                        <img src={selectedAnuncioDetail.autorImageUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-[10px] font-black text-violet-400">
+                          {selectedAnuncioDetail.autorNombre?.[0]?.toUpperCase() ?? 'P'}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                      {selectedAnuncioDetail.autorNombre}
+                    </p>
+                    <p className="text-[9px] text-slate-600 font-mono">{formatDate(selectedAnuncioDetail.createdAt)}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <span className={`text-[7px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                    selectedAnuncioDetail.tipo === 'CAPSULA' 
+                      ? 'bg-violet-500/10 text-violet-400 border-violet-500/20' 
+                      : 'bg-sud-orange/10 text-sud-orange border-sud-orange/20'
+                  }`}>
+                    {selectedAnuncioDetail.tipo === 'CAPSULA' ? 'Material / Cápsula' : 'Anuncio'}
+                  </span>
+                  <h4 className="text-xl font-black text-white uppercase tracking-tight leading-snug">{selectedAnuncioDetail.titulo}</h4>
+                </div>
+
+                <div className="space-y-1">
+                  <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">Contenido</h5>
+                  <p className="text-slate-300 text-sm leading-relaxed whitespace-pre-wrap">{selectedAnuncioDetail.contenido}</p>
+                </div>
+
+                {selectedAnuncioDetail.urlRecurso && (
+                  <div className="pt-4 border-t border-white/5 flex justify-end">
+                    <a
+                      href={selectedAnuncioDetail.urlRecurso.startsWith('http') ? selectedAnuncioDetail.urlRecurso : `https://${selectedAnuncioDetail.urlRecurso}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={(e) => e.stopPropagation()}
+                      className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-[1.8rem] bg-gradient-to-r from-sud-yellow via-sud-orange to-sud-turquoise text-black font-black uppercase tracking-widest text-[10px] transition-all hover:scale-[1.02]"
+                    >
+                      <Link2 size={14} /> Ver recurso
+                    </a>
+                  </div>
+                )}
               </div>
             </motion.div>
           </div>

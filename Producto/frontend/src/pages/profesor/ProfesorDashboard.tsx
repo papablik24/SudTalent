@@ -23,6 +23,7 @@ import { profesorService, ProfesorDTO, ProfesorAlumnoDTO } from '../../services/
 import { cursoService } from '../../services/cursoService';
 import { anuncioService, AnuncioDTO } from '../../services/anuncioService';
 import { convocatoriaService, Convocatoria } from '../../services/convocatoriaService';
+import { agendaService, AgendaEventoDTO } from '../../services/agendaService';
 
 interface ProfesorDashboardProps {
   user: UserProfile;
@@ -34,6 +35,98 @@ interface DisplayCurso {
   titulo: string;
   modalidad: string;
   descripcion?: string;
+}
+
+export function formatAgendaDateTime(fechaStr: string, horaStr?: string): string {
+  if (!fechaStr) return '';
+  const parts = fechaStr.split('-');
+  if (parts.length === 3) {
+    const year = parseInt(parts[0], 10);
+    const month = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+    const meses = [
+      'enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio',
+      'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'
+    ];
+    const monthName = meses[month] || '';
+    const formattedDate = `${day} de ${monthName} de ${year}`;
+    if (horaStr) {
+      return `${formattedDate} · ${horaStr} hrs`;
+    }
+    return formattedDate;
+  }
+  return `${fechaStr}${horaStr ? ` · ${horaStr} hrs` : ''}`;
+}
+
+export function getRelativeTimeSpan(fechaStr: string, horaStr?: string): string {
+  if (!fechaStr) return '';
+  const dateParts = fechaStr.split('-');
+  if (dateParts.length !== 3) return '';
+  const year = parseInt(dateParts[0], 10);
+  const month = parseInt(dateParts[1], 10) - 1;
+  const day = parseInt(dateParts[2], 10);
+  
+  let hours = 0;
+  let minutes = 0;
+  if (horaStr) {
+    const timeParts = horaStr.split(':');
+    if (timeParts.length >= 2) {
+      hours = parseInt(timeParts[0], 10);
+      minutes = parseInt(timeParts[1], 10);
+    }
+  }
+  
+  const eventDate = new Date(year, month, day, hours, minutes);
+  const now = new Date();
+  
+  const diffMs = eventDate.getTime() - now.getTime();
+  if (diffMs < 0) {
+    return 'Actividad pasada';
+  }
+  
+  const isToday = eventDate.getDate() === now.getDate() &&
+                  eventDate.getMonth() === now.getMonth() &&
+                  eventDate.getFullYear() === now.getFullYear();
+                  
+  const tomorrow = new Date();
+  tomorrow.setDate(now.getDate() + 1);
+  const isTomorrow = eventDate.getDate() === tomorrow.getDate() &&
+                     eventDate.getMonth() === tomorrow.getMonth() &&
+                     eventDate.getFullYear() === tomorrow.getFullYear();
+                     
+  const formatTime = (h: number, m: number) => {
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+  };
+
+  const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+  if (isToday) {
+    if (diffHours >= 1) {
+      return `Hoy a las ${formatTime(hours, minutes)} (Faltan ${diffHours} hora${diffHours > 1 ? 's' : ''})`;
+    } else if (diffMinutes >= 1) {
+      return `Hoy a las ${formatTime(hours, minutes)} (Faltan ${diffMinutes} min)`;
+    }
+    return `Hoy a las ${formatTime(hours, minutes)}`;
+  }
+  
+  if (isTomorrow) {
+    return `Mañana a las ${formatTime(hours, minutes)}`;
+  }
+  
+  // Calculate exact day difference
+  const eventDateStart = new Date(eventDate.getFullYear(), eventDate.getMonth(), eventDate.getDate());
+  const nowDateStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const dayDiff = Math.round((eventDateStart.getTime() - nowDateStart.getTime()) / (1000 * 60 * 60 * 24));
+  
+  if (dayDiff === 1) {
+    return `Mañana a las ${formatTime(hours, minutes)}`;
+  }
+  if (dayDiff > 1) {
+    return `Faltan ${dayDiff} días`;
+  }
+  
+  return `Faltan ${diffHours} horas`;
 }
 
 export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
@@ -53,8 +146,8 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [error, setError] = useState<string | null>(null);
   const [anunciosError, setAnunciosError] = useState<string | null>(null);
   
-  // Active View State ('dashboard' | 'alumnos')
-  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos'>('dashboard');
+  // Active View State ('dashboard' | 'alumnos' | 'agenda')
+  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos' | 'agenda'>('dashboard');
   
   // Alumnos State
   const [alumnos, setAlumnos] = useState<ProfesorAlumnoDTO[]>([]);
@@ -72,6 +165,26 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [publishError, setPublishError] = useState<string | null>(null);
   const [editingAnuncio, setEditingAnuncio] = useState<AnuncioDTO | null>(null);
   const [deleteConfirmAnuncio, setDeleteConfirmAnuncio] = useState<AnuncioDTO | null>(null);
+
+  // Agenda State
+  const [agenda, setAgenda] = useState<AgendaEventoDTO[]>([]);
+  const [loadingAgenda, setLoadingAgenda] = useState(false);
+  const [agendaError, setAgendaError] = useState<string | null>(null);
+  const [editingEvento, setEditingEvento] = useState<AgendaEventoDTO | null>(null);
+  const [deleteConfirmEvento, setDeleteConfirmEvento] = useState<AgendaEventoDTO | null>(null);
+
+  // Agenda Form State
+  const [eventoCursoId, setEventoCursoId] = useState('');
+  const [eventoTitulo, setEventoTitulo] = useState('');
+  const [eventoDescripcion, setEventoDescripcion] = useState('');
+  const [eventoFecha, setEventoFecha] = useState('');
+  const [eventoHora, setEventoHora] = useState('');
+  const [eventoLink, setEventoLink] = useState('');
+  const [savingEvento, setSavingEvento] = useState(false);
+  const [eventoError, setEventoError] = useState<string | null>(null);
+
+  const dateRef = React.useRef<HTMLInputElement>(null);
+  const timeRef = React.useRef<HTMLInputElement>(null);
 
   // Fetch Profesor profile, courses and convocatorias
   useEffect(() => {
@@ -120,6 +233,13 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
     }, 4000);
     return () => clearTimeout(timer);
   }, [toastMessage]);
+
+  // Auto-select the first course when realCursos loads and no course is selected
+  useEffect(() => {
+    if (realCursos.length > 0 && !eventoCursoId) {
+      setEventoCursoId(realCursos[0].id);
+    }
+  }, [realCursos, eventoCursoId]);
 
   // Load announcements when a course is selected
   useEffect(() => {
@@ -282,8 +402,123 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
     fetchAlumnos();
   };
 
+  // Fetch Agenda Events
+  const fetchAgenda = async () => {
+    setLoadingAgenda(true);
+    setAgendaError(null);
+    try {
+      const data = await agendaService.getAgenda();
+      setAgenda(data);
+    } catch (err: any) {
+      console.error('Error al cargar la agenda:', err);
+      setAgendaError(err.message || 'Error al cargar los eventos de la agenda.');
+    } finally {
+      setLoadingAgenda(false);
+    }
+  };
+
+  const handleStartEditEvento = (evt: AgendaEventoDTO) => {
+    setEditingEvento(evt);
+    setEventoCursoId(evt.cursoId);
+    setEventoTitulo(evt.titulo);
+    setEventoDescripcion(evt.descripcion || '');
+    setEventoFecha(evt.fecha);
+    setEventoHora(evt.hora);
+    setEventoLink(evt.link || '');
+    setEventoError(null);
+  };
+
+  const handleCancelEditEvento = () => {
+    setEditingEvento(null);
+    setEventoCursoId(realCursos.length > 0 ? realCursos[0].id : '');
+    setEventoTitulo('');
+    setEventoDescripcion('');
+    setEventoFecha('');
+    setEventoHora('');
+    setEventoLink('');
+    setEventoError(null);
+  };
+
+  const handleSaveEvento = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!eventoCursoId) {
+      setEventoError('Debes seleccionar un curso.');
+      return;
+    }
+    if (!eventoTitulo.trim()) {
+      setEventoError('El título es obligatorio.');
+      return;
+    }
+    if (!eventoFecha) {
+      setEventoError('La fecha es obligatoria.');
+      return;
+    }
+    if (!eventoHora) {
+      setEventoError('La hora es obligatoria.');
+      return;
+    }
+
+    setSavingEvento(true);
+    setEventoError(null);
+    try {
+      const payload = {
+        cursoId: eventoCursoId,
+        titulo: eventoTitulo.trim(),
+        descripcion: eventoDescripcion.trim() || undefined,
+        fecha: eventoFecha,
+        hora: eventoHora,
+        link: eventoLink.trim() || undefined
+      };
+
+      if (editingEvento) {
+        const updated = await agendaService.update(editingEvento.id, payload);
+        setAgenda(prev => prev.map(evt => evt.id === updated.id ? updated : evt));
+        setToastMessage('Actividad de la agenda actualizada con éxito.');
+        handleCancelEditEvento();
+      } else {
+        const created = await agendaService.create(payload);
+        setAgenda(prev => {
+          const updatedList = [created, ...prev];
+          return updatedList.sort((a, b) => {
+            const dateComp = a.fecha.localeCompare(b.fecha);
+            if (dateComp !== 0) return dateComp;
+            return a.hora.localeCompare(b.hora);
+          });
+        });
+        setToastMessage('Actividad agregada a la agenda con éxito.');
+        handleCancelEditEvento();
+      }
+    } catch (err: any) {
+      console.error('Error al guardar evento de la agenda:', err);
+      setEventoError(err.message || 'No se pudo guardar la actividad de la agenda.');
+    } finally {
+      setSavingEvento(false);
+    }
+  };
+
+  const handleDeleteEvento = async (eventoId: string) => {
+    try {
+      await agendaService.delete(eventoId);
+      setAgenda(prev => prev.filter(evt => evt.id !== eventoId));
+      setToastMessage('Actividad eliminada de la agenda.');
+    } catch (err: any) {
+      console.error('Error al eliminar evento de la agenda:', err);
+      alert(err.message || 'Error al eliminar actividad de la agenda.');
+    }
+  };
+
   const handleMiAgendaClick = () => {
-    setToastMessage('La agenda de clases estará disponible próximamente.');
+    setActiveView('agenda');
+    setSelectedCurso(null);
+    setEditingEvento(null);
+    setEventoCursoId(realCursos.length > 0 ? realCursos[0].id : '');
+    setEventoTitulo('');
+    setEventoDescripcion('');
+    setEventoFecha('');
+    setEventoHora('');
+    setEventoLink('');
+    setEventoError(null);
+    fetchAgenda();
   };
 
   return (
@@ -556,6 +791,328 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                 );
               })()
             )}
+          </div>
+        ) : activeView === 'agenda' ? (
+          /* ========================================================
+             MI AGENDA VIEW
+             ======================================================== */
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Back button */}
+            <button
+              onClick={() => setActiveView('dashboard')}
+              className="inline-flex items-center gap-2 text-[10px] text-slate-400 hover:text-white font-black uppercase tracking-widest border border-white/10 hover:border-white/20 bg-white/5 px-4 py-2 rounded-xl transition-all cursor-pointer"
+            >
+              <ChevronLeft size={14} /> Volver al Panel
+            </button>
+
+            {/* View Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <Clock className="text-violet-400" size={24} /> Mi Agenda
+                </h2>
+                <p className="text-slate-400 text-xs">
+                  Organiza clases, tutorías, ensayos o recordatorios con fecha y hora.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Event List */}
+              <div className="lg:col-span-2 space-y-6">
+                <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center gap-2">
+                  <Calendar className="text-sud-turquoise" size={18} /> Actividades Programadas
+                </h3>
+
+                {loadingAgenda ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="w-8 h-8 border-3 border-sud-turquoise/20 border-t-sud-turquoise rounded-full animate-spin" />
+                  </div>
+                ) : agendaError ? (
+                  <div className="p-4 border border-red-500/20 rounded-xl bg-red-500/5 text-red-400 text-xs font-bold text-center">
+                    {agendaError}
+                  </div>
+                ) : agenda.length > 0 ? (
+                  <div className="space-y-4">
+                    {agenda.map((evt) => (
+                      <div
+                        key={evt.id}
+                        className="sud-glass-panel p-5 border-white/5 hover:border-white/10 transition-all space-y-3 relative group"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-2">
+                            <span className="inline-flex items-center text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded bg-sud-orange/15 text-sud-orange border border-sud-orange/20">
+                              {evt.cursoTitulo}
+                            </span>
+                            <h4 className="text-base font-black text-white uppercase tracking-tight leading-snug">{evt.titulo}</h4>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0 opacity-80 group-hover:opacity-100 transition-opacity">
+                            <button
+                              type="button"
+                              onClick={() => handleStartEditEvento(evt)}
+                              className="p-1.5 rounded-lg bg-white/5 border border-white/10 text-slate-400 hover:text-sud-turquoise hover:bg-sud-turquoise/5 transition-all cursor-pointer"
+                              title="Editar actividad"
+                            >
+                              <Pencil size={12} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setDeleteConfirmEvento(evt)}
+                              className="p-1.5 rounded-lg bg-red-500/5 border border-red-500/10 text-red-400/70 hover:text-red-400 hover:bg-red-500/20 transition-all cursor-pointer"
+                              title="Eliminar actividad"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {evt.descripcion && (
+                          <p className="text-xs text-slate-400 whitespace-pre-wrap leading-relaxed pl-1">{evt.descripcion}</p>
+                        )}
+
+                        <div className="flex flex-wrap items-center justify-between gap-4 pt-3 border-t border-white/5 text-[10px] text-slate-500 font-bold uppercase tracking-widest pl-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="flex items-center gap-1.5 text-slate-300">
+                              <Calendar size={13} className="text-violet-400" />
+                              {formatAgendaDateTime(evt.fecha, evt.hora)}
+                            </span>
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                              getRelativeTimeSpan(evt.fecha, evt.hora) === 'Actividad pasada'
+                                ? 'bg-red-500/10 text-red-400 border-red-500/20'
+                                : getRelativeTimeSpan(evt.fecha, evt.hora).includes('Hoy')
+                                  ? 'bg-sud-turquoise/10 text-sud-turquoise border-sud-turquoise/20'
+                                  : getRelativeTimeSpan(evt.fecha, evt.hora).includes('Mañana')
+                                    ? 'bg-sud-orange/10 text-sud-orange border-sud-orange/20'
+                                    : 'bg-white/5 text-slate-400 border-white/10'
+                            }`}>
+                              {getRelativeTimeSpan(evt.fecha, evt.hora)}
+                            </span>
+                          </div>
+                          
+                          {evt.link && (
+                            <a
+                              href={evt.link.startsWith('http') ? evt.link : `https://${evt.link}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-sud-turquoise/5 border border-sud-turquoise/20 text-sud-turquoise hover:bg-sud-turquoise/15 transition-all text-[9px]"
+                            >
+                              <LinkIcon size={12} /> Enlace de reunión o recurso
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-16 text-center border border-dashed border-white/5 rounded-2xl bg-white/[0.005] space-y-2">
+                    <Calendar size={32} className="mx-auto text-slate-755" />
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-xs">
+                      Aún no tienes actividades agendadas.
+                    </p>
+                    <p className="text-slate-500 text-[10px] font-medium leading-relaxed max-w-xs mx-auto">
+                      Crea una clase, tutoría o recordatorio asociado a uno de tus cursos.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Formulario de Evento */}
+              <div className="space-y-6">
+                <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Clock className={editingEvento ? "text-sud-turquoise animate-pulse" : "text-sud-orange"} size={18} />
+                    {editingEvento ? 'Editar actividad' : 'Nueva actividad'}
+                  </span>
+                  {editingEvento && (
+                    <button
+                      type="button"
+                      onClick={handleCancelEditEvento}
+                      className="px-3 py-1 text-[9px] font-black uppercase tracking-widest border border-sud-turquoise/30 bg-sud-turquoise/10 text-sud-turquoise hover:bg-sud-turquoise/20 rounded-lg transition-all cursor-pointer"
+                    >
+                      Nueva actividad
+                    </button>
+                  )}
+                </h3>
+
+                {realCursos.length === 0 ? (
+                  <div className="sud-glass-panel p-5 border-red-500/10 bg-red-500/5 text-red-400 text-xs font-bold uppercase tracking-widest text-center leading-relaxed">
+                    No tienes cursos asignados.<br />Debes tener al menos un curso para agendar actividades.
+                  </div>
+                ) : (
+                  <form 
+                    onSubmit={handleSaveEvento} 
+                    className={`sud-glass-panel p-5 space-y-4 transition-all duration-300 ${
+                      editingEvento 
+                        ? 'border-sud-turquoise/30 bg-sud-turquoise/[0.01]' 
+                        : 'border-white/5'
+                    }`}
+                  >
+                    {eventoError && (
+                      <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-[10px] font-bold flex items-center gap-2">
+                        <AlertCircle size={14} className="shrink-0" />
+                        {eventoError}
+                      </div>
+                    )}
+
+                    {editingEvento && (
+                      <div className="p-3.5 rounded-xl bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise text-[10px] font-bold flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Pencil size={14} className="shrink-0 animate-pulse" />
+                          <span>Editando actividad</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleCancelEditEvento}
+                          className="text-[9px] font-black uppercase tracking-widest text-slate-400 hover:text-white underline cursor-pointer"
+                        >
+                          Crear nueva
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Curso */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Curso Asociado *
+                      </label>
+                      <select
+                        value={eventoCursoId}
+                        onChange={e => setEventoCursoId(e.target.value)}
+                        className="sud-input w-full text-xs py-2.5 px-3.5 bg-black/50 border border-white/10 text-white rounded-xl focus:outline-none focus:border-sud-turquoise/50 cursor-pointer"
+                      >
+                        {realCursos.map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.titulo}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Titulo */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Título de la actividad *
+                      </label>
+                      <input
+                        type="text"
+                        value={eventoTitulo}
+                        onChange={e => setEventoTitulo(e.target.value)}
+                        placeholder="Ej: Clase En Vivo: Técnicas de Doblaje"
+                        className="sud-input w-full text-xs py-2.5 px-3.5"
+                      />
+                    </div>
+
+                    {/* Fecha y Hora */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                          Fecha *
+                        </label>
+                        <div className="relative cursor-pointer">
+                          <Calendar size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          <input
+                            ref={dateRef}
+                            type="date"
+                            value={eventoFecha}
+                            onChange={e => setEventoFecha(e.target.value)}
+                            onClick={() => {
+                              try {
+                                dateRef.current?.showPicker();
+                              } catch (err) {
+                                console.warn("showPicker no soportado:", err);
+                              }
+                            }}
+                            style={{ colorScheme: 'dark' }}
+                            className="sud-input w-full text-xs py-2.5 pl-9 pr-3.5 bg-black/50 text-white cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                          Hora *
+                        </label>
+                        <div className="relative cursor-pointer">
+                          <Clock size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                          <input
+                            ref={timeRef}
+                            type="time"
+                            value={eventoHora}
+                            onChange={e => setEventoHora(e.target.value)}
+                            onClick={() => {
+                              try {
+                                timeRef.current?.showPicker();
+                              } catch (err) {
+                                console.warn("showPicker no soportado:", err);
+                              }
+                            }}
+                            style={{ colorScheme: 'dark' }}
+                            className="sud-input w-full text-xs py-2.5 pl-9 pr-3.5 bg-black/50 text-white cursor-pointer"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Descripcion */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Descripción Opcional
+                      </label>
+                      <textarea
+                        value={eventoDescripcion}
+                        onChange={e => setEventoDescripcion(e.target.value)}
+                        placeholder="Escribe detalles adicionales de la clase o recordatorios..."
+                        rows={3}
+                        className="sud-input w-full text-xs py-2.5 px-3.5 resize-none"
+                      />
+                    </div>
+
+                    {/* Link */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Enlace de reunión o recurso opcional
+                      </label>
+                      <div className="relative">
+                        <LinkIcon size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-600" />
+                        <input
+                          type="text"
+                          value={eventoLink}
+                          onChange={e => setEventoLink(e.target.value)}
+                          placeholder="https://meet.google.com/..."
+                          className="sud-input w-full text-xs py-2.5 pl-9 pr-3.5"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Botones */}
+                    <div className="flex gap-2 pt-2">
+                      {editingEvento && (
+                        <button
+                          type="button"
+                          onClick={handleCancelEditEvento}
+                          className="w-1/3 py-3 border border-white/10 hover:border-white/20 bg-white/5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all cursor-pointer"
+                        >
+                          Cancelar
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={savingEvento}
+                        className={`${editingEvento ? 'w-2/3' : 'w-full'} sud-btn-primary py-3 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest disabled:opacity-50 cursor-pointer`}
+                      >
+                        {savingEvento ? (
+                          editingEvento ? 'Guardando...' : 'Agendando...'
+                        ) : (
+                          <>
+                            <Send size={12} /> {editingEvento ? 'Guardar cambios' : 'Agendar'}
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
           </div>
         ) : !selectedCurso ? (
           /* ========================================================
@@ -1042,6 +1599,47 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                     const toDelete = deleteConfirmAnuncio;
                     setDeleteConfirmAnuncio(null);
                     await handleDeleteAnuncio(toDelete.id);
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer"
+                >
+                  Eliminar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+      {/* ── Modal de Confirmación de Eliminación de Evento ─────────── */}
+      <AnimatePresence>
+        {deleteConfirmEvento && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative max-w-sm w-full bg-[#0f0f0f] border border-white/10 rounded-3xl p-6 space-y-6 text-center shadow-2xl"
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto animate-pulse">
+                <Trash2 size={24} />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-lg font-black text-white uppercase tracking-tight">¿Eliminar esta actividad?</h4>
+                <p className="text-slate-400 text-xs leading-relaxed">Esta acción quitará el evento de tu agenda y no se puede deshacer.</p>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setDeleteConfirmEvento(null)}
+                  className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const toDelete = deleteConfirmEvento;
+                    setDeleteConfirmEvento(null);
+                    await handleDeleteEvento(toDelete.id);
                   }}
                   className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer"
                 >

@@ -23,7 +23,8 @@
   }
 
   :root.light body {
-    @apply bg-slate-50 text-slate-900;
+    background-color: #cbd5e1 !important; /* slate-300 - gris medio claro */
+    color: #0f172a !important;
   }
 
   /* Títulos y textos comunes */
@@ -51,10 +52,25 @@
 
   /* ── Paneles / cards ─────────────────────────────────────── */
   .sud-glass-panel {
-    @apply bg-white/[0.02] border border-white/5 backdrop-blur-md rounded-[2.5rem] shadow-2xl;
+    @apply bg-white/[0.045] border border-white/10 backdrop-blur-md rounded-[2.5rem] shadow-2xl;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .sud-glass-panel.cursor-pointer:hover {
+    border-color: rgba(255, 255, 255, 0.2) !important;
+    background-color: rgba(255, 255, 255, 0.075) !important;
+    box-shadow: 0 0 25px -5px rgba(255, 255, 255, 0.035), 0 10px 15px -3px rgba(0, 0, 0, 0.35) !important;
   }
   :root.light .sud-glass-panel {
-    @apply bg-white border border-slate-200 shadow-sm backdrop-blur-none;
+    background-color: #e2e8f0 !important; /* slate-200 - gris claro visible */
+    border: 1px solid #cbd5e1 !important; /* slate-300 */
+    box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08), 0 4px 12px -4px rgba(15, 23, 42, 0.04) !important;
+    backdrop-filter: none !important;
+  }
+  :root.light .sud-glass-panel.cursor-pointer:hover {
+    border-color: #94a3b8 !important; /* slate-400 */
+    background-color: #e2e8f0 !important;
+    box-shadow: 0 20px 40px -8px rgba(15, 23, 42, 0.12), 0 8px 16px -6px rgba(15, 23, 42, 0.06) !important;
+    transform: scale(1.01);
   }
 
   /* ── Botón primario (gradiente — funciona en ambos modos) ── */
@@ -72,10 +88,12 @@
 
   /* ── Input ───────────────────────────────────────────────── */
   .sud-input {
-    @apply bg-black/60 border border-white/10 rounded-2xl p-5 focus:border-sud-turquoise/50 focus:ring-1 focus:ring-sud-turquoise/20 transition-all outline-none text-white placeholder:text-white/20 font-medium;
+    @apply bg-black/85 border border-white/15 rounded-2xl p-5 focus:border-sud-turquoise/60 focus:ring-1 focus:ring-sud-turquoise/25 transition-all outline-none text-white placeholder:text-white/40 font-medium;
   }
   :root.light .sud-input {
-    @apply bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-sud-turquoise/70 focus:ring-sud-turquoise/20;
+    @apply text-slate-900 placeholder:text-slate-500 focus:border-sud-turquoise focus:bg-white transition-all;
+    background-color: #ffffff !important; /* blanco puro para destacar dentro de tarjetas grises */
+    border: 1px solid #cbd5e1 !important; /* slate-300 */
   }
 
   /* ── Stat card ───────────────────────────────────────────── */
@@ -83,7 +101,7 @@
     @apply p-8 rounded-[2rem] bg-white/[0.01] border border-white/5 hover:border-white/10 transition-all duration-500 hover:bg-white/[0.02];
   }
   :root.light .sud-stat-card {
-    @apply bg-white border-slate-200 hover:border-slate-300 hover:bg-slate-50 shadow-sm;
+    @apply bg-white border-slate-300 hover:border-slate-400 hover:bg-slate-50 shadow-sm;
   }
 
   /* ── Textos blancos genéricos en modo claro ──────────────── */
@@ -94,22 +112,22 @@
     color: #1e293b !important;
   }
   :root.light .text-slate-200 {
-    color: #334155 !important;
+    color: #1e293b !important;
   }
   :root.light .text-slate-300 {
-    color: #475569 !important;
+    color: #1e293b !important; /* Más oscuro (slate-800) */
   }
   :root.light .text-slate-400 {
-    color: #64748b !important;
+    color: #334155 !important; /* Más oscuro (slate-700) */
   }
   :root.light .text-slate-500 {
-    color: #64748b !important;
+    color: #334155 !important; /* Más oscuro (slate-700) */
   }
   :root.light .text-slate-600 {
-    color: #475569 !important;
+    color: #1e293b !important; /* Más oscuro (slate-800) */
   }
   :root.light .text-slate-700 {
-    color: #334155 !important;
+    color: #0f172a !important; /* Más oscuro (slate-900) */
   }
 
   /* ── Colores de marca con legibilidad en modo claro ──────── */
@@ -128,50 +146,100 @@
   :root.light .bg-black\/40,
   :root.light .bg-black\/20,
   :root.light .bg-black\/80 {
-    background-color: rgba(241, 245, 249, 0.9) !important;
+    background-color: #e2e8f0 !important; /* slate-200 */
   }
 
   :root.light .bg-white\/\[0\.01\],
   :root.light .bg-white\/\[0\.02\],
+  :root.light .bg-white\/\[0\.005\],
+  :root.light .bg-white\/5,
+  :root.light .bg-white\/10,
+  :root.light .bg-white\/\[0\.015\] {
+    background-color: #ffffff !important; /* blanco puro para destacar dentro de tarjetas grises */
+    border-color: #cbd5e1 !important; /* slate-300 */
+  }
+
   :root.light .bg-white\/\[0\.03\],
   :root.light .bg-white\/\[0\.04\],
-  :root.light .bg-white\/\[0\.05\],
-  :root.light .bg-white\/5 {
-    background-color: #f1f5f9 !important;
+  :root.light .bg-white\/\[0\.045\],
+  :root.light .bg-white\/\[0\.05\] {
+    background-color: #e2e8f0 !important; /* slate-200 - cards principales */
+    border-color: #cbd5e1 !important;
   }
 
   /* ── Hover de elementos interactivos claros ──────────────── */
   :root.light .hover\:bg-white\/\[0\.05\]:hover,
   :root.light .hover\:bg-white\/\[0\.03\]:hover,
   :root.light .hover\:bg-white\/\[0\.04\]:hover,
-  :root.light .hover\:bg-white\/5:hover {
-    background-color: #e2e8f0 !important;
+  :root.light .hover\:bg-white\/5:hover,
+  :root.light .hover\:bg-white\/10:hover,
+  :root.light .hover\:bg-white\/\[0\.02\]:hover {
+    background-color: #f8fafc !important; /* slate-50 */
+    border-color: #94a3b8 !important;
   }
 
   /* ── Bordes en modo claro ────────────────────────────────── */
   :root.light .border-white\/5,
+  :root.light .border-white\/\[0\.02\],
   :root.light .border-white\/\[0\.05\],
   :root.light .border-white\/10,
+  :root.light .border-white\/\[0\.1\],
+  :root.light .border-slate-200 {
+    border-color: #cbd5e1 !important; /* slate-300 */
+  }
   :root.light .border-white\/20,
-  :root.light .border-white\/\[0\.02\],
-  :root.light .border-white\/\[0\.1\] {
-    border-color: #cbd5e1 !important;
+  :root.light .border-white\/30,
+  :root.light .border-white\/40,
+  :root.light .border-white\/50,
+  :root.light .border-white\/\[0\.15\],
+  :root.light .border-white\/\[0\.2\],
+  :root.light .border-slate-300,
+  :root.light .border-slate-400 {
+    border-color: #94a3b8 !important; /* slate-400 */
+  }
+
+  /* ── Divisiones / Líneas delgadas en modo claro ──────────── */
+  :root.light [class*="divide-white"] > :not([hidden]) ~ :not([hidden]),
+  :root.light [class*="divide-slate"] > :not([hidden]) ~ :not([hidden]) {
+    border-color: #cbd5e1 !important; /* slate-300 */
   }
 
   /* ── Fondos sud-black ────────────────────────────────────── */
   :root.light .bg-sud-black {
-    background-color: #f8fafc !important;
+    background-color: #cbd5e1 !important; /* slate-300 */
   }
   :root.light .bg-sud-black\/80 {
-    background-color: rgba(248, 250, 252, 0.9) !important;
+    background-color: rgba(203, 213, 225, 0.9) !important;
   }
 
   /* ── Select / dropdown oscuro → claro ───────────────────── */
   :root.light select.bg-black,
   :root.light select {
     background-color: #ffffff !important;
-    border-color: #cbd5e1 !important;
+    border-color: #cbd5e1 !important; /* slate-300 */
     color: #0f172a !important;
+  }
+
+  /* ── Sidebar e ítems activos en modo claro ────────────────── */
+  :root.light .sud-glass-sidebar {
+    background-color: #ffffff !important;
+    border-right: 1px solid #cbd5e1 !important; /* slate-300 */
+    box-shadow: 4px 0 24px -5px rgba(0, 0, 0, 0.06) !important;
+  }
+  :root.light .light\:bg-slate-100 {
+    background-color: #e2e8f0 !important; /* slate-200 para ítems activos y bloque de usuario */
+  }
+  :root.light .light\:bg-white {
+    background-color: #e2e8f0 !important; /* slate-200 */
+  }
+  :root.light .light\:bg-slate-50 {
+    background-color: #ffffff !important; /* white for inner sections */
+  }
+  :root.light .light\:bg-slate-200 {
+    background-color: #cbd5e1 !important; /* slate-300 */
+  }
+  :root.light .light\:border-slate-200 {
+    border-color: #cbd5e1 !important; /* slate-300 */
   }
 
   /* ── Avatar inner bg-black ───────────────────────────────── */
@@ -199,4 +267,85 @@
     drop-shadow(0 -1px 0 rgba(2, 6, 23, 0.95))
     drop-shadow(0 1px 2px rgba(2, 6, 23, 0.75));
 }
+
+/* ── MEJORAS DE CONTRASTE EN MODO OSCURO (IPS/HDR) ── */
+:root:not(.light) {
+  /* Aumentar contraste del fondo base para que resalten más las tarjetas */
+  body,
+  html,
+  .bg-sud-black,
+  .bg-sud-dark,
+  .bg-\[\#0a0a0a\] {
+    background-color: #060606 !important;
+  }
+
+  /* Aumentar contraste de textos secundarios y etiquetas */
+  .text-slate-400 {
+    color: #a0aec0 !important; /* Más claro que slate-400 (#94a3b8) */
+  }
+  .text-slate-500 {
+    color: #8b9bb4 !important; /* Más claro que slate-500 (#64748b) */
+  }
+  .text-slate-600 {
+    color: #718096 !important; /* Más claro que slate-600 (#475569) */
+  }
+
+  /* Aumentar visibilidad de bordes sutiles y separadores */
+  .border-white\/5 {
+    border-color: rgba(255, 255, 255, 0.08) !important;
+  }
+  .border-white\/10 {
+    border-color: rgba(255, 255, 255, 0.16) !important;
+  }
+  .border-white\/20 {
+    border-color: rgba(255, 255, 255, 0.28) !important;
+  }
+
+  /* Aumentar contraste de fondos translúcidos en tarjetas y solapas */
+  .bg-white\/\[0\.01\] {
+    background-color: rgba(255, 255, 255, 0.02) !important;
+  }
+  .bg-white\/\[0\.02\] {
+    background-color: rgba(255, 255, 255, 0.035) !important;
+  }
+  .bg-white\/\[0\.03\] {
+    background-color: rgba(255, 255, 255, 0.045) !important;
+  }
+  .bg-white\/5 {
+    background-color: rgba(255, 255, 255, 0.055) !important;
+  }
+  .bg-white\/\[0\.005\] {
+    background-color: rgba(255, 255, 255, 0.015) !important;
+  }
+
+  /* ── Sidebar & Active items in Dark Mode ── */
+  .sud-glass-sidebar button {
+    transition-property: color, background-color, border-color, box-shadow !important;
+    transition-duration: 150ms !important; /* Hover responsivo */
+  }
+  .sud-glass-sidebar button.bg-white\/5.text-white {
+    background-color: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid rgba(45, 212, 191, 0.25) !important;
+    box-shadow: 0 0 15px -3px rgba(45, 212, 191, 0.22), 0 8px 16px -4px rgba(0, 0, 0, 0.6) !important;
+    transition: none !important; /* Cambio instantáneo de estado activo, evita retrasos en Framer Motion */
+  }
+  .sud-glass-sidebar button.bg-white\/5.text-white span {
+    color: #ffffff !important;
+  }
+
+  /* User profile box in Dark Mode */
+  .sud-glass-sidebar .bg-white\/2 {
+    background-color: rgba(255, 255, 255, 0.04) !important;
+    border: 1px solid rgba(255, 255, 255, 0.15) !important;
+    box-shadow: 0 8px 20px -4px rgba(0, 0, 0, 0.5) !important;
+    transition: all 0.3s ease !important;
+  }
+
+  /* Inactive sidebar items hover in Dark Mode */
+  .sud-glass-sidebar .hover\:bg-white\/\[0\.02\]:hover {
+    background-color: rgba(255, 255, 255, 0.035) !important;
+    color: #ffffff !important;
+  }
+}
+
 

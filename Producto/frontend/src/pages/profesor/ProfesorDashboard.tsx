@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { 
   LogOut, 
   GraduationCap, 
@@ -147,7 +148,25 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [anunciosError, setAnunciosError] = useState<string | null>(null);
   
   // Active View State ('dashboard' | 'alumnos' | 'agenda')
+  const [searchParams, setSearchParams] = useSearchParams();
+  const viewParam = searchParams.get('view');
   const [activeView, setActiveView] = useState<'dashboard' | 'alumnos' | 'agenda'>('dashboard');
+
+  // Sync activeView with viewParam query parameter
+  useEffect(() => {
+    if (viewParam === 'alumnos') {
+      setActiveView('alumnos');
+      setSelectedCurso(null);
+    } else if (viewParam === 'agenda') {
+      setActiveView('agenda');
+      setSelectedCurso(null);
+    } else {
+      setActiveView('dashboard');
+      if (viewParam === 'dashboard') {
+        setSelectedCurso(null);
+      }
+    }
+  }, [viewParam]);
   
   // Alumnos State
   const [alumnos, setAlumnos] = useState<ProfesorAlumnoDTO[]>([]);
@@ -366,7 +385,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
 
   // Click Handlers for Top Info Cards
   const handleMisCursosClick = () => {
-    setActiveView('dashboard');
+    setSearchParams({ view: 'dashboard' });
     if (displayCursos.length === 1) {
       setSelectedCurso(displayCursos[0]);
     } else {
@@ -395,11 +414,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   };
 
   const handleMisAlumnosClick = () => {
-    setActiveView('alumnos');
-    setSelectedCurso(null);
-    setSearchAlumnoQuery('');
-    setSelectedCursoFilter('todos');
-    fetchAlumnos();
+    setSearchParams({ view: 'alumnos' });
   };
 
   // Fetch Agenda Events
@@ -416,6 +431,25 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
       setLoadingAgenda(false);
     }
   };
+
+  // Trigger data fetching on activeView changes
+  useEffect(() => {
+    if (activeView === 'alumnos') {
+      setSearchAlumnoQuery('');
+      setSelectedCursoFilter('todos');
+      fetchAlumnos();
+    } else if (activeView === 'agenda') {
+      setEditingEvento(null);
+      setEventoCursoId(realCursos.length > 0 ? realCursos[0].id : '');
+      setEventoTitulo('');
+      setEventoDescripcion('');
+      setEventoFecha('');
+      setEventoHora('');
+      setEventoLink('');
+      setEventoError(null);
+      fetchAgenda();
+    }
+  }, [activeView, realCursos.length]);
 
   const handleStartEditEvento = (evt: AgendaEventoDTO) => {
     setEditingEvento(evt);
@@ -508,51 +542,13 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   };
 
   const handleMiAgendaClick = () => {
-    setActiveView('agenda');
-    setSelectedCurso(null);
-    setEditingEvento(null);
-    setEventoCursoId(realCursos.length > 0 ? realCursos[0].id : '');
-    setEventoTitulo('');
-    setEventoDescripcion('');
-    setEventoFecha('');
-    setEventoHora('');
-    setEventoLink('');
-    setEventoError(null);
-    fetchAgenda();
+    setSearchParams({ view: 'agenda' });
   };
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-slate-100 relative overflow-hidden flex flex-col justify-between">
-      {/* Background gradients */}
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-sud-turquoise/[0.03] blur-[150px] rounded-full -mr-48 -mt-48 pointer-events-none" />
-      <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-sud-orange/[0.02] blur-[150px] rounded-full -ml-48 -mb-48 pointer-events-none" />
-
-      {/* Navigation Header */}
-      <header className="border-b border-white/5 bg-black/30 backdrop-blur-md sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-sud-gradient p-[1px]">
-              <div className="w-full h-full rounded-[0.6rem] bg-black flex items-center justify-center">
-                <GraduationCap className="text-sud-turquoise" size={20} />
-              </div>
-            </div>
-            <div>
-              <span className="text-sm font-black tracking-tight text-white uppercase">SudTalent</span>
-              <span className="block text-[8px] text-sud-turquoise font-black uppercase tracking-widest -mt-1">Docentes</span>
-            </div>
-          </div>
-
-          <button
-            onClick={onLogout}
-            className="px-4 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-black uppercase tracking-widest text-slate-300 hover:text-white flex items-center gap-2 transition-all cursor-pointer"
-          >
-            <LogOut size={14} /> Cerrar Sesión
-          </button>
-        </div>
-      </header>
-
+    <div className="w-full relative">
       {/* Main Content Area */}
-      <main className="flex-1 max-w-5xl mx-auto px-6 py-12 z-10 w-full relative">
+      <div className="max-w-5xl mx-auto px-6 py-6 z-10 w-full relative">
         {/* Visual Toast Notification */}
         {toastMessage && (
           <div className="fixed top-24 right-6 md:right-12 z-[100] max-w-sm w-full bg-[#121212]/95 border border-sud-orange/30 backdrop-blur-md rounded-2xl p-4 shadow-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -1557,17 +1553,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
             </div>
           </div>
         )}
-      </main>
-
-      {/* Footer */}
-      <footer className="border-t border-white/5 py-6 bg-black/10 mt-12">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-[8px] text-slate-600 font-bold uppercase tracking-widest">
-            Uso Restringido © Sudamerican Voices 2026
-          </p>
-          <img src="/logos/LIBERA TU VOZ.png" alt="Libera tu voz" className="h-4 opacity-20" />
-        </div>
-      </footer>
+      </div>
       {/* ── Modal de Confirmación de Eliminación ─────────────────── */}
       <AnimatePresence>
         {deleteConfirmAnuncio && (

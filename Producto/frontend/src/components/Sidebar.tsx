@@ -17,12 +17,14 @@ import {
   Sun,
   Moon,
   Bell,
-  CheckCheck
+  CheckCheck,
+  Calendar
 } from 'lucide-react';
 import { NavItem } from './ui/NavItem';
 import { UserProfile, UserRole, Notificacion } from '../types';
 import { useTheme } from '../contexts/ThemeContext';
 import { notificacionService } from '../services/notificacionService';
+import { useLocation } from 'react-router-dom';
 
 interface SidebarProps {
   role: UserRole;
@@ -34,6 +36,8 @@ interface SidebarProps {
 
 export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: SidebarProps) {
   const { theme, toggleTheme } = useTheme();
+  const location = useLocation();
+  const activePath = location.pathname + location.search;
 
   // Notification States
   const [notifications, setNotifications] = React.useState<Notificacion[]>([]);
@@ -322,6 +326,27 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               onClick={() => onNavigate('/admin/settings')}
             />
           </>
+        ) : role === 'PROFESOR' ? (
+          <>
+            <NavItem 
+              icon={<BookOpen size={20} />} 
+              label="Mis Cursos" 
+              active={activePath === '/profesor?view=dashboard' || activePath === '/profesor' || activePath === '/profesor/'} 
+              onClick={() => onNavigate('/profesor?view=dashboard')}
+            />
+            <NavItem 
+              icon={<Users size={20} />} 
+              label="Mis Alumnos" 
+              active={activePath === '/profesor?view=alumnos'} 
+              onClick={() => onNavigate('/profesor?view=alumnos')}
+            />
+            <NavItem 
+              icon={<Calendar size={20} />} 
+              label="Mi Agenda" 
+              active={activePath === '/profesor?view=agenda'} 
+              onClick={() => onNavigate('/profesor?view=agenda')}
+            />
+          </>
         ) : (
           <>
             <NavItem 
@@ -377,7 +402,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
           </div>
           <div className="truncate flex-1 min-w-0 space-y-0.5">
             <p className="text-sm font-black truncate text-white light:text-slate-900 uppercase tracking-tight">
-              {user?.name || (role === 'ADMIN' ? 'Admin' : 'Alumno')}
+              {user?.name || (role === 'ADMIN' ? 'Admin' : role === 'PROFESOR' ? 'Profesor' : 'Alumno')}
             </p>
             {user?.phone && (
               <p className="text-[12px] text-slate-500 truncate font-mono">

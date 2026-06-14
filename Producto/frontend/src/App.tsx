@@ -256,7 +256,9 @@ function AppRoutes() {
           {/* ── Profesor Routes ──────────────────────────────── */}
           <Route path="/profesor" element={
             <ProtectedRoute user={currentUser} role={role} allowedRoles={['PROFESOR']} loading={loading}>
-              <ProfesorDashboard user={currentUser!} onLogout={logout} />
+              <MainLayout user={currentUser} role="PROFESOR" onLogout={logout}>
+                <ProfesorDashboard user={currentUser!} onLogout={logout} />
+              </MainLayout>
             </ProtectedRoute>
           } />
 

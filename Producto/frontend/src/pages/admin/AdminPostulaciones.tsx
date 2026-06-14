@@ -48,6 +48,25 @@ export function AdminPostulaciones() {
   const [submittingSchedule, setSubmittingSchedule] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
+  // Toast Message State
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Canceling Audicion Modal State
+  const [cancelingAudicionId, setCancelingAudicionId] = useState<string | null>(null);
+
+  // Refs for Date and Time pickers
+  const dateRef = React.useRef<HTMLInputElement>(null);
+  const timeRef = React.useRef<HTMLInputElement>(null);
+
+  // Auto-hide toast message
+  useEffect(() => {
+    if (!toastMessage) return;
+    const timer = setTimeout(() => {
+      setToastMessage(null);
+    }, 4000);
+    return () => clearTimeout(timer);
+  }, [toastMessage]);
+
   // ── Load data ────────────────────────────────────────────────────────
   useEffect(() => {
     loadData();
@@ -115,7 +134,7 @@ export function AdminPostulaciones() {
     } catch (err: any) {
       // Revert on failure
       setPostulaciones(prev => prev.map(p => p.id === postId ? { ...p, estado: oldStatus } : p));
-      alert(err.message || 'Error al actualizar el estado.');
+      setToastMessage(err.message || 'Error al actualizar el estado.');
     } finally {
       setUpdatingIds(prev => {
         const next = { ...prev };
@@ -134,14 +153,17 @@ export function AdminPostulaciones() {
   }), [postulaciones]);
 
   // ── Audicion Actions ─────────────────────────────────────────────────
-  const handleCancelarAudicion = async (audicionId: string) => {
-    if (!window.confirm('¿Está seguro de que desea cancelar esta audición?')) return;
+  const handleCancelarAudicion = (audicionId: string) => {
+    setCancelingAudicionId(audicionId);
+  };
+
+  const executeCancelarAudicion = async (audicionId: string) => {
     try {
       await audicionService.cancelarAudicion(audicionId);
       await loadData(true);
-      alert('Audición cancelada con éxito.');
+      setToastMessage('Audición cancelada con éxito.');
     } catch (err: any) {
-      alert(err.message || 'Error al cancelar la audición.');
+      setToastMessage(err.message || 'Error al cancelar la audición.');
     }
   };
 
@@ -198,9 +220,9 @@ export function AdminPostulaciones() {
 
       setShowScheduleModal(false);
       await loadData(true);
-      alert('¡Audición programada correctamente!');
+      setToastMessage('Audición programada correctamente');
     } catch (err: any) {
-      setFormError(err.message || 'Error al programar la audición.');
+      setFormError(err.message || 'No se pudo programar la audición. Intenta nuevamente.');
     } finally {
       setSubmittingSchedule(false);
     }
@@ -227,6 +249,23 @@ export function AdminPostulaciones() {
 
   return (
     <div className="space-y-8">
+      {/* Visual Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-24 right-6 md:right-12 z-[100] max-w-sm w-full bg-[#121212]/95 border border-sud-orange/30 backdrop-blur-md rounded-2xl p-4 shadow-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
+          <AlertCircle className="text-sud-orange shrink-0 mt-0.5" size={16} />
+          <div className="flex-1">
+            <p className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Notificación</p>
+            <p className="text-xs text-white leading-relaxed mt-1">{toastMessage}</p>
+          </div>
+          <button
+            onClick={() => setToastMessage(null)}
+            className="text-slate-500 hover:text-white p-0.5 rounded transition-colors cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Header */}
       <header>
         <h2 className="text-3xl font-black tracking-tighter text-white">Gestión de <span className="sud-vibrant-text-gradient uppercase tracking-widest">Postulaciones</span></h2>
@@ -538,9 +577,17 @@ export function AdminPostulaciones() {
               </button>
               
               <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Programar Audición</h3>
-              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-6">
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-4">
                 Postulante: {selectedPostulacion.userName}
               </p>
+
+              {/* Explicación breve de qué es una audición */}
+              <div className="mb-6 p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex gap-3 text-[10px] text-slate-400 leading-relaxed">
+                <AlertCircle className="text-sud-orange shrink-0 mt-0.5" size={14} />
+                <p>
+                  La audición es una evaluación complementaria de la postulación. El profesor asignado revisará al postulante y registrará un puntaje, resultado y observaciones para apoyar la decisión final del administrador.
+                </p>
+              </div>
 
               {formError && (
                 <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold">
@@ -571,21 +618,45 @@ export function AdminPostulaciones() {
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Fecha *</label>
-                    <input
-                      type="date"
-                      value={scheduleFecha}
-                      onChange={e => setScheduleFecha(e.target.value)}
-                      className="sud-input w-full"
-                    />
+                    <div className="relative cursor-pointer">
+                      <Calendar size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        ref={dateRef}
+                        type="date"
+                        value={scheduleFecha}
+                        onChange={e => setScheduleFecha(e.target.value)}
+                        onClick={() => {
+                          try {
+                            dateRef.current?.showPicker();
+                          } catch (err) {
+                            console.warn("showPicker no soportado:", err);
+                          }
+                        }}
+                        style={{ colorScheme: 'dark' }}
+                        className="sud-input w-full text-xs py-2.5 pl-9 pr-3.5 bg-black/50 text-white cursor-pointer"
+                      />
+                    </div>
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Hora *</label>
-                    <input
-                      type="time"
-                      value={scheduleHora}
-                      onChange={e => setScheduleHora(e.target.value)}
-                      className="sud-input w-full"
-                    />
+                    <div className="relative cursor-pointer">
+                      <Clock size={12} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                      <input
+                        ref={timeRef}
+                        type="time"
+                        value={scheduleHora}
+                        onChange={e => setScheduleHora(e.target.value)}
+                        onClick={() => {
+                          try {
+                            timeRef.current?.showPicker();
+                          } catch (err) {
+                            console.warn("showPicker no soportado:", err);
+                          }
+                        }}
+                        style={{ colorScheme: 'dark' }}
+                        className="sud-input w-full text-xs py-2.5 pl-9 pr-3.5 bg-black/50 text-white cursor-pointer"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -638,6 +709,48 @@ export function AdminPostulaciones() {
                   <span>Programar Audición</span>
                 </button>
               </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Modal Confirmación de Cancelación */}
+      <AnimatePresence>
+        {cancelingAudicionId && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="relative max-w-sm w-full bg-[#0f0f0f] border border-white/10 rounded-3xl p-6 space-y-6 text-center shadow-2xl"
+            >
+              <div className="w-12 h-12 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 flex items-center justify-center mx-auto animate-pulse">
+                <AlertCircle size={24} />
+              </div>
+              <div className="space-y-2">
+                <h4 className="text-lg font-black text-white uppercase tracking-tight">¿Cancelar Audición?</h4>
+                <p className="text-slate-400 text-xs leading-relaxed">Esta acción cancelará la audición programada y no se puede deshacer.</p>
+              </div>
+              <div className="flex gap-3 justify-center">
+                <button
+                  type="button"
+                  onClick={() => setCancelingAudicionId(null)}
+                  className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-white/5 border border-white/10 text-slate-400 hover:bg-white/10 transition-all cursor-pointer"
+                >
+                  Atrás
+                </button>
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const id = cancelingAudicionId;
+                    setCancelingAudicionId(null);
+                    await executeCancelarAudicion(id);
+                  }}
+                  className="px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest bg-red-500/20 border border-red-500/30 text-red-400 hover:bg-red-500/30 transition-all cursor-pointer"
+                >
+                  Confirmar Cancelación
+                </button>
+              </div>
             </motion.div>
           </div>
         )}

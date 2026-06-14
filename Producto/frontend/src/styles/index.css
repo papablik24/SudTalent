@@ -348,4 +348,88 @@
   }
 }
 
+/* ── Notification Bell Animation ── */
+@keyframes swing {
+  0%, 100% { transform: rotate(0); }
+  20% { transform: rotate(15deg); }
+  40% { transform: rotate(-10deg); }
+  60% { transform: rotate(5deg); }
+  80% { transform: rotate(-5deg); }
+}
+.animate-swing {
+  animation: swing 1.5s ease infinite;
+  transform-origin: top center;
+}
 
+/* ── Glow / Borde con colores SudTalent para campana con no leídas ── */
+.sud-bell-unread {
+  border: 1px solid rgba(45, 212, 191, 0.5) !important;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  box-shadow: 0 0 12px rgba(45, 212, 191, 0.25) !important;
+  color: #2dd4bf !important;
+}
+:root.light .sud-bell-unread {
+  border: 1px solid rgba(13, 148, 136, 0.5) !important;
+  background-color: #ffffff !important;
+  box-shadow: 0 0 10px rgba(13, 148, 136, 0.15) !important;
+  color: #0d9488 !important;
+}
+
+/* ── Estilos de tarjetas de notificación (Leídas vs No Leídas) ── */
+.notification-unread {
+  position: relative;
+  background-color: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(45, 212, 191, 0.3) !important;
+  box-shadow: 0 4px 10px rgba(45, 212, 191, 0.08) !important;
+  padding-left: 14px !important;
+  transition: all 0.2s ease;
+}
+:root.light .notification-unread {
+  background-color: #ffffff !important;
+  border: 1px solid rgba(13, 148, 136, 0.3) !important;
+  box-shadow: 0 4px 8px rgba(13, 148, 136, 0.06) !important;
+  padding-left: 14px !important;
+  transition: all 0.2s ease;
+}
+
+/* Borde lateral izquierdo con gradiente */
+.notification-unread::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  border-radius: 4px 0 0 4px;
+  background: linear-gradient(to bottom, #fbbf24, #2dd4bf, #2563eb);
+}
+:root.light .notification-unread::before {
+  background: linear-gradient(to bottom, #d97706, #0d9488, #2563eb);
+}
+
+.notification-read {
+  background-color: rgba(255, 255, 255, 0.01) !important;
+  border: 1px solid rgba(255, 255, 255, 0.04) !important;
+  opacity: 0.65;
+  padding-left: 14px !important;
+  transition: all 0.2s ease;
+}
+:root.light .notification-read {
+  background-color: rgba(241, 245, 249, 0.45) !important;
+  border: 1px solid rgba(203, 213, 225, 0.5) !important;
+  opacity: 0.75;
+  padding-left: 14px !important;
+  transition: all 0.2s ease;
+}
+
+/* Badge NUEVA con gradiente de marca */
+.badge-new {
+  background: linear-gradient(to right, #fbbf24, #2dd4bf, #2563eb) !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+:root.light .badge-new {
+  background: linear-gradient(to right, #d97706, #0d9488, #2563eb) !important;
+  color: #ffffff !important;
+  font-weight: 900 !important;
+}

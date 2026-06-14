@@ -23,6 +23,7 @@ public class AnuncioService {
     private final AnuncioRepository anuncioRepository;
     private final CursoRepository cursoRepository;
     private final UserRepository userRepository;
+    private final NotificacionService notificacionService;
 
     public List<AnuncioDTO> getAnunciosByCurso(UUID cursoId) {
         return anuncioRepository.findByCursoIdOrderByCreatedAtDesc(cursoId)
@@ -54,7 +55,30 @@ public class AnuncioService {
                 .urlRecurso(urlRecurso != null && !urlRecurso.isBlank() ? urlRecurso.trim() : null)
                 .build();
 
-        return toDTO(anuncioRepository.save(anuncio));
+        Anuncio saved = anuncioRepository.save(anuncio);
+
+        try {
+            if (curso.getAlumnos() != null) {
+                for (Curso.CursoAlumno ca : curso.getAlumnos()) {
+                    if (ca.getAlumnoId() != null && !ca.getAlumnoId().equals(autorId)) {
+                        userRepository.findByIdActive(ca.getAlumnoId()).ifPresent(student -> {
+                            notificacionService.crearNotificacion(
+                                    student,
+                                    "Nueva publicación en " + curso.getTitulo(),
+                                    "Se publicó '" + saved.getTitulo() + "' en el tablón del curso.",
+                                    "CURSO",
+                                    saved.getId(),
+                                    "CURSO"
+                            );
+                        });
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error enviando notificaciones de anuncio: " + e.getMessage());
+        }
+
+        return toDTO(saved);
     }
 
     public void deleteAnuncio(UUID anuncioId, UUID autorId) {

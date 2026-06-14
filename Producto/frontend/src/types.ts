@@ -213,3 +213,14 @@ export interface CursoDTO {
   updatedAt: string;
 }
 
+export interface Notificacion {
+  id: string;
+  titulo: string;
+  mensaje: string;
+  tipo: 'POSTULACION' | 'CURSO' | 'AGENDA';
+  leido: boolean;
+  fechaCreacion: string;
+  referenciaId?: string;
+  referenciaTipo?: string;
+}
+

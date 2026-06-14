@@ -1,10 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Baby, AudioLines, Settings, Trash2, Loader, Camera, Phone, Mail, Calendar, Sparkles } from 'lucide-react';
+import { User, Baby, AudioLines, Settings, Loader, Camera, Phone, Mail, Calendar, Sparkles } from 'lucide-react';
 import { UserProfile, TalentProfile } from '../../types';
-import { audioService } from '../../services/audioService';
 import { fetchAPI } from '../../services/backendService';
-import { AudioPlayer } from '../../components/ui/AudioPlayer';
-import { AudioDropZone } from '../../components/ui/AudioDropZone';
 import { InstagramFeed } from '../../components/InstagramFeed';
 
 interface UserProfileViewProps {
@@ -32,16 +29,16 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  // Audio de perfil — estados del flujo
-  const [profileAudio, setProfileAudio] = useState<string | null>(null);
-  const [pendingAudio, setPendingAudio] = useState<string | null>(null); // audio subido pero sin confirmar
-  const [isUploadingAudio, setIsUploadingAudio] = useState(false);
-  const [audioError, setAudioError] = useState<string | null>(null);
-  const [isLoadingAudio, setIsLoadingAudio] = useState(true);
-  const [showAudioManager, setShowAudioManager] = useState(false); // panel de gestión
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-
+  // Avatar Cropping states
+  const [cropModalOpen, setCropModalOpen] = useState(false);
+  const [cropImageSrc, setCropImageSrc] = useState<string | null>(null);
+  const [cropFileObject, setCropFileObject] = useState<File | null>(null);
+  const [zoom, setZoom] = useState(1);
+  const [position, setPosition] = useState({ x: 0, y: 0 });
+  const [imgSize, setImgSize] = useState({ width: 0, height: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStart = useRef({ x: 0, y: 0 });
+  const positionStart = useRef({ x: 0, y: 0 });
   // Sincronizar editData cuando cambia el usuario
   useEffect(() => {
     setEditData({
@@ -93,30 +90,6 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
     }
   }, [user.uid]);
 
-  // Cargar audio del perfil
-  useEffect(() => {
-    const loadProfileAudio = async () => {
-      try {
-        setIsLoadingAudio(true);
-        const token = localStorage.getItem('sud_jwt_token');
-        if (!token) { setIsLoadingAudio(false); return; }
-        const audios = await audioService.getUserAudios(token, 'profile');
-        if (audios && audios.length > 0) {
-          setProfileAudio(audios[0].fileUrl);
-          localStorage.setItem(`profileAudio_${user.uid}`, audios[0].fileUrl);
-        } else {
-          const saved = localStorage.getItem(`profileAudio_${user.uid}`);
-          if (saved) setProfileAudio(saved);
-        }
-      } catch {
-        const saved = localStorage.getItem(`profileAudio_${user.uid}`);
-        if (saved) setProfileAudio(saved);
-      } finally {
-        setIsLoadingAudio(false);
-      }
-    };
-    loadProfileAudio();
-  }, [user.uid]);
 
   // ─── Guardar perfil en backend ────────────────────────────────
   const handleSave = async () => {
@@ -174,15 +147,10 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
   };
 
   // ─── Upload avatar ────────────────────────────────────────────
-  const handleAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const performAvatarUpload = async (file: File) => {
     setAvatarError(null);
     setIsUploadingAvatar(true);
     try {
-      if (!file.type.startsWith('image/')) throw new Error('Solo se permiten imágenes');
-      if (file.size > 5 * 1024 * 1024) throw new Error('La imagen no puede superar 5MB');
-
       const token = localStorage.getItem('sud_jwt_token');
       if (!token) throw new Error('No hay sesión activa');
 
@@ -214,231 +182,119 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
       setAvatarError(err?.message || 'Error al subir la imagen');
     } finally {
       setIsUploadingAvatar(false);
+    }
+  };
+
+  const clampPosition = (x: number, y: number, currentZoom: number) => {
+    if (imgSize.width === 0) return { x, y };
+    const renderW = imgSize.width * currentZoom;
+    const renderH = imgSize.height * currentZoom;
+    const minX = 280 - renderW;
+    const minY = 280 - renderH;
+    
+    return {
+      x: Math.min(0, Math.max(minX, x)),
+      y: Math.min(0, Math.max(minY, y))
+    };
+  };
+
+  useEffect(() => {
+    if (imgSize.width === 0) return;
+    setPosition(prev => clampPosition(prev.x, prev.y, zoom));
+  }, [zoom, imgSize.width, imgSize.height]);
+
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setIsDragging(true);
+    dragStart.current = { x: e.clientX, y: e.clientY };
+    positionStart.current = { ...position };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isDragging) return;
+    const deltaX = e.clientX - dragStart.current.x;
+    const deltaY = e.clientY - dragStart.current.y;
+    
+    const targetX = positionStart.current.x + deltaX;
+    const targetY = positionStart.current.y + deltaY;
+    
+    setPosition(clampPosition(targetX, targetY, zoom));
+  };
+
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (isDragging) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+      setIsDragging(false);
+    }
+  };
+
+  const handleAvatarSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarError(null);
+    try {
+      if (!file.type.startsWith('image/')) throw new Error('Solo se permiten imágenes');
+      if (file.size > 5 * 1024 * 1024) throw new Error('La imagen no puede superar 5MB');
+
+      setCropFileObject(file);
+      const reader = new FileReader();
+      reader.onload = () => {
+        setCropImageSrc(reader.result as string);
+        setCropModalOpen(true);
+        setZoom(1);
+        setPosition({ x: 0, y: 0 });
+      };
+      reader.readAsDataURL(file);
+    } catch (err: any) {
+      setAvatarError(err?.message || 'Error al seleccionar la imagen');
       if (avatarInputRef.current) avatarInputRef.current.value = '';
     }
   };
 
-  // ─── Audio handlers ───────────────────────────────────────────
-  const handleAudioUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setAudioError(null);
-    setIsUploadingAudio(true);
-    try {
-      if (!file.type.includes('audio')) throw new Error('Por favor selecciona un archivo de audio');
-      if (file.size / (1024 * 1024) > 10) throw new Error('El archivo es muy grande. Máximo 10MB');
-      const token = localStorage.getItem('sud_jwt_token');
-      if (!token) throw new Error('No hay sesión activa');
-      const result = await audioService.uploadAudio(file, 'profile', token);
-      // Guardar como pendiente — esperar confirmación del usuario
-      setPendingAudio(result.fileUrl);
-      localStorage.setItem(`profileAudio_${user.uid}`, result.fileUrl);
-    } catch (err: any) {
-      setAudioError(err instanceof Error ? err.message : 'Error desconocido');
-    } finally {
-      setIsUploadingAudio(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
+  const handleCropCancel = () => {
+    setCropModalOpen(false);
+    setCropImageSrc(null);
+    setCropFileObject(null);
+    if (avatarInputRef.current) avatarInputRef.current.value = '';
   };
 
-  const handleConfirmAudio = () => {
-    if (!pendingAudio) return;
-    setProfileAudio(pendingAudio);
-    setPendingAudio(null);
-    setShowAudioManager(false);
-  };
+  const handleCropSave = () => {
+    if (!cropImageSrc) return;
+    const img = new Image();
+    img.src = cropImageSrc;
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      canvas.width = 400;
+      canvas.height = 400;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
 
-  const handleCancelPendingAudio = async () => {
-    // Eliminar el audio recién subido si el usuario cancela
-    if (pendingAudio) {
-      try {
-        const token = localStorage.getItem('sud_jwt_token');
-        if (token) {
-          const audios = await audioService.getUserAudios(token, 'profile');
-          // Eliminar solo el que coincide con pendingAudio
-          const match = audios?.find((a: any) => a.fileUrl === pendingAudio);
-          if (match) await audioService.deleteAudio(match.id, token);
-        }
-      } catch { /* silencioso */ }
-    }
-    setPendingAudio(null);
-    setAudioError(null);
-  };
+      const scaleCanvas = 400 / 280;
+      const canvasW = imgSize.width * zoom * scaleCanvas;
+      const canvasH = imgSize.height * zoom * scaleCanvas;
+      
+      const drawX = position.x * scaleCanvas;
+      const drawY = position.y * scaleCanvas;
 
-  const handleDeleteAudio = async () => {
-    if (!profileAudio) return;
-    setConfirmingDelete(false);
-    setIsUploadingAudio(true);
-    try {
-      const token = localStorage.getItem('sud_jwt_token');
-      if (!token) throw new Error('No hay sesión activa');
-      const audios = await audioService.getUserAudios(token, 'profile');
-      if (audios?.length > 0) {
-        await audioService.deleteAudio(audios[0].id, token);
-        setProfileAudio(null);
-        setShowAudioManager(false);
-        localStorage.removeItem(`profileAudio_${user.uid}`);
-      }
-    } catch { setAudioError('Error al eliminar el audio'); }
-    finally { setIsUploadingAudio(false); }
+      // Limpiar canvas a negro
+      ctx.fillStyle = '#000000';
+      ctx.fillRect(0, 0, 400, 400);
+
+      ctx.drawImage(img, drawX, drawY, canvasW, canvasH);
+
+      canvas.toBlob((blob) => {
+        if (!blob) return;
+        const filename = cropFileObject?.name || 'avatar.jpg';
+        const croppedFile = new File([blob], filename, { type: 'image/jpeg' });
+        performAvatarUpload(croppedFile);
+        handleCropCancel();
+      }, 'image/jpeg', 0.9);
+    };
   };
 
   return (
     <div className="space-y-10">
-
-      {/* ── Audio de Perfil ── */}
-      <section className="relative bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-        <div className="flex items-center gap-3">
-          <AudioLines className="text-sud-orange" size={24} />
-          <h3 className="text-xl font-black uppercase tracking-tighter text-white">Audio de Perfil</h3>
-        </div>
-
-        {/* Botón de gestión — esquina superior derecha de la sección, solo cuando hay audio */}
-        {profileAudio && !isLoadingAudio && (
-          <button
-            onClick={() => { setShowAudioManager(v => !v); setAudioError(null); setConfirmingDelete(false); }}
-            className={`absolute top-6 right-6 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${showAudioManager ? 'bg-white/20 text-white' : 'bg-white/5 hover:bg-white/15 text-slate-500 hover:text-slate-300'}`}
-            title="Gestionar audio"
-          >
-            <Settings size={14} />
-          </button>
-        )}
-
-        {isLoadingAudio ? (
-          /* ── Cargando ── */
-          <div className="flex items-center justify-center py-8">
-            <div className="w-8 h-8 border-2 border-sud-orange/30 border-t-sud-orange rounded-full animate-spin" />
-          </div>
-
-        ) : pendingAudio ? (
-          /* ── Estado 2: Audio subido, esperando confirmación ── */
-          <div className="space-y-4">
-            <div className="p-4 rounded-2xl bg-sud-orange/10 border border-sud-orange/20">
-              <p className="text-[10px] font-black uppercase tracking-widest text-sud-orange mb-3 flex items-center gap-2">
-                <span className="w-2 h-2 bg-sud-orange rounded-full animate-pulse" />
-                Previsualiza tu audio antes de confirmar
-              </p>
-              <AudioPlayer src={pendingAudio} title="Audio nuevo" showVolume />
-            </div>
-
-            {audioError && (
-              <p className="text-red-400 text-xs font-bold px-1">{audioError}</p>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleConfirmAudio}
-                disabled={isUploadingAudio}
-                className="flex-1 py-3 bg-sud-orange hover:bg-sud-orange/80 disabled:opacity-50 text-black font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all"
-              >
-                ✓ Confirmar Audio
-              </button>
-              <button
-                onClick={handleCancelPendingAudio}
-                disabled={isUploadingAudio}
-                className="flex-1 py-3 bg-white/5 hover:bg-white/10 disabled:opacity-50 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-2xl transition-all"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-
-        ) : profileAudio ? (
-          /* ── Estado 3: Audio confirmado ── */
-          <div className="space-y-4">
-          {/* Player principal */}
-            <div className="relative">
-              <AudioPlayer
-                src={profileAudio}
-                title="Mi audio de perfil"
-                showVolume
-                onDownload={() => audioService.downloadAudio(profileAudio, 'mi-audio.mp3')}
-              />
-            </div>
-
-            {/* Panel de gestión */}
-            {showAudioManager && (
-              <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-5 space-y-4">
-
-                {audioError && (
-                  <p className="text-red-400 text-xs font-bold">{audioError}</p>
-                )}
-
-                {/* Cambiar audio */}
-                <div>
-                  <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2">Reemplazar audio</p>
-                  <AudioDropZone
-                    file={null}
-                    isUploading={isUploadingAudio}
-                    error={null}
-                    onFileSelected={(file) => {
-                      const dt = new DataTransfer(); dt.items.add(file);
-                      handleAudioUpload({ target: { files: dt.files } } as any);
-                    }}
-                    hint="Sube un nuevo archivo para reemplazar el actual"
-                  />
-                </div>
-
-                {/* Eliminar */}
-                <div className="pt-2 border-t border-white/5">
-                  {!confirmingDelete ? (
-                    <button
-                      onClick={() => setConfirmingDelete(true)}
-                      disabled={isUploadingAudio}
-                      className="flex items-center gap-2 px-4 py-2.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 disabled:opacity-50 text-red-400 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all"
-                    >
-                      <Trash2 size={13} /> Eliminar audio
-                    </button>
-                  ) : (
-                    <div className="space-y-2">
-                      <p className="text-[10px] text-red-400 font-black uppercase tracking-widest">
-                        ¿Seguro que quieres eliminar tu audio de perfil?
-                      </p>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleDeleteAudio}
-                          disabled={isUploadingAudio}
-                          className="px-4 py-2 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-black text-[10px] uppercase tracking-widest rounded-xl transition-all flex items-center gap-2"
-                        >
-                          {isUploadingAudio ? <Loader size={12} className="animate-spin" /> : <Trash2 size={12} />}
-                          Sí, eliminar
-                        </button>
-                        <button
-                          onClick={() => setConfirmingDelete(false)}
-                          className="px-4 py-2 bg-white/5 hover:bg-white/10 text-slate-400 font-black text-[10px] uppercase tracking-widest rounded-xl transition-all"
-                        >
-                          Cancelar
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-          </div>
-
-        ) : (
-          /* ── Estado 1: Sin audio ── */
-          <div className="space-y-3">
-            <p className="text-[10px] text-slate-600 uppercase font-black tracking-widest">
-              Sube tu audio de presentación
-            </p>
-            <AudioDropZone
-              file={null}
-              isUploading={isUploadingAudio}
-              error={audioError}
-              onFileSelected={(file) => {
-                const dt = new DataTransfer(); dt.items.add(file);
-                handleAudioUpload({ target: { files: dt.files } } as any);
-              }}
-              hint="MP3 o WAV · Máximo 10MB"
-            />
-          </div>
-        )}
-
-        <input ref={fileInputRef} type="file" accept="audio/mpeg,audio/wav,.mp3,.wav"
-          onChange={handleAudioUpload} disabled={isUploadingAudio} className="hidden" />
-      </section>
 
       {/* ── Header con foto de perfil ── */}
       <section className="relative rounded-[3rem] overflow-hidden bg-black light:bg-white border border-white/10 light:border-slate-200 shadow-2xl light:shadow-md">
@@ -469,7 +325,7 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
                 : <Camera size={16} className="text-white" />}
             </button>
             <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
-              onChange={handleAvatarUpload} disabled={isUploadingAvatar} className="hidden" />
+              onChange={handleAvatarSelect} disabled={isUploadingAvatar} className="hidden" />
           </div>
 
           {avatarError && (
@@ -676,6 +532,102 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
 
       {/* ── Feed de Instagram ── */}
       <InstagramFeed />
+
+      {/* ── Modal de Ajuste de Foto de Perfil ── */}
+      {cropModalOpen && cropImageSrc && (
+        <div className="fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center z-[100] p-4">
+          <div className="bg-[#0f0f0f] border border-white/10 rounded-[2.5rem] p-6 max-w-sm w-full space-y-6 shadow-2xl">
+            <div className="space-y-1">
+              <h3 className="text-xs font-black text-white uppercase tracking-wider text-center">
+                Ajustar foto de perfil
+              </h3>
+              <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest text-center">
+                Arrastra la imagen para encuadrarla
+              </p>
+            </div>
+
+            {/* Contenedor de encuadre */}
+            <div 
+              onPointerDown={handlePointerDown}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
+              className={`relative w-[280px] h-[280px] rounded-[2rem] border border-white/10 bg-black mx-auto overflow-hidden flex items-center justify-center select-none touch-none ${
+                isDragging ? 'cursor-grabbing' : 'cursor-grab'
+              }`}
+            >
+              <img
+                src={cropImageSrc}
+                alt="Vista previa"
+                onLoad={(e) => {
+                  const img = e.currentTarget;
+                  const aspect = img.naturalWidth / img.naturalHeight;
+                  let w = 280;
+                  let h = 280;
+                  if (aspect > 1) {
+                    w = 280 * aspect;
+                  } else {
+                    h = 280 / aspect;
+                  }
+                  setImgSize({ width: w, height: h });
+                  
+                  // Center by default
+                  const defaultX = -Math.max(0, (w - 280) / 2);
+                  const defaultY = -Math.max(0, (h - 280) / 2);
+                  setPosition({ x: defaultX, y: defaultY });
+                }}
+                style={{
+                  position: 'absolute',
+                  width: `${imgSize.width * zoom}px`,
+                  height: `${imgSize.height * zoom}px`,
+                  left: `${position.x}px`,
+                  top: `${position.y}px`,
+                  maxWidth: 'none',
+                  maxHeight: 'none',
+                  pointerEvents: 'none',
+                }}
+              />
+              {/* Máscara de avatar circular para visualización del corte final */}
+              <div className="absolute inset-0 rounded-[2rem] border-4 border-sud-turquoise/40 pointer-events-none" />
+            </div>
+
+            {/* Controles de Zoom */}
+            <div className="space-y-4">
+              <div className="space-y-1">
+                <div className="flex justify-between text-[8px] text-slate-500 font-black uppercase tracking-wider">
+                  <span>Ajusta el zoom</span>
+                  <span>{Math.round(zoom * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min="1"
+                  max="3"
+                  step="0.05"
+                  value={zoom}
+                  onChange={e => setZoom(parseFloat(e.target.value))}
+                  className="w-full accent-sud-turquoise h-1 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                />
+              </div>
+            </div>
+
+            {/* Botones de acción */}
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={handleCropCancel}
+                className="flex-1 py-3.5 bg-white/5 hover:bg-white/10 text-slate-400 hover:text-white font-black text-[9px] uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={handleCropSave}
+                className="flex-1 py-3.5 bg-sud-orange hover:bg-sud-orange/80 text-black font-black text-[9px] uppercase tracking-widest rounded-2xl transition-all cursor-pointer"
+              >
+                Guardar foto
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

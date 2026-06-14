@@ -28,6 +28,7 @@ public class PostulacionService {
     private final PostulacionRepository postulacionRepository;
     private final SoftDeleteService softDeleteService;
     private final UserRepository userRepository;
+    private final NotificacionService notificacionService;
 
     @PersistenceContext
     private EntityManager entityManager;
@@ -148,8 +149,11 @@ public class PostulacionService {
             }
         }
 
-        if (nuevoEstado != null) {
+        boolean estadoCambiado = false;
+        String estadoAnterior = postulacion.getEstado();
+        if (nuevoEstado != null && !nuevoEstado.equals(estadoAnterior)) {
             postulacion.setEstado(nuevoEstado);
+            estadoCambiado = true;
         }
         if (nuevoMensaje != null) {
             postulacion.setMensaje(nuevoMensaje);
@@ -161,7 +165,24 @@ public class PostulacionService {
             }
             postulacion.setVoiceAudio(audioRef);
         }
-        return toDTO(postulacionRepository.save(postulacion));
+
+        Postulacion saved = postulacionRepository.save(postulacion);
+        if (estadoCambiado && saved.getAlumno() != null) {
+            try {
+                String convTitulo = saved.getConvocatoria() != null ? saved.getConvocatoria().getTitulo() : "Convocatoria";
+                notificacionService.crearNotificacion(
+                        saved.getAlumno(),
+                        "Estado de postulación actualizado",
+                        "Tu postulación a '" + convTitulo + "' cambió a: " + nuevoEstado + ".",
+                        "POSTULACION",
+                        saved.getId(),
+                        "POSTULACION"
+                );
+            } catch (Exception e) {
+                System.err.println("Error enviando notificación de postulación: " + e.getMessage());
+            }
+        }
+        return toDTO(saved);
     }
 
     // ── Delete ───────────────────────────────────────────────────────────

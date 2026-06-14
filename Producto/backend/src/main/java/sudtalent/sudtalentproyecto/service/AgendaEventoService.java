@@ -25,6 +25,7 @@ public class AgendaEventoService {
     private final AgendaEventoRepository agendaEventoRepository;
     private final CursoRepository cursoRepository;
     private final UserRepository userRepository;
+    private final NotificacionService notificacionService;
 
     public List<AgendaEventoDTO> getAgendaByProfesor(UUID profesorId) {
         return agendaEventoRepository.findByProfesorIdOrderByFechaAscHoraAsc(profesorId)
@@ -93,7 +94,30 @@ public class AgendaEventoService {
                 .link(link != null && !link.isBlank() ? link.trim() : null)
                 .build();
 
-        return toDTO(agendaEventoRepository.save(evento));
+        AgendaEvento saved = agendaEventoRepository.save(evento);
+
+        try {
+            if (curso.getAlumnos() != null) {
+                for (Curso.CursoAlumno ca : curso.getAlumnos()) {
+                    if (ca.getAlumnoId() != null && !ca.getAlumnoId().equals(profesorId)) {
+                        userRepository.findByIdActive(ca.getAlumnoId()).ifPresent(student -> {
+                            notificacionService.crearNotificacion(
+                                    student,
+                                    "Nueva actividad agendada",
+                                    "Se agendó '" + saved.getTitulo() + "' para el curso " + curso.getTitulo() + " el " + fecha + " a las " + hora + ".",
+                                    "AGENDA",
+                                    saved.getId(),
+                                    "AGENDA"
+                            );
+                        });
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error enviando notificaciones de agenda: " + e.getMessage());
+        }
+
+        return toDTO(saved);
     }
 
     public AgendaEventoDTO updateEvento(UUID profesorId, UUID eventoId, UUID cursoId, String titulo, String descripcion, LocalDate fecha, String hora, String link) {

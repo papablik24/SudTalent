@@ -18,6 +18,7 @@ export function AdminPostulaciones() {
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingIds, setUpdatingIds] = useState<Record<string, boolean>>({});
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -29,9 +30,11 @@ export function AdminPostulaciones() {
     loadData();
   }, []);
 
-  const loadData = async () => {
-    setLoading(true);
-    setError(null);
+  const loadData = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const [posts, convs] = await Promise.all([
         postulacionService.getAllPostulaciones(),
@@ -40,9 +43,15 @@ export function AdminPostulaciones() {
       setPostulaciones(posts);
       setConvocatorias(convs);
     } catch (err: any) {
-      setError(err.message || 'Error al cargar datos.');
+      if (!silent) {
+        setError(err.message || 'Error al cargar datos.');
+      } else {
+        console.error('Error in silent reload:', err);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -65,8 +74,28 @@ export function AdminPostulaciones() {
 
   // ── Status change ────────────────────────────────────────────────────
   const handleStatusChange = async (postId: string, newStatus: PostulacionEstado) => {
-    await postulacionService.updatePostulacionStatus(postId, newStatus);
-    await loadData();
+    const postToUpdate = postulaciones.find(p => p.id === postId);
+    if (!postToUpdate) return;
+    const oldStatus = postToUpdate.estado;
+
+    // Optimistic update
+    setPostulaciones(prev => prev.map(p => p.id === postId ? { ...p, estado: newStatus } : p));
+    setUpdatingIds(prev => ({ ...prev, [postId]: true }));
+
+    try {
+      await postulacionService.updatePostulacionStatus(postId, newStatus);
+      await loadData(true); // Silent reload to keep other things in sync
+    } catch (err: any) {
+      // Revert on failure
+      setPostulaciones(prev => prev.map(p => p.id === postId ? { ...p, estado: oldStatus } : p));
+      alert(err.message || 'Error al actualizar el estado.');
+    } finally {
+      setUpdatingIds(prev => {
+        const next = { ...prev };
+        delete next[postId];
+        return next;
+      });
+    }
   };
 
   // ── Stats ────────────────────────────────────────────────────────────
@@ -91,7 +120,7 @@ export function AdminPostulaciones() {
       <div className="p-12 text-center border border-red-500/20 rounded-[2rem] bg-red-500/5">
         <AlertCircle size={32} className="mx-auto text-red-400 mb-4" />
         <p className="text-red-400 font-bold text-sm">{error}</p>
-        <button onClick={loadData} className="mt-4 text-[10px] text-red-400 underline uppercase tracking-widest font-bold">Reintentar</button>
+        <button onClick={() => loadData()} className="mt-4 text-[10px] text-red-400 underline uppercase tracking-widest font-bold">Reintentar</button>
       </div>
     );
   }
@@ -226,8 +255,11 @@ export function AdminPostulaciones() {
               <div className="relative">
                 <select 
                   value={post.estado}
+                  disabled={updatingIds[post.id]}
                   onChange={(e) => handleStatusChange(post.id, e.target.value as PostulacionEstado)}
-                  className="text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-xl bg-black border border-white/10 outline-none text-slate-400 appearance-none pr-8 min-w-[130px]"
+                  className={`text-[9px] font-black uppercase tracking-widest px-3 py-2 rounded-xl bg-black border border-white/10 outline-none text-slate-400 appearance-none pr-8 min-w-[130px] ${
+                    updatingIds[post.id] ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
                   <option value="PENDIENTE">Pendiente</option>
                   <option value="EN_REVISION">En Revisión</option>
@@ -236,6 +268,9 @@ export function AdminPostulaciones() {
                 </select>
                 <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
               </div>
+              {updatingIds[post.id] && (
+                <div className="w-4 h-4 border-2 border-sud-turquoise/20 border-t-sud-turquoise rounded-full animate-spin shrink-0" />
+              )}
             </div>
           </motion.div>
         ))}

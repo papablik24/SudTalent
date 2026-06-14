@@ -17,7 +17,12 @@ import {
   FileText,
   AlertCircle,
   X,
-  Search
+  Search,
+  MapPin,
+  Mail,
+  Phone,
+  Mic2,
+  ChevronDown
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CursoDTO } from '../../types';
@@ -26,6 +31,7 @@ import { cursoService } from '../../services/cursoService';
 import { anuncioService, AnuncioDTO } from '../../services/anuncioService';
 import { convocatoriaService, Convocatoria } from '../../services/convocatoriaService';
 import { agendaService, AgendaEventoDTO } from '../../services/agendaService';
+import { audicionService, Audicion } from '../../services/audicionService';
 
 interface ProfesorDashboardProps {
   user: UserProfile;
@@ -148,10 +154,10 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [error, setError] = useState<string | null>(null);
   const [anunciosError, setAnunciosError] = useState<string | null>(null);
   
-  // Active View State ('dashboard' | 'alumnos' | 'agenda' | 'ia')
+  // Active View State ('dashboard' | 'alumnos' | 'agenda' | 'ia' | 'audiciones')
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
-  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos' | 'agenda' | 'ia'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos' | 'agenda' | 'ia' | 'audiciones'>('dashboard');
 
   // Sync activeView with viewParam query parameter
   useEffect(() => {
@@ -163,6 +169,9 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
       setSelectedCurso(null);
     } else if (viewParam === 'ia') {
       setActiveView('ia');
+      setSelectedCurso(null);
+    } else if (viewParam === 'audiciones') {
+      setActiveView('audiciones');
       setSelectedCurso(null);
     } else {
       setActiveView('dashboard');
@@ -208,6 +217,58 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
 
   const dateRef = React.useRef<HTMLInputElement>(null);
   const timeRef = React.useRef<HTMLInputElement>(null);
+
+  // Audiciones State
+  const [audiciones, setAudiciones] = useState<Audicion[]>([]);
+  const [loadingAudiciones, setLoadingAudiciones] = useState(false);
+  const [audicionesError, setAudicionesError] = useState<string | null>(null);
+
+  // Form State for Audicion Evaluation
+  const [evaluatingAudicion, setEvaluatingAudicion] = useState<Audicion | null>(null);
+  const [evalPuntaje, setEvalPuntaje] = useState<number>(80);
+  const [evalObservaciones, setEvalObservaciones] = useState('');
+  const [evalResultado, setEvalResultado] = useState<'APROBADA' | 'RECHAZADA'>('APROBADA');
+  const [savingEvaluacion, setSavingEvaluacion] = useState(false);
+
+  const fetchAudiciones = async () => {
+    setLoadingAudiciones(true);
+    setAudicionesError(null);
+    try {
+      const data = await audicionService.getMisAudicionesProfesor();
+      setAudiciones(data);
+    } catch (err: any) {
+      console.error('Error al cargar audiciones del profesor:', err);
+      setAudicionesError(err.message || 'Error al cargar tus audiciones asignadas.');
+    } finally {
+      setLoadingAudiciones(false);
+    }
+  };
+
+  const handleSaveEvaluacion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!evaluatingAudicion) return;
+
+    if (evalPuntaje < 1 || evalPuntaje > 100) {
+      alert('El puntaje debe estar entre 1 y 100.');
+      return;
+    }
+
+    setSavingEvaluacion(true);
+    try {
+      await audicionService.evaluarAudicion(evaluatingAudicion.id, {
+        puntaje: evalPuntaje,
+        observaciones: evalObservaciones,
+        resultado: evalResultado,
+      });
+      setToastMessage('Audición evaluada y registrada con éxito.');
+      setEvaluatingAudicion(null);
+      await fetchAudiciones();
+    } catch (err: any) {
+      alert(err.message || 'Error al evaluar la audición.');
+    } finally {
+      setSavingEvaluacion(false);
+    }
+  };
 
   // Fetch Profesor profile, courses and convocatorias
   useEffect(() => {
@@ -452,6 +513,12 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
       setEventoLink('');
       setEventoError(null);
       fetchAgenda();
+    } else if (activeView === 'audiciones') {
+      setEvaluatingAudicion(null);
+      setEvalPuntaje(80);
+      setEvalObservaciones('');
+      setEvalResultado('APROBADA');
+      fetchAudiciones();
     }
   }, [activeView, realCursos.length]);
 
@@ -791,6 +858,254 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                 );
               })()
             )}
+          </div>
+        ) : activeView === 'audiciones' ? (
+          /* ========================================================
+             AUDICIONES VIEW
+             ======================================================== */
+          <div className="space-y-8 animate-in fade-in duration-300">
+            {/* Back button */}
+            <button
+              onClick={() => {
+                setActiveView('dashboard');
+                setSearchParams({ view: 'dashboard' });
+              }}
+              className="inline-flex items-center gap-2 text-[10px] text-slate-400 hover:text-white font-black uppercase tracking-widest border border-white/10 hover:border-white/20 bg-white/5 px-4 py-2 rounded-xl transition-all cursor-pointer"
+            >
+              <ChevronLeft size={14} /> Volver al Panel
+            </button>
+
+            {/* View Header */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/5 pb-4">
+              <div className="space-y-1">
+                <h2 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+                  <Mic2 className="text-sud-orange" size={24} /> Evaluaciones de Audiciones
+                </h2>
+                <p className="text-slate-400 text-xs">
+                  Listado de audiciones asignadas para evaluar el desempeño de postulantes de casting.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              {/* Audiciones List */}
+              <div className="lg:col-span-2 space-y-6">
+                <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center gap-2">
+                  <Calendar className="text-sud-turquoise" size={18} /> Audiciones Asignadas
+                </h3>
+
+                {loadingAudiciones ? (
+                  <div className="flex justify-center items-center py-12">
+                    <div className="w-8 h-8 border-3 border-sud-turquoise/20 border-t-sud-turquoise rounded-full animate-spin" />
+                  </div>
+                ) : audicionesError ? (
+                  <div className="p-4 border border-red-500/20 rounded-xl bg-red-500/5 text-red-400 text-xs font-bold text-center">
+                    {audicionesError}
+                  </div>
+                ) : audiciones.length > 0 ? (
+                  <div className="space-y-4">
+                    {audiciones.map((aud) => (
+                      <div
+                        key={aud.id}
+                        className={`sud-glass-panel p-5 border-white/5 transition-all space-y-3 relative group ${
+                          evaluatingAudicion?.id === aud.id ? 'border-sud-orange/40 bg-sud-orange/[0.01]' : ''
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="space-y-2">
+                            <span className="inline-flex items-center text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded bg-sud-orange/15 text-sud-orange border border-sud-orange/20">
+                              {aud.convocatoriaTitulo || 'Casting Convocatoria'}
+                            </span>
+                            <h4 className="text-base font-black text-white uppercase tracking-tight leading-snug">
+                              Postulante: {aud.alumnoNombre}
+                            </h4>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {aud.estado === 'PROGRAMADA' && (
+                              <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                PROGRAMADA
+                              </span>
+                            )}
+                            {aud.estado === 'EVALUADA' && (
+                              <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded border ${
+                                aud.resultado === 'APROBADA'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                  : 'bg-red-500/10 text-red-400 border-red-500/20'
+                              }`}>
+                                EVALUADA • {aud.resultado}
+                              </span>
+                            )}
+                            {aud.estado === 'CANCELADA' && (
+                              <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded bg-slate-600/10 text-slate-400 border border-white/10 line-through">
+                                CANCELADA
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[10px] text-slate-400 pt-2 border-t border-white/5">
+                          <div className="space-y-1.5">
+                            <p className="flex items-center gap-1.5"><Mail size={12} className="text-slate-500" /> <span className="font-bold text-slate-500">Email:</span> {aud.alumnoEmail}</p>
+                            <p className="flex items-center gap-1.5"><Phone size={12} className="text-slate-500" /> <span className="font-bold text-slate-500">Teléfono:</span> {aud.alumnoTelefono}</p>
+                          </div>
+                          <div className="space-y-1.5">
+                            <p className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-500" /> <span className="font-bold text-slate-500">Fecha/Hora:</span> {aud.fecha} a las {aud.hora}</p>
+                            <p className="flex items-center gap-1.5"><MapPin size={12} className="text-slate-500" /> <span className="font-bold text-slate-500">Lugar ({aud.modalidad}):</span> {aud.lugar}</p>
+                          </div>
+                        </div>
+
+                        {aud.link && (
+                          <div className="text-[10px] pt-1 flex items-center gap-1.5">
+                            <LinkIcon size={12} className="text-slate-500" />
+                            <span className="font-bold text-slate-500">Enlace:</span>
+                            <a href={aud.link.startsWith('http') ? aud.link : `https://${aud.link}`} target="_blank" rel="noopener noreferrer" className="text-sud-turquoise hover:underline truncate max-w-xs">
+                              {aud.link}
+                            </a>
+                          </div>
+                        )}
+
+                        {aud.estado === 'EVALUADA' && (
+                          <div className="mt-3 p-3.5 rounded-xl bg-black/40 border border-white/5 space-y-2">
+                            <div className="flex items-center justify-between text-[10px]">
+                              <span className="font-black text-slate-500 uppercase tracking-widest">Puntaje Otorgado:</span>
+                              <span className="font-black text-white text-xs">{aud.puntaje}/100</span>
+                            </div>
+                            {aud.observaciones && (
+                              <p className="text-[10px] text-slate-400 italic font-medium">
+                                "{aud.observaciones}"
+                              </p>
+                            )}
+                          </div>
+                        )}
+
+                        {aud.estado === 'PROGRAMADA' && (
+                          <div className="pt-3 border-t border-white/5 flex justify-end">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEvaluatingAudicion(aud);
+                                setEvalPuntaje(80);
+                                setEvalObservaciones('');
+                                setEvalResultado('APROBADA');
+                              }}
+                              className="px-4 py-2 bg-sud-turquoise/15 hover:bg-sud-turquoise/25 border border-sud-turquoise/30 text-sud-turquoise text-[10px] font-black uppercase tracking-widest rounded-xl transition-all cursor-pointer"
+                            >
+                              Evaluar Audición
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="py-16 text-center border border-dashed border-white/5 rounded-2xl bg-white/[0.005] space-y-2">
+                    <Award size={32} className="mx-auto text-slate-755" />
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-xs">
+                      No tienes audiciones programadas
+                    </p>
+                    <p className="text-slate-500 text-[10px] font-medium leading-relaxed max-w-xs mx-auto">
+                      Las audiciones para evaluar postulantes serán programadas por el administrador de la plataforma.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {/* Evaluation Form */}
+              <div className="space-y-6">
+                <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-2">
+                    <Award className="text-sud-orange" size={18} />
+                    Evaluar Candidato
+                  </span>
+                </h3>
+
+                {!evaluatingAudicion ? (
+                  <div className="sud-glass-panel p-5 border-white/5 text-slate-500 text-xs font-bold uppercase tracking-widest text-center leading-relaxed">
+                    Selecciona una audición de la lista para evaluarla.
+                  </div>
+                ) : (
+                  <form
+                    onSubmit={handleSaveEvaluacion}
+                    className="sud-glass-panel p-5 space-y-4 border-sud-orange/30 bg-sud-orange/[0.01]"
+                  >
+                    <div className="p-3 rounded-xl bg-black/40 border border-white/5 text-[10px] text-slate-400 space-y-1">
+                      <p className="font-bold text-white uppercase">Evaluando a:</p>
+                      <p>{evaluatingAudicion.alumnoNombre}</p>
+                      <p className="text-[8px] uppercase tracking-wider text-slate-500">{evaluatingAudicion.convocatoriaTitulo}</p>
+                    </div>
+
+                    {/* Puntaje */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Puntaje (1 - 100) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        max="100"
+                        value={evalPuntaje}
+                        onChange={e => setEvalPuntaje(parseInt(e.target.value) || 0)}
+                        className="sud-input w-full text-xs py-2.5 px-3.5"
+                        required
+                      />
+                    </div>
+
+                    {/* Resultado */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Resultado *
+                      </label>
+                      <div className="relative">
+                        <select
+                          value={evalResultado}
+                          onChange={e => setEvalResultado(e.target.value as any)}
+                          className="sud-input w-full appearance-none pr-10"
+                          required
+                        >
+                          <option value="APROBADA">APROBADA</option>
+                          <option value="RECHAZADA">RECHAZADA</option>
+                        </select>
+                        <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                      </div>
+                    </div>
+
+                    {/* Observaciones */}
+                    <div>
+                      <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
+                        Observaciones *
+                      </label>
+                      <textarea
+                        value={evalObservaciones}
+                        onChange={e => setEvalObservaciones(e.target.value)}
+                        placeholder="Escribe comentarios sobre el tono de voz, respiración, dicción, etc..."
+                        rows={4}
+                        className="sud-input w-full text-xs py-2.5 px-3.5 resize-none"
+                        required
+                      />
+                    </div>
+
+                    {/* Botones */}
+                    <div className="flex gap-2 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setEvaluatingAudicion(null)}
+                        className="w-1/3 py-3 border border-white/10 hover:border-white/20 bg-white/5 rounded-xl text-xs font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={savingEvaluacion}
+                        className="w-2/3 sud-btn-primary py-3 flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest disabled:opacity-50 cursor-pointer"
+                      >
+                        {savingEvaluacion ? 'Guardando...' : 'Registrar'}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            </div>
           </div>
         ) : activeView === 'agenda' ? (
           /* ========================================================

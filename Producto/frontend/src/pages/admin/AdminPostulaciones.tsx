@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Search, ChevronDown, AlertCircle, FileText, Mail, Phone } from 'lucide-react';
-import { motion } from 'motion/react';
+import { Users, Search, ChevronDown, AlertCircle, FileText, Mail, Phone, Calendar, Clock, MapPin, Link as LinkIcon, User, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import {
   postulacionService,
@@ -12,10 +12,21 @@ import {
   convocatoriaService,
   Convocatoria,
 } from '../../services/convocatoriaService';
+import {
+  audicionService,
+  Audicion,
+  AudicionModalidad,
+} from '../../services/audicionService';
+import {
+  profesorService,
+  ProfesorDTO,
+} from '../../services/profesorService';
 
 export function AdminPostulaciones() {
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
+  const [audiciones, setAudiciones] = useState<Audicion[]>([]);
+  const [profesores, setProfesores] = useState<ProfesorDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [updatingIds, setUpdatingIds] = useState<Record<string, boolean>>({});
@@ -24,6 +35,18 @@ export function AdminPostulaciones() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterEstado, setFilterEstado] = useState<PostulacionEstado | 'TODAS'>('TODAS');
   const [filterConvocatoria, setFilterConvocatoria] = useState<string>('TODAS');
+
+  // Modal Programar Audición
+  const [showScheduleModal, setShowScheduleModal] = useState(false);
+  const [selectedPostulacion, setSelectedPostulacion] = useState<Postulacion | null>(null);
+  const [scheduleProfesorId, setScheduleProfesorId] = useState('');
+  const [scheduleFecha, setScheduleFecha] = useState('');
+  const [scheduleHora, setScheduleHora] = useState('');
+  const [scheduleModalidad, setScheduleModalidad] = useState<AudicionModalidad>('ONLINE');
+  const [scheduleLugar, setScheduleLugar] = useState('');
+  const [scheduleLink, setScheduleLink] = useState('');
+  const [submittingSchedule, setSubmittingSchedule] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
 
   // ── Load data ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -36,12 +59,16 @@ export function AdminPostulaciones() {
       setError(null);
     }
     try {
-      const [posts, convs] = await Promise.all([
+      const [posts, convs, auds, profs] = await Promise.all([
         postulacionService.getAllPostulaciones(),
         convocatoriaService.getConvocatorias(),
+        audicionService.getAllAudiciones(),
+        profesorService.getAll(),
       ]);
       setPostulaciones(posts);
       setConvocatorias(convs);
+      setAudiciones(auds);
+      setProfesores(profs.filter(p => p.active !== false)); // Cargar solo profesores activos
     } catch (err: any) {
       if (!silent) {
         setError(err.message || 'Error al cargar datos.');
@@ -63,8 +90,8 @@ export function AdminPostulaciones() {
     if (searchTerm) {
       const low = searchTerm.toLowerCase();
       result = result.filter(p =>
-        p.userName.toLowerCase().includes(low) ||
-        p.userEmail.toLowerCase().includes(low) ||
+        (p.userName || '').toLowerCase().includes(low) ||
+        (p.userEmail || '').toLowerCase().includes(low) ||
         (p.convocatoriaTitulo || '').toLowerCase().includes(low)
       );
     }
@@ -105,6 +132,79 @@ export function AdminPostulaciones() {
     enRevision: postulaciones.filter(p => p.estado === 'EN_REVISION').length,
     aceptadas: postulaciones.filter(p => p.estado === 'ACEPTADA').length,
   }), [postulaciones]);
+
+  // ── Audicion Actions ─────────────────────────────────────────────────
+  const handleCancelarAudicion = async (audicionId: string) => {
+    if (!window.confirm('¿Está seguro de que desea cancelar esta audición?')) return;
+    try {
+      await audicionService.cancelarAudicion(audicionId);
+      await loadData(true);
+      alert('Audición cancelada con éxito.');
+    } catch (err: any) {
+      alert(err.message || 'Error al cancelar la audición.');
+    }
+  };
+
+  const handleOpenScheduleModal = (post: Postulacion) => {
+    setSelectedPostulacion(post);
+    setScheduleProfesorId('');
+    setScheduleFecha('');
+    setScheduleHora('');
+    setScheduleModalidad('ONLINE');
+    setScheduleLugar('');
+    setScheduleLink('');
+    setFormError(null);
+    setShowScheduleModal(true);
+  };
+
+  const handleScheduleAudicion = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError(null);
+
+    if (!selectedPostulacion) return;
+    if (!scheduleProfesorId) {
+      setFormError('Debe seleccionar un profesor.');
+      return;
+    }
+    if (!scheduleFecha || !scheduleHora) {
+      setFormError('Debe ingresar la fecha y hora de la audición.');
+      return;
+    }
+    if (!scheduleLugar.trim()) {
+      setFormError('Debe especificar un lugar o dirección.');
+      return;
+    }
+
+    setSubmittingSchedule(true);
+    try {
+      await audicionService.crearAudicion({
+        postulacionId: selectedPostulacion.id,
+        profesorId: scheduleProfesorId,
+        fecha: scheduleFecha,
+        hora: scheduleHora,
+        modalidad: scheduleModalidad,
+        lugar: scheduleLugar.trim(),
+        link: scheduleLink.trim() || undefined,
+      });
+
+      // Pasar postulación a EN_REVISION si estaba en PENDIENTE
+      if (selectedPostulacion.estado === 'PENDIENTE') {
+        try {
+          await postulacionService.updatePostulacionStatus(selectedPostulacion.id, 'EN_REVISION');
+        } catch (err: any) {
+          console.warn('No se pudo actualizar el estado de la postulación de forma automática:', err);
+        }
+      }
+
+      setShowScheduleModal(false);
+      await loadData(true);
+      alert('¡Audición programada correctamente!');
+    } catch (err: any) {
+      setFormError(err.message || 'Error al programar la audición.');
+    } finally {
+      setSubmittingSchedule(false);
+    }
+  };
 
   // ── Loading / Error ──────────────────────────────────────────────────
   if (loading) {
@@ -192,7 +292,7 @@ export function AdminPostulaciones() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: i * 0.03 }}
-            className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-6 group hover:border-white/20 transition-all"
+            className="sud-glass-panel p-6 md:p-8 flex flex-col md:flex-row items-start md:items-stretch justify-between gap-6 group hover:border-white/20 transition-all"
           >
             <div className="flex items-start gap-5 flex-1 min-w-0">
               <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] shrink-0">
@@ -247,10 +347,145 @@ export function AdminPostulaciones() {
                     </span>
                   )}
                 </div>
+
+                {/* Sección de Audición Asociada */}
+                {(() => {
+                  const postAudicion = audiciones.find(a => a.postulacionId === post.id);
+                  
+                  // Si NO hay audición
+                  if (!postAudicion) {
+                    if (post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION') {
+                      return (
+                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center justify-between">
+                          <span className="text-[9px] text-slate-500 font-bold uppercase tracking-widest">Sin audición programada</span>
+                          <button
+                            onClick={() => handleOpenScheduleModal(post)}
+                            className="px-4 py-2 bg-sud-orange/10 hover:bg-sud-orange/20 border border-sud-orange/30 text-sud-orange text-[9px] font-black uppercase tracking-widest rounded-xl transition-all flex items-center gap-1.5"
+                          >
+                            <Calendar size={12} />
+                            Programar Audición
+                          </button>
+                        </div>
+                      );
+                    }
+                    if (post.estado === 'ACEPTADA' || post.estado === 'RECHAZADA') {
+                      return (
+                        <div className="mt-4 pt-3 border-t border-white/5 flex items-center">
+                          <span className={`text-[9px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-xl border ${
+                            post.estado === 'ACEPTADA'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          }`}>
+                            {post.estado === 'ACEPTADA'
+                              ? 'Postulación aceptada — audición no requerida'
+                              : 'Postulación rechazada — audición no requerida'}
+                          </span>
+                        </div>
+                      );
+                    }
+                    return null;
+                  }
+
+                  // Si SÍ hay audición
+                  const showControls = post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION';
+                  
+                  return (
+                    <div className="mt-4 p-4 rounded-2xl bg-white/[0.02] border border-white/5 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest">Audición:</span>
+                          {postAudicion.estado === 'PROGRAMADA' && (
+                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              PROGRAMADA
+                            </span>
+                          )}
+                          {postAudicion.estado === 'EVALUADA' && (
+                            <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md border ${
+                              postAudicion.resultado === 'APROBADA'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : 'bg-red-500/10 text-red-400 border-red-500/20'
+                            }`}>
+                              EVALUADA • {postAudicion.resultado}
+                            </span>
+                          )}
+                          {postAudicion.estado === 'CANCELADA' && (
+                            <span className="text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md bg-slate-600/10 text-slate-400 border border-white/10 line-through">
+                              CANCELADA
+                            </span>
+                          )}
+                        </div>
+
+                        {showControls && postAudicion.estado === 'PROGRAMADA' && (
+                          <button
+                            onClick={() => handleCancelarAudicion(postAudicion.id)}
+                            className="text-[9px] text-red-400 hover:text-red-300 font-bold uppercase tracking-widest underline decoration-dashed shrink-0"
+                          >
+                            Cancelar Audición
+                          </button>
+                        )}
+                        {showControls && postAudicion.estado === 'CANCELADA' && (
+                          <button
+                            onClick={() => handleOpenScheduleModal(post)}
+                            className="px-3 py-1.5 bg-sud-orange/10 hover:bg-sud-orange/20 border border-sud-orange/30 text-sud-orange text-[8px] font-black uppercase tracking-widest rounded-lg transition-all"
+                          >
+                            Programar Nueva Audición
+                          </button>
+                        )}
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[10px] text-slate-400">
+                        <div className="space-y-1.5">
+                          <p className="flex items-center gap-1.5 font-medium"><User size={12} className="text-slate-500" /> <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider">Evaluador:</span> {postAudicion.profesorNombre}</p>
+                          <p className="flex items-center gap-1.5 font-medium"><Calendar size={12} className="text-slate-500" /> <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider">Fecha/Hora:</span> {postAudicion.fecha} a las {postAudicion.hora}</p>
+                        </div>
+                        <div className="space-y-1.5">
+                          <p className="flex items-center gap-1.5 font-medium"><MapPin size={12} className="text-slate-500" /> <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider">Lugar ({postAudicion.modalidad}):</span> {postAudicion.lugar}</p>
+                          {postAudicion.link && (
+                            <p className="flex items-center gap-1.5 font-medium truncate">
+                              <LinkIcon size={12} className="text-slate-500 shrink-0" />
+                              <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider shrink-0">Enlace:</span>
+                              <a href={postAudicion.link.startsWith('http') ? postAudicion.link : `https://${postAudicion.link}`} target="_blank" rel="noopener noreferrer" className="text-sud-turquoise hover:underline truncate">
+                                {postAudicion.link}
+                              </a>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {postAudicion.estado === 'EVALUADA' && (
+                        <div className="mt-2.5 p-3 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[9px] uppercase font-black tracking-widest text-slate-500">Puntaje Recibido:</span>
+                            <span className="text-sm font-black text-white">{postAudicion.puntaje}/100</span>
+                          </div>
+                          {postAudicion.observaciones && (
+                            <p className="text-[10px] leading-relaxed text-slate-400 italic font-medium">
+                              "{postAudicion.observaciones}"
+                            </p>
+                          )}
+                        </div>
+                      )}
+
+                      {!showControls && (
+                        <div className="mt-1 pt-2 border-t border-white/5 flex items-center justify-between">
+                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded border ${
+                            post.estado === 'ACEPTADA'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          }`}>
+                            {post.estado === 'ACEPTADA'
+                              ? 'Flujo cerrado — Postulación Aceptada'
+                              : 'Flujo cerrado — Postulación Rechazada'}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
 
-            <div className="flex items-center gap-4 shrink-0">
+            <div className="flex md:flex-col justify-between items-center md:items-end gap-4 shrink-0">
               <StatusBadge status={post.estado} size="md" />
               <div className="relative">
                 <select 
@@ -284,6 +519,130 @@ export function AdminPostulaciones() {
           </div>
         )}
       </div>
+
+      {/* ── Modal Programar Audición ─────────────────────────────────── */}
+      <AnimatePresence>
+        {showScheduleModal && selectedPostulacion && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60">
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-lg p-10 relative overflow-hidden max-h-[90vh] overflow-y-auto"
+            >
+              <button 
+                onClick={() => setShowScheduleModal(false)} 
+                className="absolute top-6 right-6 text-slate-500 hover:text-white"
+              >
+                <X size={20} />
+              </button>
+              
+              <h3 className="text-xl font-black text-white mb-2 uppercase tracking-tight">Programar Audición</h3>
+              <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mb-6">
+                Postulante: {selectedPostulacion.userName}
+              </p>
+
+              {formError && (
+                <div className="mb-6 p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-400 text-xs font-bold">
+                  {formError}
+                </div>
+              )}
+
+              <form onSubmit={handleScheduleAudicion} className="space-y-5">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Evaluador (Profesor) *</label>
+                  <div className="relative">
+                    <select
+                      value={scheduleProfesorId}
+                      onChange={e => setScheduleProfesorId(e.target.value)}
+                      className="sud-input w-full appearance-none pr-10"
+                    >
+                      <option value="">— Seleccione Evaluador —</option>
+                      {profesores.map(p => (
+                        <option key={p.id} value={p.id}>
+                          {p.name} ({p.especialidad})
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Fecha *</label>
+                    <input
+                      type="date"
+                      value={scheduleFecha}
+                      onChange={e => setScheduleFecha(e.target.value)}
+                      className="sud-input w-full"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Hora *</label>
+                    <input
+                      type="time"
+                      value={scheduleHora}
+                      onChange={e => setScheduleHora(e.target.value)}
+                      className="sud-input w-full"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Modalidad *</label>
+                    <div className="relative">
+                      <select
+                        value={scheduleModalidad}
+                        onChange={e => setScheduleModalidad(e.target.value as AudicionModalidad)}
+                        className="sud-input w-full appearance-none pr-10"
+                      >
+                        <option value="ONLINE">ONLINE</option>
+                        <option value="PRESENCIAL">PRESENCIAL</option>
+                      </select>
+                      <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                    </div>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Lugar / Plataforma *</label>
+                    <input
+                      type="text"
+                      value={scheduleLugar}
+                      onChange={e => setScheduleLugar(e.target.value)}
+                      className="sud-input w-full"
+                      placeholder="Ej: Zoom, Sala A, etc."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Enlace de la Videollamada (Opcional)</label>
+                  <input
+                    type="text"
+                    value={scheduleLink}
+                    onChange={e => setScheduleLink(e.target.value)}
+                    className="sud-input w-full"
+                    placeholder="https://zoom.us/j/..."
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submittingSchedule}
+                  className="w-full sud-btn-primary py-4 uppercase tracking-widest font-black text-xs mt-3 flex items-center justify-center gap-2"
+                >
+                  {submittingSchedule && (
+                    <div className="w-4 h-4 border-2 border-black/20 border-t-black rounded-full animate-spin" />
+                  )}
+                  <span>Programar Audición</span>
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+

@@ -32,7 +32,8 @@ export function AsistenteIA() {
         let userDemos: any[] = [];
         let userPostulaciones: any[] = [];
         let activeConvocatorias: any[] = [];
-        let profesorCursos: any[] = [];
+        let professorCursos: any[] = [];
+        let allCursosCatalog: any[] = [];
         let allUsersCount: string | number = 'No disponible';
         let allPostulacionesCount: string | number = 'No disponible';
         let allConvocatoriasCount: string | number = 'No disponible';
@@ -55,7 +56,7 @@ export function AsistenteIA() {
         const telefono = profileDetails?.phone || currentUser.phone || 'No disponible';
         const bio = profileDetails?.bio || currentUser.bio || 'No disponible';
 
-        // 2. Alumno vs Admin vs Profesor
+        // 2. Alumno vs Profesor vs Admin
         if (currentUser.role === 'ADMIN') {
           // Si es ADMIN, podemos intentar cargar datos generales si están disponibles
           try {
@@ -75,12 +76,12 @@ export function AsistenteIA() {
         } else if (currentUser.role === 'PROFESOR') {
           // Si es PROFESOR, cargar cursos asignados
           try {
-            profesorCursos = await cursoService.getByProfesor(currentUser.uid);
+            professorCursos = await cursoService.getByProfesor(currentUser.uid);
           } catch (err) {
             console.warn('Error al obtener cursos del profesor para contexto de IA:', err);
           }
         } else {
-          // Si es Alumno/USER, cargar demos, postulaciones y convocatorias activas
+          // Si es Alumno/USER, cargar demos, postulaciones, convocatorias activas y catálogo de cursos
           try {
             if (token) {
               userDemos = await demoService.getUserDemos(token);
@@ -99,6 +100,12 @@ export function AsistenteIA() {
             activeConvocatorias = await convocatoriaService.getConvocatoriasActivas();
           } catch (err) {
             console.warn('Error al obtener convocatorias activas:', err);
+          }
+
+          try {
+            allCursosCatalog = await cursoService.getAll();
+          } catch (err) {
+            console.warn('Error al obtener el catálogo de cursos:', err);
           }
         }
 
@@ -121,19 +128,26 @@ DATOS GENERALES DE LA PLATAFORMA (VISTA ADMINISTRADOR):
 `;
         } else if (currentUser.role === 'PROFESOR') {
           contextText += `
-DATOS DE CURSOS Y ACTIVIDAD DOCENTE (VISTA PROFESOR):
-- Cantidad de Cursos Asignados: ${profesorCursos.length}
+DATOS DEL PROFESOR:
+- Cantidad de Cursos Asignados: ${professorCursos.length}
 `;
-          if (profesorCursos.length > 0) {
-            contextText += `Cursos dictados actualmente:\n` + profesorCursos.map((c) => `  - Curso: "${c.titulo}" (ID: ${c.id}, Modalidad: ${c.modalidad || 'No disponible'})`).join('\n') + '\n';
+          if (professorCursos.length > 0) {
+            contextText += `Cursos asignados:\n` + professorCursos.map((c, i) => `  - "${c.titulo}" (Modalidad: ${c.modalidad || 'Docencia Oficial'}, Descripción: ${c.descripcion || 'Sin descripción'})`).join('\n') + '\n';
+          } else {
+            contextText += `Cursos asignados: Ninguno actualmente.\n`;
           }
+          contextText += `
+INFORMACIÓN ADICIONAL DE DOCENCIA:
+- Estudiantes: No hay un listado de estudiantes disponible en este contexto (el servicio de listado de alumnos del profesor no está disponible).
+- Agenda y Horarios: No disponible (el servicio de agenda no está disponible).
+`;
         } else {
           contextText += `
 DEMOS DE VOZ Y PORTAFOLIO:
 - Cantidad de Demos Subidas: ${userDemos.length}
 `;
           if (userDemos.length > 0) {
-            contextText += `Demos actuales:\n` + userDemos.map((d, i) => `  - "${d.title}" - Categoría: ${d.category} (Formato: ${d.fileFormat || 'No disponible'}, Tamaño: ${d.fileSizeMb}MB)`).join('\n') + '\n';
+            contextText += `Demos actuales:\n` + userDemos.map((d, i) => `  - "${d.title}" - Categoría: ${d.category} (Formato: ${d.fileFormat || 'No disponible'}, Género visual: ${d.visualGenre || 'No disponible'}, Descripción: ${d.description || 'Sin descripción'})`).join('\n') + '\n';
           }
 
           contextText += `
@@ -150,6 +164,14 @@ CONVOCATORIAS DISPONIBLES EN LA PLATAFORMA:
 `;
           if (activeConvocatorias.length > 0) {
             contextText += `Oportunidades activas:\n` + activeConvocatorias.map((c, i) => `  - Convocatoria: "${c.titulo}" (Categoría: ${c.categoria}) - Fecha Límite: ${c.fechaLimite}`).join('\n') + '\n';
+          }
+
+          contextText += `
+CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
+- Cantidad de Cursos en Catálogo: ${allCursosCatalog.length}
+`;
+          if (allCursosCatalog.length > 0) {
+            contextText += `Cursos disponibles:\n` + allCursosCatalog.map((c, i) => `  - Curso: "${c.titulo}" (Modalidad: ${c.modalidad || 'No disponible'}, Descripción: ${c.descripcion || 'Sin descripción'})`).join('\n') + '\n';
           }
         }
 
@@ -170,22 +192,29 @@ CONVOCATORIAS DISPONIBLES EN LA PLATAFORMA:
       setApiKeyConfigured(false);
     } else {
       setApiKeyConfigured(true);
-      
-      let welcomeText = '¡Hola! Soy tu asistente virtual de SudTalent. Te puedo ayudar a completar tu perfil de talento, darte consejos para mejorar tus demos de voz, guiarte en tus postulaciones y explicarte el funcionamiento general de la plataforma. ¿En qué te puedo colaborar hoy, po?';
-      if (currentUser?.role === 'PROFESOR') {
-        welcomeText = '¡Hola, Profesor! Soy su asistente virtual de SudTalent. Puedo ayudarle a redactar anuncios para sus cursos, diseñar actividades pedagógicas de doblaje o locución, estructurar tutorías y dar sugerencias de retroalimentación para sus alumnos. ¿En qué le puedo asistir hoy, colega?';
-      } else if (currentUser?.role === 'ADMIN') {
-        welcomeText = '¡Hola, Administrador! Soy tu asistente virtual de SudTalent. Te puedo ayudar a revisar estadísticas de la plataforma, redactar comunicados o absolver dudas administrativas. ¿En qué te puedo colaborar hoy?';
-      }
-
-      setMessages([
-        {
-          role: 'model',
-          text: welcomeText
-        }
-      ]);
     }
-  }, [currentUser?.role]);
+  }, []);
+
+  // Mensaje de bienvenida inicial personalizado por rol
+  useEffect(() => {
+    if (!apiKeyConfigured || !currentUser) return;
+    
+    let welcomeText = '';
+    if (currentUser.role === 'PROFESOR') {
+      welcomeText = `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
+    } else if (currentUser.role === 'ADMIN') {
+      welcomeText = '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
+    } else {
+      welcomeText = `¡Hola, ${currentUser.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+    }
+    
+    setMessages([
+      {
+        role: 'model',
+        text: welcomeText
+      }
+    ]);
+  }, [currentUser, apiKeyConfigured]);
 
   // Hacer scroll automático al último mensaje
   useEffect(() => {

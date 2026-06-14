@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { UserProfile, TalentProfile, VoiceDemo, WhitelistEntry, ProfileStatus, ProfileCategory } from '../types';
-import { backendService } from '../services/backendService';
+import { backendService, fetchAPI } from '../services/backendService';
 
 export function useAdminData(role: string | null, currentUser: UserProfile | null) {
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
@@ -20,14 +20,10 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     setLoading(true);
     setError(null);
     try {
-      // Cargar whitelist, usuarios y demos en paralelo
-      const [whitelistData, usuariosData, demosData] = await Promise.all([
+      // Cargar whitelist y usuarios en paralelo
+      const [whitelistData, usuariosData] = await Promise.all([
         backendService.getWhitelist(),
         backendService.getAllUsers(),
-        backendService.getAllDemos().catch((err) => {
-          console.warn('⚠️ No se pudieron cargar las demos de casting:', err);
-          return [] as any[];
-        }),
       ]);
 
       // Mapear usuarios primero
@@ -62,6 +58,25 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
         };
       });
       setAllUsers(mappedUsers);
+
+      // Cargar las demos de cada usuario en paralelo usando el endpoint existente
+      let demosData: any[] = [];
+      try {
+        const demosDataList = await Promise.all(
+          mappedUsers.map(async (u) => {
+            try {
+              const userDemos = await fetchAPI<any[]>(`/voice-audios/user/${u.uid}?category=demo`);
+              return (userDemos || []).map(d => ({ ...d, userId: u.uid }));
+            } catch (err) {
+              console.warn(`⚠️ No se pudieron cargar las demos para el usuario ${u.uid}:`, err);
+              return [];
+            }
+          })
+        );
+        demosData = demosDataList.flat();
+      } catch (err) {
+        console.warn('⚠️ Error general al cargar demos de casting:', err);
+      }
 
       // Mapear perfiles de talentos desde los datos de usuarios
       const profilesMap: Record<string, TalentProfile> = {};

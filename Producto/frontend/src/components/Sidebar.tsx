@@ -18,7 +18,8 @@ import {
   Moon,
   Bell,
   CheckCheck,
-  Calendar
+  Calendar,
+  BarChart3
 } from 'lucide-react';
 import { NavItem } from './ui/NavItem';
 import { UserProfile, UserRole, Notificacion } from '../types';
@@ -276,6 +277,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               label="Lista Blanca" 
               active={currentPath === '/admin'} 
               onClick={() => onNavigate('/admin')}
+            />
+            <NavItem 
+              icon={<BarChart3 size={20} />} 
+              label="Reportería" 
+              active={currentPath === '/admin/reports'} 
+              onClick={() => onNavigate('/admin/reports')}
             />
             <NavItem 
               icon={<Users size={20} />} 

@@ -10,6 +10,7 @@ import { ConvocatoriasAdmin } from './pages/admin/AdminConvocatorias';
 import { AdminPostulaciones } from './pages/admin/AdminPostulaciones';
 import { AdminProfesores } from './pages/admin/AdminProfesores';
 import { AdminCursos } from './pages/admin/AdminCursos';
+import { AdminReports } from './pages/admin/AdminReports';
 import { UserCursosView } from './pages/user/UserCursosView';
 import { ConvocatoriasUser } from './pages/user/ConvocatoriasUser';
 import { UserPostulacionesView } from './pages/user/UserPostulacionesView';
@@ -249,6 +250,14 @@ function AppRoutes() {
             <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
               <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
                 <AsistenteIA />
+              </MainLayout>
+            </ProtectedRoute>
+          } />
+
+          <Route path="/admin/reports" element={
+            <ProtectedRoute user={currentUser} role={role} allowedRoles={['ADMIN']} loading={loading}>
+              <MainLayout user={currentUser} role="ADMIN" onLogout={logout}>
+                <AdminReports />
               </MainLayout>
             </ProtectedRoute>
           } />

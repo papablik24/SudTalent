@@ -42,6 +42,27 @@ const formatDate = (val: any) => {
   return isNaN(d.getTime()) ? '—' : d.toLocaleDateString('es-CL');
 };
 
+/**
+ * Función helper robusta para descargar archivos Blob en el navegador.
+ * Resuelve problemas en Chrome y Edge relacionados con la revocación inmediata de object URLs
+ * y descargas asíncronas bloqueadas.
+ */
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  
+  // Revocar la URL después de un retraso seguro para permitir que Chrome complete la descarga
+  setTimeout(() => {
+    URL.revokeObjectURL(url);
+  }, 5000);
+}
+
 export function generateAlumnosPDF(entries: any[]) {
   const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
 
@@ -155,7 +176,9 @@ export function generateAlumnosPDF(entries: any[]) {
     doc.text('SudTalent — Documento confidencial', 14, 205);
   }
 
-  doc.save(`sudtalent-alumnos-${new Date().toISOString().slice(0, 10)}.pdf`);
+  // En lugar de doc.save(), generamos el blob con tipo mime correcto y usamos downloadBlob
+  const pdfBlob = doc.output('blob');
+  downloadBlob(pdfBlob, `sudtalent-alumnos-${new Date().toISOString().slice(0, 10)}.pdf`);
 }
 
 export function generateAlumnosExcel(data: any[]) {
@@ -169,6 +192,14 @@ export function generateAlumnosExcel(data: any[]) {
     wch: Math.max(key.length + 2, ...data.map(row => String(row[key] || '').length + 2))
   }));
 
-  // Usar directamente XLSX.writeFile para asegurar la descarga del archivo reporte_alumnos_sudtalent.xlsx
-  XLSX.writeFile(workbook, 'reporte_alumnos_sudtalent.xlsx');
+  // Escribimos el libro de trabajo en memoria como un ArrayBuffer
+  const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  
+  // Envolvemos el ArrayBuffer en un Blob con el tipo MIME correcto para archivos .xlsx de Excel
+  const excelBlob = new Blob([excelBuffer], { 
+    type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+  });
+  
+  // Descargamos usando downloadBlob para una descarga segura y robusta en Chrome
+  downloadBlob(excelBlob, `sudtalent-alumnos-${new Date().toISOString().slice(0, 10)}.xlsx`);
 }

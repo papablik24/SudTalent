@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { AsistenteIA } from '../AsistenteIA';
 import { 
   LogOut, 
   GraduationCap, 
@@ -147,10 +148,10 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   const [error, setError] = useState<string | null>(null);
   const [anunciosError, setAnunciosError] = useState<string | null>(null);
   
-  // Active View State ('dashboard' | 'alumnos' | 'agenda')
+  // Active View State ('dashboard' | 'alumnos' | 'agenda' | 'ia')
   const [searchParams, setSearchParams] = useSearchParams();
   const viewParam = searchParams.get('view');
-  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos' | 'agenda'>('dashboard');
+  const [activeView, setActiveView] = useState<'dashboard' | 'alumnos' | 'agenda' | 'ia'>('dashboard');
 
   // Sync activeView with viewParam query parameter
   useEffect(() => {
@@ -159,6 +160,9 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
       setSelectedCurso(null);
     } else if (viewParam === 'agenda') {
       setActiveView('agenda');
+      setSelectedCurso(null);
+    } else if (viewParam === 'ia') {
+      setActiveView('ia');
       setSelectedCurso(null);
     } else {
       setActiveView('dashboard');
@@ -1109,6 +1113,10 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                 )}
               </div>
             </div>
+          </div>
+        ) : activeView === 'ia' ? (
+          <div className="space-y-8 animate-in fade-in duration-300">
+            <AsistenteIA />
           </div>
         ) : !selectedCurso ? (
           /* ========================================================

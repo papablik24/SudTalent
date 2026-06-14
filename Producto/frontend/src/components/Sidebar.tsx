@@ -346,6 +346,12 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
               active={activePath === '/profesor?view=agenda'} 
               onClick={() => onNavigate('/profesor?view=agenda')}
             />
+            <NavItem 
+              icon={<Bot size={20} />} 
+              label="Asistente IA" 
+              active={activePath === '/profesor?view=ia'} 
+              onClick={() => onNavigate('/profesor?view=ia')}
+            />
           </>
         ) : (
           <>

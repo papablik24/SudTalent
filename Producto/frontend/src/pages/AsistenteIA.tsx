@@ -7,6 +7,7 @@ import { fetchAPI, backendService } from '../services/backendService';
 import { demoService } from '../services/demoService';
 import { postulacionService } from '../services/postulacionService';
 import { convocatoriaService } from '../services/convocatoriaService';
+import { cursoService } from '../services/cursoService';
 
 export function AsistenteIA() {
   const { currentUser } = useAuth();
@@ -31,6 +32,7 @@ export function AsistenteIA() {
         let userDemos: any[] = [];
         let userPostulaciones: any[] = [];
         let activeConvocatorias: any[] = [];
+        let profesorCursos: any[] = [];
         let allUsersCount: string | number = 'No disponible';
         let allPostulacionesCount: string | number = 'No disponible';
         let allConvocatoriasCount: string | number = 'No disponible';
@@ -53,7 +55,7 @@ export function AsistenteIA() {
         const telefono = profileDetails?.phone || currentUser.phone || 'No disponible';
         const bio = profileDetails?.bio || currentUser.bio || 'No disponible';
 
-        // 2. Alumno vs Admin
+        // 2. Alumno vs Admin vs Profesor
         if (currentUser.role === 'ADMIN') {
           // Si es ADMIN, podemos intentar cargar datos generales si están disponibles
           try {
@@ -70,6 +72,13 @@ export function AsistenteIA() {
             const conv = await convocatoriaService.getConvocatorias();
             allConvocatoriasCount = conv.length;
           } catch {}
+        } else if (currentUser.role === 'PROFESOR') {
+          // Si es PROFESOR, cargar cursos asignados
+          try {
+            profesorCursos = await cursoService.getByProfesor(currentUser.uid);
+          } catch (err) {
+            console.warn('Error al obtener cursos del profesor para contexto de IA:', err);
+          }
         } else {
           // Si es Alumno/USER, cargar demos, postulaciones y convocatorias activas
           try {
@@ -110,6 +119,14 @@ DATOS GENERALES DE LA PLATAFORMA (VISTA ADMINISTRADOR):
 - Total de Convocatorias en la Plataforma: ${allConvocatoriasCount}
 - Total de Postulaciones en la Plataforma: ${allPostulacionesCount}
 `;
+        } else if (currentUser.role === 'PROFESOR') {
+          contextText += `
+DATOS DE CURSOS Y ACTIVIDAD DOCENTE (VISTA PROFESOR):
+- Cantidad de Cursos Asignados: ${profesorCursos.length}
+`;
+          if (profesorCursos.length > 0) {
+            contextText += `Cursos dictados actualmente:\n` + profesorCursos.map((c) => `  - Curso: "${c.titulo}" (ID: ${c.id}, Modalidad: ${c.modalidad || 'No disponible'})`).join('\n') + '\n';
+          }
         } else {
           contextText += `
 DEMOS DE VOZ Y PORTAFOLIO:
@@ -153,15 +170,22 @@ CONVOCATORIAS DISPONIBLES EN LA PLATAFORMA:
       setApiKeyConfigured(false);
     } else {
       setApiKeyConfigured(true);
-      // Mensaje de bienvenida inicial
+      
+      let welcomeText = '¡Hola! Soy tu asistente virtual de SudTalent. Te puedo ayudar a completar tu perfil de talento, darte consejos para mejorar tus demos de voz, guiarte en tus postulaciones y explicarte el funcionamiento general de la plataforma. ¿En qué te puedo colaborar hoy, po?';
+      if (currentUser?.role === 'PROFESOR') {
+        welcomeText = '¡Hola, Profesor! Soy su asistente virtual de SudTalent. Puedo ayudarle a redactar anuncios para sus cursos, diseñar actividades pedagógicas de doblaje o locución, estructurar tutorías y dar sugerencias de retroalimentación para sus alumnos. ¿En qué le puedo asistir hoy, colega?';
+      } else if (currentUser?.role === 'ADMIN') {
+        welcomeText = '¡Hola, Administrador! Soy tu asistente virtual de SudTalent. Te puedo ayudar a revisar estadísticas de la plataforma, redactar comunicados o absolver dudas administrativas. ¿En qué te puedo colaborar hoy?';
+      }
+
       setMessages([
         {
           role: 'model',
-          text: '¡Hola! Soy tu asistente virtual de SudTalent. Te puedo ayudar a completar tu perfil de talento, darte consejos para mejorar tus demos de voz, guiarte en tus postulaciones y explicarte el funcionamiento general de la plataforma. ¿En qué te puedo colaborar hoy, po?'
+          text: welcomeText
         }
       ]);
     }
-  }, []);
+  }, [currentUser?.role]);
 
   // Hacer scroll automático al último mensaje
   useEffect(() => {

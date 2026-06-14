@@ -1465,7 +1465,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                     <label className="block text-[8px] font-black text-slate-500 uppercase tracking-widest mb-1.5">
                       Tipo de Publicación
                     </label>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="flex flex-wrap gap-2">
                       {[
                         { val: 'ANUNCIO', label: 'Anuncio' },
                         { val: 'CAPSULA', label: 'Material/Cápsula' }
@@ -1474,10 +1474,10 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                           key={t.val}
                           type="button"
                           onClick={() => setAnuncioTipo(t.val as any)}
-                          className={`py-2 text-[9px] font-black uppercase tracking-widest rounded-lg border transition-all cursor-pointer ${
+                          className={`flex-1 min-w-[125px] py-2.5 px-3 text-[10px] font-black uppercase tracking-wider rounded-xl border text-center flex items-center justify-center transition-all cursor-pointer ${
                             anuncioTipo === t.val
-                              ? 'bg-sud-orange/10 border-sud-orange/40 text-white'
-                              : 'bg-white/5 border-white/5 text-slate-400 hover:text-white'
+                              ? 'bg-sud-orange/10 light:bg-sud-orange/5 border-sud-orange/40 light:border-sud-orange/30 text-white light:text-sud-orange font-black shadow-[0_0_12px_rgba(249,115,22,0.1)]'
+                              : 'bg-white/5 light:bg-slate-100 border-white/5 light:border-slate-200 text-slate-400 light:text-slate-600 hover:text-white light:hover:text-slate-900'
                           }`}
                         >
                           {t.label}

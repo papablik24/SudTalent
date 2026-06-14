@@ -110,19 +110,25 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
 
       if (uidsToFetch.length === 0) return;
 
-      const counts: Record<string, number> = { ...demoCounts };
-      await Promise.all(
-        uidsToFetch.map(async (uid) => {
-          try {
-            const audios = await fetchAPI<any[]>(`/voice-audios/user/${uid}`);
-            counts[uid] = audios ? audios.length : 0;
-          } catch (err) {
-            console.error(`Error al obtener demos del usuario ${uid}:`, err);
-            counts[uid] = 0;
-          }
-        })
-      );
-      setDemoCounts(counts);
+      const batchSize = 10;
+      for (let i = 0; i < uidsToFetch.length; i += batchSize) {
+        const batch = uidsToFetch.slice(i, i + batchSize);
+        const batchCounts: Record<string, number> = {};
+        
+        await Promise.all(
+          batch.map(async (uid) => {
+            try {
+              const audios = await fetchAPI<any[]>(`/voice-audios/user/${uid}`);
+              batchCounts[uid] = audios ? audios.length : 0;
+            } catch (err) {
+              console.error(`Error al obtener demos del usuario ${uid}:`, err);
+              batchCounts[uid] = 0;
+            }
+          })
+        );
+        
+        setDemoCounts(prev => ({ ...prev, ...batchCounts }));
+      }
     };
 
     fetchAllDemoCounts();

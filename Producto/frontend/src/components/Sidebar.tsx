@@ -124,9 +124,37 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
     setShowNotifications(false);
 
     if (notif.tipo === 'POSTULACION') {
-      onNavigate('/mis-postulaciones');
-    } else if (notif.tipo === 'CURSO' || notif.tipo === 'AGENDA') {
-      onNavigate('/cursos');
+      if (role === 'ADMIN') {
+        onNavigate('/admin/postulaciones');
+      } else if (role === 'PROFESOR') {
+        onNavigate('/profesor?view=dashboard');
+      } else {
+        onNavigate('/mis-postulaciones');
+      }
+    } else if (notif.tipo === 'CURSO') {
+      if (role === 'ADMIN') {
+        onNavigate('/admin/cursos');
+      } else if (role === 'PROFESOR') {
+        onNavigate('/profesor?view=dashboard');
+      } else {
+        onNavigate('/cursos');
+      }
+    } else if (notif.tipo === 'AGENDA') {
+      if (role === 'PROFESOR') {
+        onNavigate('/profesor?view=agenda');
+      } else if (role === 'ADMIN') {
+        onNavigate('/admin/cursos');
+      } else {
+        onNavigate('/cursos');
+      }
+    } else {
+      if (role === 'ADMIN') {
+        onNavigate('/admin');
+      } else if (role === 'PROFESOR') {
+        onNavigate('/profesor');
+      } else {
+        onNavigate('/profile');
+      }
     }
   };
 

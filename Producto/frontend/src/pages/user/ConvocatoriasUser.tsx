@@ -46,6 +46,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategoria, setFilterCategoria] = useState<ConvocatoriaCategoria | 'TODAS'>('TODAS');
   const [filterGenero, setFilterGenero] = useState<GeneroVisual | 'TODOS'>('TODOS');
+  const [filterEstado, setFilterEstado] = useState<'TODAS' | 'DISPONIBLES' | 'POSTULADAS' | 'VENCIDAS'>('TODAS');
 
   // Detail modal
   const [selectedConv, setSelectedConv] = useState<Convocatoria | null>(null);
@@ -95,8 +96,48 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       const low = searchTerm.toLowerCase();
       result = result.filter(c => c.titulo.toLowerCase().includes(low) || c.descripcion.toLowerCase().includes(low));
     }
+
+    // Filtro por Estado
+    if (filterEstado === 'DISPONIBLES') {
+      result = result.filter(c => !myPostulaciones[c.id] && daysRemaining(c.fechaLimite) > 0);
+    } else if (filterEstado === 'POSTULADAS') {
+      result = result.filter(c => !!myPostulaciones[c.id]);
+    } else if (filterEstado === 'VENCIDAS') {
+      result = result.filter(c => daysRemaining(c.fechaLimite) === 0);
+    }
+
+    const parseDate = (dStr: string) => {
+      if (!dStr) return new Date(0);
+      const parts = dStr.split('-');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      }
+      return new Date(dStr);
+    };
+
+    const getWeight = (c: Convocatoria) => {
+      const hasApplied = !!myPostulaciones[c.id];
+      const isVencida = daysRemaining(c.fechaLimite) === 0;
+
+      if (!hasApplied && !isVencida) return 1; // Disponibles
+      if (hasApplied) return 2; // Postulación enviada
+      return 3; // Plazo vencido
+    };
+
+    // Ordenar
+    result.sort((a, b) => {
+      const wA = getWeight(a);
+      const wB = getWeight(b);
+      if (wA !== wB) return wA - wB;
+
+      // Si tienen el mismo estado, ordenar por fecha de cierre más próxima primero
+      const timeA = parseDate(a.fechaLimite).getTime();
+      const timeB = parseDate(b.fechaLimite).getTime();
+      return timeA - timeB;
+    });
+
     return result;
-  }, [convocatorias, filterCategoria, filterGenero, searchTerm]);
+  }, [convocatorias, filterCategoria, filterGenero, filterEstado, searchTerm, myPostulaciones]);
 
   // ── Apply handler ────────────────────────────────────────────────────
   const handleApply = async (conv: Convocatoria) => {
@@ -212,6 +253,19 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
         <div className="flex gap-3 overflow-x-auto">
           <div className="relative">
             <select
+              value={filterEstado}
+              onChange={e => setFilterEstado(e.target.value as any)}
+              className="sud-input appearance-none pr-10 min-w-[150px]"
+            >
+              <option value="TODAS">Todas</option>
+              <option value="DISPONIBLES">Disponibles</option>
+              <option value="POSTULADAS">Postulación enviada</option>
+              <option value="VENCIDAS">Plazo vencido</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select
               value={filterCategoria}
               onChange={e => setFilterCategoria(e.target.value as any)}
               className="sud-input appearance-none pr-10 min-w-[150px]"
@@ -279,6 +333,11 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                       <CheckCircle2 size={10} /> Postulado
                     </span>
                   )}
+                  {days === 0 && !hasApplied && (
+                    <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 flex items-center gap-1">
+                      <AlertCircle size={10} /> Plazo Vencido
+                    </span>
+                  )}
                 </div>
                 
                 <h3 className="text-3xl font-black text-white uppercase tracking-tight leading-tight group-hover:sud-vibrant-text-gradient transition-all">{conv.titulo}</h3>
@@ -293,7 +352,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                   </div>
                   <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${days <= 3 ? 'text-red-400' : 'text-slate-600'}`}>
                     <Clock size={14} />
-                    <span>{days} días restantes</span>
+                    <span>{days === 0 ? 'Plazo vencido' : `${days} días restantes`}</span>
                   </div>
                 </div>
 
@@ -303,9 +362,9 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                     <span className="text-xs font-black uppercase tracking-widest">Postulación Enviada</span>
                     <StatusBadge status={myPostulaciones[conv.id].estado} />
                   </div>
-                ) : days <= 0 ? (
-                  <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400/70">
-                    <Clock size={16} />
+                ) : days === 0 ? (
+                  <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-red-500/5 border border-red-500/10 text-red-400">
+                    <AlertCircle size={16} />
                     <span className="text-xs font-black uppercase tracking-widest">Plazo Vencido</span>
                   </div>
                 ) : (
@@ -385,7 +444,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                   </div>
                   <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${daysRemaining(selectedConv.fechaLimite) <= 3 ? 'text-red-400' : 'text-slate-500'}`}>
                     <Clock size={14} />
-                    {daysRemaining(selectedConv.fechaLimite)} días restantes
+                    {daysRemaining(selectedConv.fechaLimite) === 0 ? 'Plazo vencido' : `${daysRemaining(selectedConv.fechaLimite)} días restantes`}
                   </div>
                 </div>
 
@@ -400,12 +459,12 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                       </div>
                     </div>
                   </div>
-                ) : daysRemaining(selectedConv.fechaLimite) <= 0 ? (
+                ) : daysRemaining(selectedConv.fechaLimite) === 0 ? (
                   <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-center gap-4">
-                    <Clock size={24} className="text-red-400" />
+                    <AlertCircle size={24} className="text-red-400" />
                     <div>
-                      <p className="text-red-300 font-bold text-sm">El plazo de postulación ha vencido</p>
-                      <p className="text-[10px] text-slate-500 mt-1">Esta convocatoria cerró el {formatFecha(selectedConv.fechaLimite)}</p>
+                      <p className="text-red-400 font-bold text-sm">El plazo de postulación ha vencido</p>
+                      <p className="text-xs text-slate-500 mt-1">Ya no se aceptan nuevas postulaciones para esta convocatoria.</p>
                     </div>
                   </div>
                 ) : (

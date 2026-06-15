@@ -81,14 +81,8 @@ export function AdminProfesores() {
   };
 
   const handlePhoneChange = (val: string) => {
-    let clean = val.replace(/[^0-9+]/g, '');
-    if (clean.includes('+')) {
-      clean = '+' + clean.replace(/\+/g, '');
-    }
-    const digits = clean.replace(/\D/g, '');
-    if (digits.length > 15) return;
-
-    setForm(f => ({ ...f, phone: clean }));
+    const digitsOnly = val.replace(/\D/g, '').slice(0, 8);
+    setForm(f => ({ ...f, phone: digitsOnly }));
   };
 
   // ── Load profesores ───────────────────────────────────────────────
@@ -150,10 +144,15 @@ export function AdminProfesores() {
       .filter(c => c.profesorId === p.id)
       .map(c => c.id);
 
+    const digits = (p.phone || '').replace(/\D/g, '');
+    const local = digits.startsWith('56') ? digits.slice(2) : digits;
+    const n = local.startsWith('9') ? local.slice(1) : local;
+    const phone8 = n.slice(0, 8);
+
     setForm({
       name: p.name,
       email: p.email,
-      phone: p.phone || '',
+      phone: phone8,
       especialidad: p.especialidad || 'General',
       password: '',
       confirmPassword: '',
@@ -183,12 +182,14 @@ export function AdminProfesores() {
       return;
     }
 
+    let finalPhone: string | undefined = undefined;
     if (form.phone.trim()) {
       const digitsOnly = form.phone.replace(/\D/g, '');
-      if (digitsOnly.length < 8 || digitsOnly.length > 15) {
-        setFormError('El teléfono debe tener entre 8 y 15 dígitos');
+      if (digitsOnly.length !== 8) {
+        setFormError('El teléfono debe tener exactamente 8 dígitos (después de +56 9)');
         return;
       }
+      finalPhone = `569${digitsOnly}`;
     }
 
     // Validaciones de contraseña al crear
@@ -223,7 +224,7 @@ export function AdminProfesores() {
         const updated = await profesorService.update(editingId, {
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
+          phone: finalPhone,
           especialidad: form.especialidad,
           cursosAsignados: cursosString,
         });
@@ -234,7 +235,7 @@ export function AdminProfesores() {
         const created = await profesorService.create({
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
+          phone: finalPhone,
           especialidad: form.especialidad,
           password: form.password,
           cursosAsignados: cursosString,
@@ -533,13 +534,17 @@ export function AdminProfesores() {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                     Teléfono
                   </label>
-                  <input
-                    type="text"
-                    value={form.phone}
-                    onChange={e => handlePhoneChange(e.target.value)}
-                    placeholder="+56 9 1234 5678"
-                    className="sud-input w-full"
-                  />
+                  <div className="flex items-center bg-black/60 border border-white/10 rounded-2xl overflow-hidden focus-within:border-sud-turquoise/50 focus-within:ring-1 focus-within:ring-sud-turquoise/20 transition-all light:bg-white light:border-slate-200 light:focus-within:border-sud-turquoise/40">
+                    <span className="px-5 py-5 text-white/40 font-mono text-sm border-r border-white/10 select-none shrink-0 light:text-slate-400 light:border-slate-200">+56 9</span>
+                    <input
+                      type="tel"
+                      placeholder="XXXX XXXX"
+                      value={form.phone}
+                      onChange={e => handlePhoneChange(e.target.value)}
+                      className="bg-transparent px-5 py-5 text-white font-mono text-sm outline-none flex-1 tracking-widest light:text-slate-900 placeholder:text-white/20 light:placeholder:text-slate-400"
+                      maxLength={8}
+                    />
+                  </div>
                 </div>
 
                 {/* Especialidad */}

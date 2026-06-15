@@ -228,6 +228,30 @@ export function AdminPostulaciones() {
     }
   };
 
+  // Helper to select the main audition to display for a application card
+  const getAudicionPrincipal = (postId: string): Audicion | undefined => {
+    const postAuds = audiciones.filter(a => a.postulacionId === postId);
+    if (postAuds.length === 0) return undefined;
+
+    const evaluadas = postAuds.filter(a => a.estado === 'EVALUADA');
+    const programadas = postAuds.filter(a => a.estado === 'PROGRAMADA');
+    const canceladas = postAuds.filter(a => a.estado === 'CANCELADA');
+
+    const sortByDate = (list: Audicion[]) => {
+      return [...list].sort((a, b) => {
+        const dateA = new Date(a.updatedAt || a.createdAt).getTime();
+        const dateB = new Date(b.updatedAt || b.createdAt).getTime();
+        return dateB - dateA; // Descending, most recent first
+      });
+    };
+
+    if (evaluadas.length > 0) return sortByDate(evaluadas)[0];
+    if (programadas.length > 0) return sortByDate(programadas)[0];
+    if (canceladas.length > 0) return sortByDate(canceladas)[0];
+
+    return sortByDate(postAuds)[0];
+  };
+
   // ── Loading / Error ──────────────────────────────────────────────────
   if (loading) {
     return (
@@ -389,7 +413,7 @@ export function AdminPostulaciones() {
 
                 {/* Sección de Audición Asociada */}
                 {(() => {
-                  const postAudicion = audiciones.find(a => a.postulacionId === post.id);
+                  const postAudicion = getAudicionPrincipal(post.id);
                   
                   // Si NO hay audición
                   if (!postAudicion) {

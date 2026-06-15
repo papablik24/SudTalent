@@ -616,6 +616,10 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
     setSearchParams({ view: 'agenda' });
   };
 
+  const handleAudicionesClick = () => {
+    setSearchParams({ view: 'audiciones' });
+  };
+
   return (
     <div className="w-full relative">
       {/* Main Content Area */}
@@ -1452,7 +1456,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
             </div>
 
             {/* Info Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 w-full max-w-3xl mx-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6 w-full max-w-4xl mx-auto">
               {[
                 { 
                   icon: <Users className="text-sud-turquoise" size={24} />, 
@@ -1475,6 +1479,12 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                   label: 'Mi Agenda', 
                   desc: 'Planificación de clases y horarios',
                   onClick: handleMiAgendaClick
+                },
+                { 
+                  icon: <Mic2 className="text-sud-orange" size={24} />, 
+                  label: 'Audiciones', 
+                  desc: 'Evaluaciones asignadas',
+                  onClick: handleAudicionesClick
                 },
               ].map((item, i) => (
                 <button 

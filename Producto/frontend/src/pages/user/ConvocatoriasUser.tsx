@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { Briefcase, Calendar, Sparkles, CheckCircle2, Search, ChevronDown, Clock, X, FileText, AlertCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -30,6 +31,17 @@ const formatFecha = (fechaStr: string) => {
   return new Date(fechaStr).toLocaleDateString();
 };
 
+const daysRemaining = (deadline: string | undefined) => {
+  if (!deadline) return 0;
+  const parts = deadline.split('-');
+  if (parts.length !== 3) return 0;
+  const target = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+  return diff > 0 ? diff : 0;
+};
+
 export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const navigate = useNavigate();
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
@@ -49,6 +61,16 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
 
   // Detail modal
   const [selectedConv, setSelectedConv] = useState<Convocatoria | null>(null);
+
+  // Constantes seguras para evitar errores runtime con null / undefined / TDZ
+  const selectedConvEstado = selectedConv?.estado || '';
+  const selectedConvCategoria = selectedConv?.categoria || '';
+  const selectedConvGenero = selectedConv?.generoVisual;
+  const selectedConvTitulo = selectedConv?.titulo || '';
+  const selectedConvDescripcion = selectedConv?.descripcion || '';
+  const selectedConvRequisitos = selectedConv?.requisitos || [];
+  const selectedConvFechaLimite = selectedConv?.fechaLimite || '';
+  const selectedPostulacion = selectedConv ? myPostulaciones[selectedConv.id] : undefined;
 
   // Applying state
   const [applyingId, setApplyingId] = useState<string | null>(null);
@@ -154,18 +176,6 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
     } finally {
       setApplyingId(null);
     }
-  };
-
-  // ── Days remaining ───────────────────────────────────────────────────
-  const daysRemaining = (deadline: string) => {
-    if (!deadline) return 0;
-    const parts = deadline.split('-');
-    if (parts.length !== 3) return 0;
-    const target = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const diff = Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-    return diff > 0 ? diff : 0;
   };
 
   // ── Loading ──────────────────────────────────────────────────────────
@@ -335,97 +345,108 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       </div>
 
       {/* ── Detail Modal ────────────────────────────────────────────── */}
-      <AnimatePresence>
-        {selectedConv && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => setSelectedConv(null)}>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="sud-glass-panel w-full max-w-2xl p-10 relative overflow-hidden max-h-[85vh] overflow-y-auto"
-              onClick={e => e.stopPropagation()}
-            >
-              <button onClick={() => setSelectedConv(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
-              
-              <div className="space-y-8">
-                <div className="space-y-4">
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <StatusBadge status={selectedConv.estado} size="md" />
-                    <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-sud-orange/10 text-sud-orange border border-sud-orange/20">{selectedConv.categoria}</span>
-                    {selectedConv.generoVisual && (
-                      <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">{selectedConv.generoVisual}</span>
-                    )}
+      {createPortal(
+        <AnimatePresence>
+          {selectedConv && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 backdrop-blur-md bg-black/60" onClick={() => setSelectedConv(null)}>
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                style={{ width: 'min(720px, calc(100vw - 2rem))', maxWidth: 'calc(100vw - 2rem)' }}
+                className="sud-glass-panel p-6 md:p-10 relative overflow-hidden overflow-x-hidden max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
+                onClick={e => e.stopPropagation()}
+              >
+                <button onClick={() => setSelectedConv(null)} className="absolute top-4 right-4 md:top-6 md:right-6 text-slate-500 hover:text-white z-10"><X size={22} /></button>
+                
+                <div className="space-y-8">
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {selectedConvEstado && <StatusBadge status={selectedConvEstado} size="md" />}
+                      {selectedConvCategoria && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-sud-orange/10 text-sud-orange border border-sud-orange/20">
+                          {selectedConvCategoria}
+                        </span>
+                      )}
+                      {selectedConvGenero && (
+                        <span className="text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                          {selectedConvGenero}
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight break-words pr-10">{selectedConvTitulo}</h3>
                   </div>
-                  <h3 className="text-3xl font-black text-white uppercase tracking-tight">{selectedConv.titulo}</h3>
-                </div>
 
-                <div className="space-y-2">
-                  <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Descripción</h4>
-                  <p className="text-sm text-slate-300 leading-relaxed">{selectedConv.descripcion}</p>
-                </div>
-
-                {selectedConv.requisitos.length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Requisitos</h4>
-                    <ul className="space-y-2">
-                      {selectedConv.requisitos.map((r, i) => (
-                        <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
-                          <FileText size={14} className="text-sud-turquoise mt-0.5 shrink-0" />
-                          {r}
-                        </li>
-                      ))}
-                    </ul>
+                  <div className="space-y-2">
+                    <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Descripción</h4>
+                    <p className="text-sm text-slate-300 leading-relaxed break-words">{selectedConvDescripcion}</p>
                   </div>
-                )}
 
-                <div className="flex items-center justify-between p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
-                  <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
-                    <Calendar size={14} className="text-sud-orange" />
-                    Cierre: {formatFecha(selectedConv.fechaLimite)}
-                  </div>
-                  <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${daysRemaining(selectedConv.fechaLimite) <= 3 ? 'text-red-400' : 'text-slate-500'}`}>
-                    <Clock size={14} />
-                    {daysRemaining(selectedConv.fechaLimite)} días restantes
-                  </div>
-                </div>
+                  {selectedConvRequisitos && selectedConvRequisitos.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Requisitos</h4>
+                      <ul className="space-y-2">
+                        {selectedConvRequisitos.map((r, i) => (
+                          <li key={i} className="flex items-start gap-3 text-sm text-slate-300">
+                            <FileText size={14} className="text-sud-turquoise mt-0.5 shrink-0" />
+                            <span className="break-words min-w-0">{r}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
 
-                {myPostulaciones[selectedConv.id] ? (
-                  <div className="p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex items-center gap-4">
-                    <CheckCircle2 size={24} className="text-emerald-400" />
-                    <div>
-                      <p className="text-emerald-300 font-bold text-sm">Ya has postulado a esta convocatoria</p>
-                      <div className="mt-2 flex items-center gap-2">
-                        <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Estado:</span>
-                        <StatusBadge status={myPostulaciones[selectedConv.id].estado} size="md" />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white/[0.02] border border-white/5 rounded-2xl">
+                    <div className="flex items-center gap-2 text-[10px] text-slate-500 font-bold uppercase tracking-widest">
+                      <Calendar size={14} className="text-sud-orange" />
+                      Cierre: {formatFecha(selectedConvFechaLimite)}
+                    </div>
+                    <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${daysRemaining(selectedConvFechaLimite) <= 3 ? 'text-red-400' : 'text-slate-500'}`}>
+                      <Clock size={14} />
+                      {daysRemaining(selectedConvFechaLimite)} días restantes
+                    </div>
+                  </div>
+
+                  {selectedPostulacion ? (
+                    <div className="p-5 md:p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                      <CheckCircle2 size={24} className="text-emerald-400 shrink-0" />
+                      <div className="text-center sm:text-left">
+                        <p className="text-emerald-300 font-bold text-sm">Ya has postulado a esta convocatoria</p>
+                        <div className="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                          <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Estado:</span>
+                          <StatusBadge status={selectedPostulacion.estado} size="md" />
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ) : daysRemaining(selectedConv.fechaLimite) <= 0 ? (
-                  <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-center gap-4">
-                    <Clock size={24} className="text-red-400" />
-                    <div>
-                      <p className="text-red-300 font-bold text-sm">El plazo de postulación ha vencido</p>
-                      <p className="text-[10px] text-slate-500 mt-1">Esta convocatoria cerró el {formatFecha(selectedConv.fechaLimite)}</p>
+                  ) : daysRemaining(selectedConvFechaLimite) <= 0 ? (
+                    <div className="p-5 md:p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                      <Clock size={24} className="text-red-400 shrink-0" />
+                      <div className="text-center sm:text-left">
+                        <p className="text-red-300 font-bold text-sm">El plazo de postulación ha vencido</p>
+                        <p className="text-xs text-slate-500 mt-1">Esta convocatoria cerró el {formatFecha(selectedConvFechaLimite)}</p>
+                      </div>
                     </div>
-                  </div>
-                ) : (
-                  <button 
-                    onClick={() => handleApply(selectedConv)}
-                    disabled={applyingId === selectedConv.id}
-                    className="w-full sud-btn-primary py-5 text-sm font-black uppercase tracking-widest"
-                  >
-                    {applyingId === selectedConv.id ? (
-                      <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
-                    ) : (
-                      <>Postularme Ahora <Sparkles size={16}/></>
-                    )}
-                  </button>
-                )}
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
+                  ) : (
+                    <button 
+                      onClick={() => selectedConv && handleApply(selectedConv)}
+                      disabled={applyingId === selectedConv?.id}
+                      className="w-full sud-btn-primary py-5 text-sm font-black uppercase tracking-widest"
+                    >
+                      {applyingId === selectedConv?.id ? (
+                        <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                      ) : (
+                        <>Postularme Ahora <Sparkles size={16}/></>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      ) /* ── Detail Modal End ── */
+}
 
       {/* ── No Demos Modal ─────────────────────────────────────────── */}
       <AnimatePresence>

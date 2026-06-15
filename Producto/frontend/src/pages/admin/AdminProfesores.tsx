@@ -80,15 +80,29 @@ export function AdminProfesores() {
     return `+56 9 ${n.slice(0, 4)} ${n.slice(4, 8)}`;
   };
 
-  const handlePhoneChange = (val: string) => {
-    let clean = val.replace(/[^0-9+]/g, '');
-    if (clean.includes('+')) {
-      clean = '+' + clean.replace(/\+/g, '');
+  const extractEightDigits = (phone?: string) => {
+    if (!phone) return '';
+    const digits = phone.replace(/\D/g, '');
+    if (digits.startsWith('569') && digits.length === 11) {
+      return digits.slice(3);
     }
-    const digits = clean.replace(/\D/g, '');
-    if (digits.length > 15) return;
+    if (digits.startsWith('9') && digits.length === 9) {
+      return digits.slice(1);
+    }
+    if (digits.length === 8) {
+      return digits;
+    }
+    if (digits.length > 8) {
+      return digits.slice(-8);
+    }
+    return digits;
+  };
 
-    setForm(f => ({ ...f, phone: clean }));
+  const handlePhoneChange = (val: string) => {
+    const digits = val.replace(/\D/g, '');
+    if (digits.length > 8) return;
+
+    setForm(f => ({ ...f, phone: digits }));
   };
 
   // ── Load profesores ───────────────────────────────────────────────
@@ -153,7 +167,7 @@ export function AdminProfesores() {
     setForm({
       name: p.name,
       email: p.email,
-      phone: p.phone || '',
+      phone: extractEightDigits(p.phone),
       especialidad: p.especialidad || 'General',
       password: '',
       confirmPassword: '',
@@ -185,8 +199,8 @@ export function AdminProfesores() {
 
     if (form.phone.trim()) {
       const digitsOnly = form.phone.replace(/\D/g, '');
-      if (digitsOnly.length < 8 || digitsOnly.length > 15) {
-        setFormError('El teléfono debe tener entre 8 y 15 dígitos');
+      if (digitsOnly.length !== 8) {
+        setFormError('El teléfono debe tener 8 dígitos después de +56 9');
         return;
       }
     }
@@ -218,12 +232,14 @@ export function AdminProfesores() {
 
       let profesorId: string;
 
+      const finalPhone = form.phone.trim() ? `569${form.phone.trim()}` : undefined;
+
       if (editingId) {
         // Update
         const updated = await profesorService.update(editingId, {
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
+          phone: finalPhone,
           especialidad: form.especialidad,
           cursosAsignados: cursosString,
         });
@@ -234,7 +250,7 @@ export function AdminProfesores() {
         const created = await profesorService.create({
           name: form.name.trim(),
           email: form.email.trim(),
-          phone: form.phone.trim() || undefined,
+          phone: finalPhone,
           especialidad: form.especialidad,
           password: form.password,
           cursosAsignados: cursosString,
@@ -533,13 +549,18 @@ export function AdminProfesores() {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                     Teléfono
                   </label>
-                  <input
-                    type="text"
-                    value={form.phone}
-                    onChange={e => handlePhoneChange(e.target.value)}
-                    placeholder="+56 9 1234 5678"
-                    className="sud-input w-full"
-                  />
+                  <div className="sud-input p-0 flex items-center overflow-hidden focus-within:border-sud-turquoise/60 focus-within:ring-1 focus-within:ring-sud-turquoise/25">
+                    <span className="px-4 py-3.5 bg-white/5 border-r border-white/10 text-slate-500 font-mono text-sm select-none shrink-0">
+                      +56 9
+                    </span>
+                    <input
+                      type="text"
+                      value={form.phone}
+                      onChange={e => handlePhoneChange(e.target.value)}
+                      placeholder="1234 5678"
+                      className="bg-transparent border-0 w-full px-4 py-3.5 text-white placeholder-white/40 light:placeholder-slate-500 focus:outline-none focus:ring-0 text-sm font-medium"
+                    />
+                  </div>
                 </div>
 
                 {/* Especialidad */}

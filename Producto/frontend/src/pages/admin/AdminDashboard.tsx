@@ -127,7 +127,16 @@ export function AdminDashboard({ whitelist, users, onNavigate, onUpdateStatus }:
             return (
               <div
                 key={i}
-                className="group flex items-center justify-between p-6 bg-white/[0.02] border border-white/[0.05] rounded-[2rem] hover:bg-white/[0.05] hover:border-white/10 transition-all relative z-10"
+                onClick={() => setSelectedUser(entry)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setSelectedUser(entry);
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                className="group flex items-center justify-between p-6 bg-white/[0.02] border border-white/[0.05] rounded-[2rem] hover:bg-white/[0.05] hover:border-white/10 transition-all relative z-10 cursor-pointer focus:outline-none focus:ring-2 focus:ring-sud-turquoise/40"
               >
                 <div className="flex items-center gap-5">
                   {/* Avatar */}
@@ -158,9 +167,10 @@ export function AdminDashboard({ whitelist, users, onNavigate, onUpdateStatus }:
                 </div>
 
                 <button
-                  onClick={() => setSelectedUser(entry)}
+                  onClick={(e) => { e.stopPropagation(); setSelectedUser(entry); }}
                   className="p-3 rounded-full bg-white/5 hover:bg-sud-turquoise hover:text-black transition-all"
                   title="Ver perfil"
+                  tabIndex={-1}
                 >
                   <ChevronRight size={18} />
                 </button>

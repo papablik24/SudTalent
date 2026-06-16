@@ -227,7 +227,8 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
           </div>
         </div>
 
-        {/* Lista de alumnos */}
+        {/* Lista de alumnos — solo para admin y profesor */}
+        {userRole !== 'USER' && (
         <div className="pt-2 border-t border-white/5">
           <div className="flex flex-col gap-1 mb-3">
             <p className="text-[9px] font-black uppercase tracking-[0.3em] text-slate-600">
@@ -269,6 +270,7 @@ export function CursoDetalle({ curso, userRole, userId, onBack }: Props) {
             <p className="text-slate-500 text-xs italic py-2">Sin alumnos inscritos.</p>
           )}
         </div>
+        )}
       </div>
 
       {/* ── Próximas actividades ────────────────────────── */}

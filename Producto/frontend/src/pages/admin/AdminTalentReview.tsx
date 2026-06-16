@@ -124,6 +124,8 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
 
   // Edición inline de especialidad
   const [editingSpecialtyId, setEditingSpecialtyId] = useState<string | null>(null);
+  // Especialidades en edición inline (multi-select)
+  const [inlineSpecialties, setInlineSpecialties] = useState<string[]>([]);
   // Overrides locales de especialidad (para reflejar cambios sin recargar)
   const [specialtyOverrides, setSpecialtyOverrides] = useState<Record<string, string>>({});
 
@@ -146,13 +148,31 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
         body: JSON.stringify({ specialties: cleanSpec }),
       });
     } catch (err) {
-      // Revertir si falla
       setSpecialtyOverrides(prev => {
         const next = { ...prev };
         delete next[userId];
         return next;
       });
       console.error('Error actualizando especialidad:', err);
+    }
+  };
+
+  const handleSaveInlineSpecialties = async (userId: string) => {
+    setEditingSpecialtyId(null);
+    const cleanSpec = inlineSpecialties.join(', ');
+    setSpecialtyOverrides(prev => ({ ...prev, [userId]: cleanSpec }));
+    try {
+      await fetchAPI(`/users/${userId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ specialties: cleanSpec }),
+      });
+    } catch (err) {
+      setSpecialtyOverrides(prev => {
+        const next = { ...prev };
+        delete next[userId];
+        return next;
+      });
+      console.error('Error actualizando especialidades inline:', err);
     }
   };
 
@@ -322,7 +342,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
             <div className="space-y-2">
               <label className="text-[9px] uppercase font-black text-slate-500 tracking-[0.2em] ml-1">Especialidad</label>
               <div className="grid grid-cols-1 gap-2">
-                {['TODOS', 'Doblaje', 'Locución', 'Podcast', 'Presentación'].map(cat => (
+                {['TODOS', ...AVAILABLE_SPECIALTIES].map(cat => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat as any)}
@@ -487,27 +507,46 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                         
                         <div className="col-span-3 min-w-0 pr-2" onClick={e => e.stopPropagation()}>
                           {editingSpecialtyId === user.uid ? (
-                            <select
-                              autoFocus
-                              defaultValue={getCleanSpecialties(user)[0] || ''}
-                              onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
-                              onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
-                              className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
-                            >
-                              <option value="">Sin especialidad definida</option>
-                              <option value="Doblaje">Doblaje</option>
-                              <option value="Locución">Locución</option>
-                              <option value="Podcast">Podcast</option>
-                              <option value="Presentación">Presentación</option>
-                              <option value="Narración">Narración</option>
-                              <option value="Actuación Vocal">Actuación Vocal</option>
-                              <option value="Producción Vocal">Producción Vocal</option>
-                              <option value="Canto">Canto</option>
-                            </select>
+                            <div className="bg-black/80 border border-sud-turquoise/40 rounded-xl p-2 space-y-2">
+                              <div className="flex flex-wrap gap-1">
+                                {AVAILABLE_SPECIALTIES.map(spec => (
+                                  <button
+                                    key={spec}
+                                    onClick={() => setInlineSpecialties(prev =>
+                                      prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]
+                                    )}
+                                    className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${
+                                      inlineSpecialties.includes(spec)
+                                        ? 'bg-sud-orange text-black'
+                                        : 'bg-white/10 text-slate-400 hover:bg-white/20'
+                                    }`}
+                                  >
+                                    {spec}
+                                  </button>
+                                ))}
+                              </div>
+                              <div className="flex gap-1 pt-1">
+                                <button
+                                  onClick={() => handleSaveInlineSpecialties(user.uid)}
+                                  className="flex-1 py-1 bg-sud-turquoise text-black text-[8px] font-black uppercase tracking-widest rounded-lg"
+                                >
+                                  Guardar
+                                </button>
+                                <button
+                                  onClick={() => setEditingSpecialtyId(null)}
+                                  className="py-1 px-2 bg-white/10 text-slate-400 text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-white/20"
+                                >
+                                  ✕
+                                </button>
+                              </div>
+                            </div>
                           ) : (
                             <button
-                              onClick={() => setEditingSpecialtyId(user.uid)}
-                              title="Clic para editar especialidad principal"
+                              onClick={() => {
+                                setEditingSpecialtyId(user.uid);
+                                setInlineSpecialties(getCleanSpecialties(user));
+                              }}
+                              title="Clic para editar especialidades"
                               className="flex flex-wrap gap-1 max-w-full"
                             >
                               {getCleanSpecialties(user).length > 0
@@ -640,27 +679,46 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                           <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Especialidad</span>
                           <div className="flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
                             {editingSpecialtyId === user.uid ? (
-                              <select
-                                autoFocus
-                                defaultValue={getCleanSpecialties(user)[0] || ''}
-                                onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
-                                onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
-                                className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
-                              >
-                                <option value="">Sin especialidad definida</option>
-                                <option value="Doblaje">Doblaje</option>
-                                <option value="Locución">Locución</option>
-                                <option value="Podcast">Podcast</option>
-                                <option value="Presentación">Presentación</option>
-                                <option value="Narración">Narración</option>
-                                <option value="Actuación Vocal">Actuación Vocal</option>
-                                <option value="Producción Vocal">Producción Vocal</option>
-                                <option value="Canto">Canto</option>
-                              </select>
+                              <div className="bg-black/80 border border-sud-turquoise/40 rounded-xl p-2 space-y-2 w-full">
+                                <div className="flex flex-wrap gap-1">
+                                  {AVAILABLE_SPECIALTIES.map(spec => (
+                                    <button
+                                      key={spec}
+                                      onClick={() => setInlineSpecialties(prev =>
+                                        prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]
+                                      )}
+                                      className={`px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${
+                                        inlineSpecialties.includes(spec)
+                                          ? 'bg-sud-orange text-black'
+                                          : 'bg-white/10 text-slate-400 hover:bg-white/20'
+                                      }`}
+                                    >
+                                      {spec}
+                                    </button>
+                                  ))}
+                                </div>
+                                <div className="flex gap-1 pt-1">
+                                  <button
+                                    onClick={() => handleSaveInlineSpecialties(user.uid)}
+                                    className="flex-1 py-1 bg-sud-turquoise text-black text-[8px] font-black uppercase tracking-widest rounded-lg"
+                                  >
+                                    Guardar
+                                  </button>
+                                  <button
+                                    onClick={() => setEditingSpecialtyId(null)}
+                                    className="py-1 px-2 bg-white/10 text-slate-400 text-[8px] font-black uppercase tracking-widest rounded-lg hover:bg-white/20"
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              </div>
                             ) : (
                               <button
-                                onClick={() => setEditingSpecialtyId(user.uid)}
-                                title="Clic para editar especialidad principal"
+                                onClick={() => {
+                                  setEditingSpecialtyId(user.uid);
+                                  setInlineSpecialties(getCleanSpecialties(user));
+                                }}
+                                title="Clic para editar especialidades"
                                 className="flex flex-wrap gap-1 max-w-full text-left"
                               >
                                 {getCleanSpecialties(user).length > 0 ? (

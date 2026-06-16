@@ -4,6 +4,7 @@ import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, Briefcase,
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
+import { AudioPlayer } from '../../components/ui/AudioPlayer';
 import { fetchAPI } from '../../services/backendService';
 import { convocatoriaService } from '../../services/convocatoriaService';
 import {
@@ -430,14 +431,12 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                 <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Demo de Voz Enviada</h4>
                 {selectedPost.voiceAudioId ? (
                   <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3">
-                    <div className="flex items-center gap-3">
-                      <div className="p-2 bg-sud-turquoise/10 text-sud-turquoise rounded-lg">
-                        <AudioLines size={16} />
-                      </div>
-                      <span className="text-sm font-bold text-white truncate">{selectedPost.voiceAudioTitle || 'Demo de voz'}</span>
-                    </div>
                     {selectedPost.voiceAudioUrl && (
-                      <audio src={selectedPost.voiceAudioUrl} controls className="w-full h-10 accent-sud-turquoise mt-2" />
+                      <AudioPlayer
+                        src={selectedPost.voiceAudioUrl}
+                        title={selectedPost.voiceAudioTitle || 'Demo de voz'}
+                        showVolume
+                      />
                     )}
                   </div>
                 ) : (

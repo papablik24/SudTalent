@@ -144,6 +144,30 @@ export async function deleteConvocatoria(id: string): Promise<void> {
   console.log('✅ Convocatoria eliminada');
 }
 
+/** Obtener IDs de convocatorias favoritas del alumno autenticado */
+export async function getMisFavoritasIds(): Promise<string[]> {
+  try {
+    const data = await fetchAPI<string[]>('/convocatorias/favoritas/me');
+    return data || [];
+  } catch (error) {
+    return [];
+  }
+}
+
+/** Marcar convocatoria como favorita */
+export async function marcarFavorita(id: string): Promise<void> {
+  await fetchAPI(`/convocatorias/${id}/favorita`, {
+    method: 'POST',
+  });
+}
+
+/** Quitar convocatoria de favoritas */
+export async function quitarFavorita(id: string): Promise<void> {
+  await fetchAPI(`/convocatorias/${id}/favorita`, {
+    method: 'DELETE',
+  });
+}
+
 export const convocatoriaService = {
   getConvocatorias,
   getConvocatoriasActivas,
@@ -153,4 +177,8 @@ export const convocatoriaService = {
   closeConvocatoria,
   archiveConvocatoria,
   deleteConvocatoria,
+  getMisFavoritasIds,
+  marcarFavorita,
+  quitarFavorita,
 };
+

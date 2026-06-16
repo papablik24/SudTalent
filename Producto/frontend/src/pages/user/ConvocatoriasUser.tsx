@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { Briefcase, Calendar, Sparkles, CheckCircle2, Search, ChevronDown, Clock, X, FileText, AlertCircle } from 'lucide-react';
+import { Briefcase, Calendar, Sparkles, CheckCircle2, Search, ChevronDown, Clock, X, FileText, AlertCircle, Heart } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -18,6 +18,7 @@ import {
   postulacionService,
   Postulacion,
 } from '../../services/postulacionService';
+
 
 const formatFecha = (fechaStr: string) => {
   if (!fechaStr) return '';
@@ -56,6 +57,36 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const [editingPostulacion, setEditingPostulacion] = useState<Postulacion | null>(null);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
 
+  // Favorites state
+  const [favoritasIds, setFavoritasIds] = useState<string[]>([]);
+  const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
+  const [favoriteToast, setFavoriteToast] = useState<string | null>(null);
+
+  const showFavoriteFeedback = (message: string) => {
+    setFavoriteToast(message);
+    setTimeout(() => {
+      setFavoriteToast(null);
+    }, 3000);
+  };
+
+  const handleToggleFavorite = async (convocatoriaId: string) => {
+    const isFav = favoritasIds.includes(convocatoriaId);
+    try {
+      if (isFav) {
+        await convocatoriaService.quitarFavorita(convocatoriaId);
+        setFavoritasIds(prev => prev.filter(id => id !== convocatoriaId));
+        showFavoriteFeedback('Convocatoria quitada de favoritos');
+      } else {
+        await convocatoriaService.marcarFavorita(convocatoriaId);
+        setFavoritasIds(prev => [...prev, convocatoriaId]);
+        showFavoriteFeedback('Convocatoria agregada a favoritos');
+      }
+    } catch (err: any) {
+      setError(err.message || 'Error al actualizar favorita.');
+      setTimeout(() => setError(null), 5000);
+    }
+  };
+
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategoria, setFilterCategoria] = useState<ConvocatoriaCategoria | 'TODAS'>('TODAS');
@@ -63,6 +94,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
 
   // Detail modal
   const [selectedConv, setSelectedConv] = useState<Convocatoria | null>(null);
+
 
   // Constantes seguras para evitar errores runtime con null / undefined / TDZ
   const selectedConvEstado = selectedConv?.estado || '';
@@ -123,14 +155,16 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
     }
 
     try {
-      const [convs, posts] = await Promise.all([
+      const [convs, posts, favIds] = await Promise.all([
         convocatoriaService.getConvocatoriasActivas(),
         postulacionService.getPostulacionesByUser(user.uid),
+        convocatoriaService.getMisFavoritasIds(),
       ]);
       setConvocatorias(convs);
       const map: Record<string, Postulacion> = {};
       posts.forEach(p => { map[p.convocatoriaId] = p; });
       setMyPostulaciones(map);
+      setFavoritasIds(favIds || []);
     } catch (err: any) {
       setError(err.message || 'Error al cargar convocatorias.');
     } finally {
@@ -141,6 +175,9 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   // ── Filtered list ────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     let result = [...convocatorias];
+    if (showOnlyFavorites) {
+      result = result.filter(c => favoritasIds.includes(c.id));
+    }
     if (filterCategoria !== 'TODAS') result = result.filter(c => c.categoria === filterCategoria);
     if (filterGenero !== 'TODOS') result = result.filter(c => c.generoVisual === filterGenero);
     if (searchTerm) {
@@ -148,7 +185,8 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       result = result.filter(c => c.titulo.toLowerCase().includes(low) || c.descripcion.toLowerCase().includes(low));
     }
     return result;
-  }, [convocatorias, filterCategoria, filterGenero, searchTerm]);
+  }, [convocatorias, favoritasIds, showOnlyFavorites, filterCategoria, filterGenero, searchTerm]);
+
 
   // ── Apply handler ────────────────────────────────────────────────────
   const handleApply = async (conv: Convocatoria) => {
@@ -253,6 +291,48 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
         </div>
       </header>
 
+      {/* Tabs */}
+      <div className="flex gap-6 border-b border-white/5 pb-1">
+        <button
+          onClick={() => setShowOnlyFavorites(false)}
+          className={`pb-4 text-[10px] font-black uppercase tracking-[0.2em] border-b-2 transition-all relative ${
+            !showOnlyFavorites 
+              ? 'text-white border-sud-turquoise' 
+              : 'text-slate-500 border-transparent hover:text-slate-300'
+          }`}
+        >
+          Todas las Convocatorias
+          {!showOnlyFavorites && (
+            <motion.div 
+              layoutId="activeTabUnderline" 
+              className="absolute bottom-0 left-0 right-0 h-[2px] bg-sud-turquoise"
+            />
+          )}
+        </button>
+        <button
+          onClick={() => setShowOnlyFavorites(true)}
+          className={`pb-4 text-[10px] font-black uppercase tracking-[0.2em] border-b-2 transition-all relative flex items-center gap-2 ${
+            showOnlyFavorites 
+              ? 'text-white border-sud-turquoise' 
+              : 'text-slate-500 border-transparent hover:text-slate-300'
+          }`}
+        >
+          <Heart size={12} className={showOnlyFavorites ? "text-red-500 fill-red-500" : "text-slate-500"} />
+          Convocatorias Favoritas
+          {favoritasIds.length > 0 && (
+            <span className="px-1.5 py-0.5 rounded-full text-[8px] bg-white/10 text-white font-bold">
+              {favoritasIds.length}
+            </span>
+          )}
+          {showOnlyFavorites && (
+            <motion.div 
+              layoutId="activeTabUnderline" 
+              className="absolute bottom-0 left-0 right-0 h-[2px] bg-sud-turquoise"
+            />
+          )}
+        </button>
+      </div>
+
       {/* Filters */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
@@ -306,6 +386,22 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
         )}
       </AnimatePresence>
 
+      {/* Favorite toast */}
+      <AnimatePresence>
+        {favoriteToast && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-50 p-5 bg-sud-turquoise/10 border border-sud-turquoise/30 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-md"
+          >
+            <Heart size={20} className="text-red-500 fill-red-500" />
+            <span className="text-sud-turquoise font-bold text-sm">{favoriteToast}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+
       {/* Error toast */}
       <AnimatePresence>
         {error && (
@@ -334,6 +430,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
         {filtered.map(conv => {
           const hasApplied = !!myPostulaciones[conv.id];
           const days = daysRemaining(conv.fechaLimite);
+          const isFavorite = favoritasIds.includes(conv.id);
           return (
             <motion.div 
               layout
@@ -343,7 +440,19 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-sud-turquoise/5 blur-3xl rounded-full" />
               
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleToggleFavorite(conv.id);
+                }}
+                className="absolute top-6 right-6 p-2.5 rounded-full bg-white/5 border border-white/10 text-slate-400 hover:text-white hover:bg-white/10 transition-all z-20"
+                title={isFavorite ? "Quitar de favoritas" : "Guardar como favorita"}
+              >
+                <Heart size={14} className={isFavorite ? "text-red-500 fill-red-500" : ""} />
+              </button>
+
               <div className="space-y-4">
+
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20">
                     {conv.categoria}
@@ -449,8 +558,18 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                 className="sud-glass-panel p-6 md:p-10 relative overflow-hidden overflow-x-hidden max-h-[90vh] md:max-h-[85vh] overflow-y-auto"
                 onClick={e => e.stopPropagation()}
               >
-                <button onClick={() => setSelectedConv(null)} className="absolute top-4 right-4 md:top-6 md:right-6 text-slate-500 hover:text-white z-10"><X size={22} /></button>
+                 <button onClick={() => setSelectedConv(null)} className="absolute top-4 right-4 md:top-6 md:right-6 text-slate-500 hover:text-white z-10"><X size={22} /></button>
                 
+                {selectedConv && (
+                  <button
+                    onClick={() => handleToggleFavorite(selectedConv.id)}
+                    className="absolute top-4 right-14 md:top-6 md:right-16 text-slate-400 hover:text-white z-10 transition-colors"
+                    title={favoritasIds.includes(selectedConv.id) ? "Quitar de favoritas" : "Guardar como favorita"}
+                  >
+                    <Heart size={20} className={favoritasIds.includes(selectedConv.id) ? "text-red-500 fill-red-500" : ""} />
+                  </button>
+                )}
+
                 <div className="space-y-8">
                   <div className="space-y-4">
                     <div className="flex items-center gap-3 flex-wrap">
@@ -465,9 +584,23 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                           {selectedConvGenero}
                         </span>
                       )}
+                      {selectedConv && (
+                        <button
+                          onClick={() => handleToggleFavorite(selectedConv.id)}
+                          className={`text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-lg border transition-all flex items-center gap-1.5 cursor-pointer ${
+                            favoritasIds.includes(selectedConv.id)
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                              : 'bg-white/5 text-slate-400 border-white/10 hover:bg-white/10'
+                          }`}
+                        >
+                          <Heart size={10} className={favoritasIds.includes(selectedConv.id) ? "fill-red-400" : ""} />
+                          {favoritasIds.includes(selectedConv.id) ? 'Favorita' : 'Guardar'}
+                        </button>
+                      )}
                     </div>
                     <h3 className="text-2xl md:text-3xl font-black text-white uppercase tracking-tight break-words pr-10">{selectedConvTitulo}</h3>
                   </div>
+
 
                   <div className="space-y-2">
                     <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Descripción</h4>

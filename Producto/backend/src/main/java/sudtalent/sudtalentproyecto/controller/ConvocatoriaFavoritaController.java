@@ -26,7 +26,7 @@ public class ConvocatoriaFavoritaController {
     @PreAuthorize("hasAuthority('ROLE_ALUMNO')")
     public ResponseEntity<Void> marcarFavorita(@PathVariable UUID id, Authentication authentication) {
         favoritaService.marcarComoFavorita(id, authentication);
-        return ResponseEntity.ok().build();
+        return ResponseEntity.noContent().build();
     }
 
     @DeleteMapping("/api/convocatorias/{id}/favorita")

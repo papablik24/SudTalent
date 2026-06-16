@@ -112,7 +112,11 @@ export async function fetchAPI<T>(
       return undefined as T;
     }
 
-    return response.json();
+    const text = await response.text();
+    if (!text || text.trim() === '') {
+      return undefined as T;
+    }
+    return JSON.parse(text);
   } catch (netErr: any) {
     if (netErr.message === 'Failed to fetch' || netErr.name === 'TypeError') {
       console.error('❌ Error de conexión al backend:', netErr);

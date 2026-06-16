@@ -71,6 +71,25 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
 
   const handleToggleFavorite = async (convocatoriaId: string) => {
     const isFav = favoritasIds.includes(convocatoriaId);
+    
+    if (!isFav) {
+      const conv = convocatorias.find(c => c.id === convocatoriaId);
+      if (conv) {
+        if (daysRemaining(conv.fechaLimite) <= 0) {
+          setError('No puedes guardar una convocatoria con plazo vencido.');
+          setTimeout(() => setError(null), 5000);
+          return;
+        }
+
+        const post = myPostulaciones[convocatoriaId];
+        if (post && post.estado === 'RECHAZADA') {
+          setError('No puedes guardar como favorita una convocatoria con postulación rechazada.');
+          setTimeout(() => setError(null), 5000);
+          return;
+        }
+      }
+    }
+
     try {
       if (isFav) {
         await convocatoriaService.quitarFavorita(convocatoriaId);

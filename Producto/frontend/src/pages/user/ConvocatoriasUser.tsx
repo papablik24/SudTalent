@@ -110,6 +110,8 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterCategoria, setFilterCategoria] = useState<ConvocatoriaCategoria | 'TODAS'>('TODAS');
   const [filterGenero, setFilterGenero] = useState<GeneroVisual | 'TODOS'>('TODOS');
+  // Sorting
+  const [sortBy, setSortBy] = useState<'RECENT' | 'DEADLINE_CLOSE' | 'DEADLINE_FAR' | 'TITLE_AZ'>('RECENT');
 
   // Detail modal
   const [selectedConv, setSelectedConv] = useState<Convocatoria | null>(null);
@@ -203,8 +205,29 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       const low = searchTerm.toLowerCase();
       result = result.filter(c => c.titulo.toLowerCase().includes(low) || c.descripcion.toLowerCase().includes(low));
     }
+
+    // Sorting
+    result.sort((a, b) => {
+      if (sortBy === 'RECENT') {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      } else if (sortBy === 'DEADLINE_CLOSE') {
+        const dateA = a.fechaLimite ? new Date(a.fechaLimite).getTime() : 0;
+        const dateB = b.fechaLimite ? new Date(b.fechaLimite).getTime() : 0;
+        return dateA - dateB;
+      } else if (sortBy === 'DEADLINE_FAR') {
+        const dateA = a.fechaLimite ? new Date(a.fechaLimite).getTime() : 0;
+        const dateB = b.fechaLimite ? new Date(b.fechaLimite).getTime() : 0;
+        return dateB - dateA;
+      } else if (sortBy === 'TITLE_AZ') {
+        return (a.titulo || '').localeCompare(b.titulo || '', 'es', { sensitivity: 'base' });
+      }
+      return 0;
+    });
+
     return result;
-  }, [convocatorias, favoritasIds, showOnlyFavorites, filterCategoria, filterGenero, searchTerm]);
+  }, [convocatorias, favoritasIds, showOnlyFavorites, filterCategoria, filterGenero, searchTerm, sortBy]);
 
 
   // ── Apply handler ────────────────────────────────────────────────────
@@ -367,6 +390,19 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
         <div className="flex gap-3 overflow-x-auto">
           <div className="relative">
             <select
+              value={sortBy}
+              onChange={e => setSortBy(e.target.value as any)}
+              className="sud-input appearance-none pr-10 min-w-[180px]"
+            >
+              <option value="RECENT">Ordenar por: Más recientes</option>
+              <option value="DEADLINE_CLOSE">Cierre más próximo</option>
+              <option value="DEADLINE_FAR">Mayor tiempo restante</option>
+              <option value="TITLE_AZ">Título A-Z</option>
+            </select>
+            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+          </div>
+          <div className="relative">
+            <select
               value={filterCategoria}
               onChange={e => setFilterCategoria(e.target.value as any)}
               className="sud-input appearance-none pr-10 min-w-[150px]"
@@ -445,7 +481,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       </AnimatePresence>
 
       {/* Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {filtered.map(conv => {
           const hasApplied = !!myPostulaciones[conv.id];
           const days = daysRemaining(conv.fechaLimite);
@@ -454,7 +490,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
             <motion.div 
               layout
               key={conv.id}
-              className="sud-glass-panel p-10 group relative flex flex-col justify-between space-y-8 border-white/[0.05] hover:border-white/20 transition-all duration-500 overflow-hidden cursor-pointer"
+              className="sud-glass-panel p-6 sm:p-10 group relative flex flex-col justify-between space-y-8 border-white/[0.05] hover:border-white/20 transition-all duration-500 overflow-hidden cursor-pointer"
               onClick={() => setSelectedConv(conv)}
             >
               <div className="absolute top-0 right-0 w-32 h-32 bg-sud-turquoise/5 blur-3xl rounded-full" />
@@ -471,8 +507,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
               </button>
 
               <div className="space-y-4">
-
-                <div className="flex items-center gap-3 flex-wrap">
+                <div className="flex items-center gap-3 flex-wrap pr-10">
                   <span className="text-[8px] font-black uppercase tracking-widest px-2.5 py-1.5 rounded-lg bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20">
                     {conv.categoria}
                   </span>
@@ -488,66 +523,66 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                   )}
                 </div>
                 
-                <h3 className="text-3xl font-black text-white uppercase tracking-tight leading-tight group-hover:sud-vibrant-text-gradient transition-all">{conv.titulo}</h3>
-                <p className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-3">{conv.descripcion}</p>
+                <h3 className="text-2xl sm:text-3xl font-black text-white uppercase tracking-tight leading-tight group-hover:sud-vibrant-text-gradient transition-all break-words">{conv.titulo}</h3>
+                <p className="text-xs text-slate-500 leading-relaxed font-medium line-clamp-3 break-words">{conv.descripcion}</p>
               </div>
 
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-y border-white/5 py-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between border-y border-white/5 py-4 gap-3">
                   <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
                     <Calendar size={14} className="text-sud-orange" />
                     <span>Cierre: {formatFecha(conv.fechaLimite)}</span>
                   </div>
                   <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${days <= 3 ? 'text-red-400' : 'text-slate-600'}`}>
                     <Clock size={14} />
-                    <span>{days} días restantes</span>
+                    <span>{days} {days === 1 ? 'día restante' : 'días restantes'}</span>
                   </div>
                 </div>
 
                 {hasApplied ? (
                   <div className="space-y-3">
-                    <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-slate-500">
+                    <div className="w-full min-h-[4rem] py-3 px-4 rounded-[1.5rem] flex flex-wrap items-center justify-center gap-3 bg-white/5 border border-white/10 text-slate-500">
                       <CheckCircle2 size={16} />
-                      <span className="text-xs font-black uppercase tracking-widest">Postulación Enviada</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-center">Postulación Enviada</span>
                       <StatusBadge status={myPostulaciones[conv.id].estado} />
                     </div>
                     {(myPostulaciones[conv.id].estado === 'PENDIENTE' || myPostulaciones[conv.id].estado === 'EN_REVISION') && (
-                      <div className="flex gap-3" onClick={e => e.stopPropagation()}>
+                      <div className="flex flex-col sm:flex-row gap-3 w-full" onClick={e => e.stopPropagation()}>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleCancel(myPostulaciones[conv.id].id, conv.id); }}
-                          className="flex-1 py-3.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all text-center"
+                          className="w-full sm:flex-1 py-3.5 px-4 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all text-center min-w-0"
                         >
                           Cancelar
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleEditPostulacion(myPostulaciones[conv.id], conv); }}
                           disabled={loadingEditId === myPostulaciones[conv.id].id}
-                          className="flex-1 py-3.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all text-center flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
+                          className="w-full sm:flex-1 py-3.5 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all text-center flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none min-w-0"
                         >
                           {loadingEditId === myPostulaciones[conv.id].id ? (
-                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto shrink-0" />
                           ) : (
-                            <>Editar Demo <Sparkles size={12} /></>
+                            <span className="flex items-center gap-1 truncate"><span className="truncate">Editar Demo</span> <Sparkles size={12} className="shrink-0" /></span>
                           )}
                         </button>
                       </div>
                     )}
                   </div>
                 ) : days <= 0 ? (
-                  <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400/70">
+                  <div className="w-full min-h-[4rem] py-3 px-6 rounded-[1.5rem] flex items-center justify-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400/70">
                     <Clock size={16} />
-                    <span className="text-xs font-black uppercase tracking-widest">Plazo Vencido</span>
+                    <span className="text-xs font-black uppercase tracking-widest text-center">Plazo Vencido</span>
                   </div>
                 ) : (
                   <button 
                     onClick={(e) => { e.stopPropagation(); handleApply(conv); }}
                     disabled={applyingId === conv.id}
-                    className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] shadow-2xl shadow-sud-turquoise/10 transition-all"
+                    className="w-full min-h-[4rem] py-3 px-6 rounded-[1.5rem] flex items-center justify-center gap-3 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] shadow-2xl shadow-sud-turquoise/10 transition-all min-w-0"
                   >
                     {applyingId === conv.id ? (
                       <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                     ) : (
-                      <>Postularme Ahora <Sparkles size={16}/></>
+                      <span className="flex items-center gap-2 truncate"><span className="truncate">Postularme Ahora</span> <Sparkles size={16} className="shrink-0" /></span>
                     )}
                   </button>
                 )}

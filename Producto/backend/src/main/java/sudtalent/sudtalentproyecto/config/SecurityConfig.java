@@ -58,11 +58,18 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         var config = new CorsConfiguration();
-        config.setAllowedOrigins(List.of(allowedOrigins.split(",")));
+        // Split origins and also allow any *.vercel.app preview URL
+        List<String> origins = new java.util.ArrayList<>(List.of(allowedOrigins.split(",")));
+        config.setAllowedOriginPatterns(origins.stream()
+                .map(String::trim)
+                .collect(java.util.stream.Collectors.toList()));
+        // Also allow all Vercel preview deployments
+        config.addAllowedOriginPattern("https://*-papablik24s-projects.vercel.app");
+        config.addAllowedOriginPattern("https://*.vercel.app");
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setExposedHeaders(List.of("Authorization"));
-        config.setAllowCredentials(true); // Requerido para cookies
+        config.setAllowCredentials(true);
         config.setMaxAge(3600L);
         var source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);

@@ -453,10 +453,13 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                   const genres = Array.from(new Set(uDemos.map(d => d.visualGenre).filter((g): g is VisualGenre => !!g)));
 
                   return (
-                    <button
+                    <div
                       key={user.uid}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => setSelectedUserId(user.uid)}
-                      className={`w-full grid grid-cols-12 gap-4 px-8 py-5 border-b border-white/[0.02] items-center transition-all hover:bg-white/[0.03] text-left group ${
+                      onKeyDown={(e) => e.key === 'Enter' && setSelectedUserId(user.uid)}
+                      className={`w-full grid grid-cols-12 gap-4 px-8 py-5 border-b border-white/[0.02] items-center transition-all hover:bg-white/[0.03] text-left group cursor-pointer ${
                         isSelected ? 'bg-white/5 border-l-4 border-l-sud-turquoise' : ''
                       }`}
                     >
@@ -566,7 +569,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                           </span>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   );
                 })
               ) : (
@@ -936,16 +939,6 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                     </a>
                   </section>
                 )}
-
-                {/* Footer Actions inside the scroll */}
-                <div className="pt-6 pb-12 border-t border-white/5 flex gap-4">
-                   <button className="flex-1 sud-btn-secondary">
-                      Contactar Alumno
-                   </button>
-                   <button className="flex-1 sud-btn-primary">
-                      Generar Reportería
-                   </button>
-                </div>
               </div>
             </motion.div>
           </>

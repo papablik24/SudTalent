@@ -432,18 +432,162 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
         {/* Results List */}
         <div className="flex-1 overflow-hidden flex flex-col gap-6">
           <div className="sud-glass-panel flex-1 flex flex-col p-0 overflow-hidden relative">
-            {/* Table Header */}
-            <div className="grid grid-cols-12 gap-4 px-8 py-5 bg-white/[0.02] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
-              <div className="col-span-3">Nombre / Talento</div>
-              <div className="col-span-2">Especialidad</div>
-              <div className="col-span-2">Género / Escena</div>
-              <div className="col-span-1">Tipo</div>
-              <div className="col-span-2">Estado</div>
-              <div className="col-span-2 text-right">Demos</div>
+            {/* Desktop Table View (>= 2xl) */}
+            <div className="hidden 2xl:flex flex-col flex-1 overflow-hidden">
+              {/* Table Header */}
+              <div className="grid grid-cols-12 gap-4 px-8 py-5 bg-white/[0.02] border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-slate-500">
+                <div className="col-span-3">Nombre / Talento</div>
+                <div className="col-span-3">Especialidad</div>
+                <div className="col-span-2">Género / Escena</div>
+                <div className="col-span-1">Tipo</div>
+                <div className="col-span-2">Estado</div>
+                <div className="col-span-1 text-right">Demos</div>
+              </div>
+
+              {/* Table Body */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar">
+                {filteredUsers.length > 0 ? (
+                  filteredUsers.map((user) => {
+                    const selectedUserDemoCount = selectedUserId === user.uid ? loadedDemos.length : (demoCounts[user.uid] ?? null);
+                    const isSelected = selectedUserId === user.uid;
+                    
+                    const uDemos = allDemos[user.uid] || [];
+                    const genres = Array.from(new Set(uDemos.map(d => d.visualGenre).filter((g): g is VisualGenre => !!g)));
+
+                    return (
+                      <div
+                        key={user.uid}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setSelectedUserId(user.uid)}
+                        onKeyDown={(e) => e.key === 'Enter' && setSelectedUserId(user.uid)}
+                        className={`w-full grid grid-cols-12 gap-4 px-8 py-5 border-b border-white/[0.02] items-center transition-all hover:bg-white/[0.03] text-left group cursor-pointer ${
+                          isSelected ? 'bg-white/5 border-l-4 border-l-sud-turquoise' : ''
+                        }`}
+                      >
+                        <div className="col-span-3 flex items-center gap-4 min-w-0">
+                          <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] shrink-0">
+                            <div className="w-full h-full rounded-[0.9rem] bg-black flex items-center justify-center overflow-hidden">
+                              {user.avatar ? (
+                                <img src={user.avatar} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <User size={20} className="text-slate-600" />
+                              )}
+                            </div>
+                          </div>
+                          <div className="truncate min-w-0">
+                            <p className="text-sm font-black text-white uppercase tracking-tight group-hover:text-sud-turquoise transition-colors truncate">
+                              {user.name || 'Sin Nombre'}
+                            </p>
+                            <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate">
+                              {user.phone}
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="col-span-3 min-w-0 pr-2" onClick={e => e.stopPropagation()}>
+                          {editingSpecialtyId === user.uid ? (
+                            <select
+                              autoFocus
+                              defaultValue={getCleanSpecialties(user)[0] || ''}
+                              onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
+                              onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
+                              className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
+                            >
+                              <option value="">Sin especialidad definida</option>
+                              <option value="Doblaje">Doblaje</option>
+                              <option value="Locución">Locución</option>
+                              <option value="Podcast">Podcast</option>
+                              <option value="Presentación">Presentación</option>
+                              <option value="Narración">Narración</option>
+                              <option value="Actuación Vocal">Actuación Vocal</option>
+                              <option value="Producción Vocal">Producción Vocal</option>
+                              <option value="Canto">Canto</option>
+                            </select>
+                          ) : (
+                            <button
+                              onClick={() => setEditingSpecialtyId(user.uid)}
+                              title="Clic para editar especialidad principal"
+                              className="flex flex-wrap gap-1 max-w-full"
+                            >
+                              {getCleanSpecialties(user).length > 0
+                                ? getCleanSpecialties(user).map((s, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange hover:bg-sud-orange/20 transition-all whitespace-normal break-words leading-tight text-left inline-block"
+                                    >
+                                      {s}
+                                    </span>
+                                  ))
+                                : <span className="px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500 whitespace-normal break-words leading-tight inline-block text-left">Sin especialidad</span>
+                              }
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Género / Escena */}
+                        <div className="col-span-2 flex flex-wrap gap-1 min-w-0">
+                          {genres.length > 0 ? (
+                            genres.slice(0, 2).map((g, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20 whitespace-normal break-words leading-tight text-left inline-block"
+                              >
+                                {g.toUpperCase()}
+                              </span>
+                            ))
+                          ) : (
+                            <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest whitespace-normal break-words">
+                              Sin género
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="col-span-1 min-w-0">
+                          <span className="text-[10px] font-black uppercase text-slate-400 tracking-wider block truncate max-w-full">
+                            <span className="hidden xl:inline">{user.profileType === 'PARENT' ? '👶 ' : '👤 '}</span>
+                            {user.profileType === 'PARENT' ? 'Menor' : 'Adulto'}
+                          </span>
+                        </div>
+
+                        <div className="col-span-2 min-w-0">
+                          <div className="flex items-center gap-1.5 md:gap-2 whitespace-nowrap">
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                              user.status === 'APPROVED' ? 'bg-sud-turquoise' : 
+                              user.status === 'INACTIVE' ? 'bg-red-500' : 'bg-sud-yellow'
+                            }`} />
+                            <span className="text-[10px] font-black uppercase tracking-widest text-slate-300 truncate">
+                              {user.status === 'APPROVED' ? 'Aprobado' : 
+                               user.status === 'INACTIVE' ? 'Inactivo' : 'Pendiente'}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="col-span-1 text-right">
+                          <div className="flex items-center justify-end">
+                            <span className={`text-[10px] font-black font-mono ${
+                              (selectedUserDemoCount ?? 0) > 0 ? 'text-sud-turquoise' : 'text-slate-600'
+                            }`}>
+                              {selectedUserDemoCount === null ? '…' : selectedUserDemoCount}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="flex flex-col items-center justify-center py-24 text-slate-500 space-y-4">
+                    <div className="w-20 h-20 rounded-full bg-white/[0.02] flex items-center justify-center animate-pulse">
+                      <Search size={32} className="opacity-20" />
+                    </div>
+                    <p className="font-black uppercase tracking-[0.2em] text-[11px]">No se encontraron talentos con estos criterios</p>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Table Body */}
-            <div className="flex-1 overflow-y-auto custom-scrollbar">
+            {/* Responsive Card/Stacked View (< 2xl) */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar p-6 space-y-4 2xl:hidden">
               {filteredUsers.length > 0 ? (
                 filteredUsers.map((user) => {
                   const selectedUserDemoCount = selectedUserId === user.uid ? loadedDemos.length : (demoCounts[user.uid] ?? null);
@@ -459,11 +603,12 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                       tabIndex={0}
                       onClick={() => setSelectedUserId(user.uid)}
                       onKeyDown={(e) => e.key === 'Enter' && setSelectedUserId(user.uid)}
-                      className={`w-full grid grid-cols-12 gap-4 px-8 py-5 border-b border-white/[0.02] items-center transition-all hover:bg-white/[0.03] text-left group cursor-pointer ${
-                        isSelected ? 'bg-white/5 border-l-4 border-l-sud-turquoise' : ''
+                      className={`w-full flex flex-col md:flex-row md:items-center justify-between gap-4 p-5 rounded-2xl border transition-all hover:bg-white/[0.03] text-left group cursor-pointer ${
+                        isSelected ? 'bg-white/5 border-sud-turquoise' : 'bg-white/[0.02] border-white/5'
                       }`}
                     >
-                      <div className="col-span-3 flex items-center gap-4">
+                      {/* Left: Avatar & Info */}
+                      <div className="flex items-center gap-4 min-w-0 md:w-1/3">
                         <div className="w-12 h-12 rounded-2xl bg-sud-gradient p-[1px] shrink-0">
                           <div className="w-full h-full rounded-[0.9rem] bg-black flex items-center justify-center overflow-hidden">
                             {user.avatar ? (
@@ -473,83 +618,97 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                             )}
                           </div>
                         </div>
-                        <div className="truncate">
-                          <p className="text-sm font-black text-white uppercase tracking-tight group-hover:text-sud-turquoise transition-colors truncate">
-                            {user.name || 'Sin Nombre'}
-                          </p>
-                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest truncate">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <p className="text-sm font-black text-white uppercase tracking-tight group-hover:text-sud-turquoise transition-colors truncate">
+                              {user.name || 'Sin Nombre'}
+                            </p>
+                            <span className="text-[8px] font-black uppercase text-slate-400 tracking-wider bg-white/5 px-2 py-0.5 rounded whitespace-nowrap">
+                              {user.profileType === 'PARENT' ? '👶 Menor' : '👤 Adulto'}
+                            </span>
+                          </div>
+                          <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">
                             {user.phone}
                           </p>
                         </div>
                       </div>
-                      
-                      <div className="col-span-2" onClick={e => e.stopPropagation()}>
-                        {editingSpecialtyId === user.uid ? (
-                          <select
-                            autoFocus
-                            defaultValue={getCleanSpecialties(user)[0] || ''}
-                            onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
-                            onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
-                            className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
-                          >
-                            <option value="">Sin especialidad definida</option>
-                            <option value="Doblaje">Doblaje</option>
-                            <option value="Locución">Locución</option>
-                            <option value="Podcast">Podcast</option>
-                            <option value="Presentación">Presentación</option>
-                            <option value="Narración">Narración</option>
-                            <option value="Actuación Vocal">Actuación Vocal</option>
-                            <option value="Producción Vocal">Producción Vocal</option>
-                            <option value="Canto">Canto</option>
-                          </select>
-                        ) : (
-                          <button
-                            onClick={() => setEditingSpecialtyId(user.uid)}
-                            title="Clic para editar especialidad principal"
-                            className="flex flex-wrap gap-1"
-                          >
-                            {getCleanSpecialties(user).length > 0
-                              ? getCleanSpecialties(user).map((s, i) => (
-                                  <span
-                                    key={i}
-                                    className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange hover:bg-sud-orange/20 transition-all"
-                                  >
-                                    {s}
+
+                      {/* Middle: Specialties & Genres */}
+                      <div className="flex flex-wrap gap-6 items-start md:w-1/2 min-w-0">
+                        {/* Specialties */}
+                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Especialidad</span>
+                          <div className="flex flex-wrap gap-1" onClick={e => e.stopPropagation()}>
+                            {editingSpecialtyId === user.uid ? (
+                              <select
+                                autoFocus
+                                defaultValue={getCleanSpecialties(user)[0] || ''}
+                                onBlur={e => handleSpecialtyChange(user.uid, e.target.value)}
+                                onChange={e => handleSpecialtyChange(user.uid, e.target.value)}
+                                className="bg-black border border-sud-turquoise/40 rounded-lg px-2 py-1 text-[9px] font-black uppercase tracking-widest text-white outline-none w-full"
+                              >
+                                <option value="">Sin especialidad definida</option>
+                                <option value="Doblaje">Doblaje</option>
+                                <option value="Locución">Locución</option>
+                                <option value="Podcast">Podcast</option>
+                                <option value="Presentación">Presentación</option>
+                                <option value="Narración">Narración</option>
+                                <option value="Actuación Vocal">Actuación Vocal</option>
+                                <option value="Producción Vocal">Producción Vocal</option>
+                                <option value="Canto">Canto</option>
+                              </select>
+                            ) : (
+                              <button
+                                onClick={() => setEditingSpecialtyId(user.uid)}
+                                title="Clic para editar especialidad principal"
+                                className="flex flex-wrap gap-1 max-w-full text-left"
+                              >
+                                {getCleanSpecialties(user).length > 0 ? (
+                                  getCleanSpecialties(user).map((s, i) => (
+                                    <span
+                                      key={i}
+                                      className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-orange/10 text-sud-orange hover:bg-sud-orange/20 transition-all whitespace-normal break-words leading-tight inline-block"
+                                    >
+                                      {s}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500 whitespace-normal break-words leading-tight inline-block">
+                                    Sin especialidad
                                   </span>
-                                ))
-                              : <span className="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest bg-slate-500/10 text-slate-500">Sin especialidad definida</span>
-                            }
-                          </button>
-                        )}
+                                )}
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Genres */}
+                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                          <span className="text-[8px] font-black uppercase tracking-[0.2em] text-slate-500">Género / Escena</span>
+                          <div className="flex flex-wrap gap-1">
+                            {genres.length > 0 ? (
+                              genres.slice(0, 3).map((g, idx) => (
+                                <span
+                                  key={idx}
+                                  className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20 whitespace-normal break-words leading-tight inline-block"
+                                >
+                                  {g.toUpperCase()}
+                                </span>
+                              ))
+                            ) : (
+                              <span className="text-[9px] font-black uppercase text-slate-600 tracking-widest">
+                                Sin género
+                              </span>
+                            )}
+                          </div>
+                        </div>
                       </div>
 
-                      {/* Género / Escena */}
-                      <div className="col-span-2 flex flex-wrap gap-1">
-                        {genres.length > 0 ? (
-                          genres.map((g, idx) => (
-                            <span
-                              key={idx}
-                              className="px-2 py-0.5 rounded-full text-[8px] font-black uppercase tracking-widest bg-sud-turquoise/10 text-sud-turquoise border border-sud-turquoise/20"
-                            >
-                              {g.toUpperCase()}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[10px] font-black uppercase text-slate-600 tracking-widest">
-                            Sin género
-                          </span>
-                        )}
-                      </div>
-
-                      <div className="col-span-1">
-                        <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
-                          {user.profileType === 'PARENT' ? '👶 Menor' : '👤 Adulto'}
-                        </span>
-                      </div>
-
-                      <div className="col-span-2">
-                        <div className="flex items-center gap-2">
-                          <div className={`w-1.5 h-1.5 rounded-full ${
+                      {/* Right: Status & Demos count */}
+                      <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-white/5 pt-3 md:pt-0 shrink-0 md:w-1/6">
+                        {/* Status */}
+                        <div className="flex items-center gap-1.5 whitespace-nowrap">
+                          <div className={`w-1.5 h-1.5 rounded-full shrink-0 ${
                             user.status === 'APPROVED' ? 'bg-sud-turquoise' : 
                             user.status === 'INACTIVE' ? 'bg-red-500' : 'bg-sud-yellow'
                           }`} />
@@ -558,10 +717,10 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                              user.status === 'INACTIVE' ? 'Inactivo' : 'Pendiente'}
                           </span>
                         </div>
-                      </div>
 
-                      <div className="col-span-2 text-right">
-                        <div className="flex items-center justify-end">
+                        {/* Demos Count */}
+                        <div className="flex items-center gap-2 bg-white/[0.03] px-3 py-1.5 rounded-xl border border-white/5">
+                          <span className="text-[8px] font-black uppercase tracking-widest text-slate-500">Demos</span>
                           <span className={`text-[10px] font-black font-mono ${
                             (selectedUserDemoCount ?? 0) > 0 ? 'text-sud-turquoise' : 'text-slate-600'
                           }`}>

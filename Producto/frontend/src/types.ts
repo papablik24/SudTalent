@@ -217,7 +217,7 @@ export interface Notificacion {
   id: string;
   titulo: string;
   mensaje: string;
-  tipo: 'POSTULACION' | 'CURSO' | 'AGENDA';
+  tipo: 'POSTULACION' | 'CURSO' | 'AGENDA' | 'CONVOCATORIA';
   leido: boolean;
   fechaCreacion: string;
   referenciaId?: string;

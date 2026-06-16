@@ -64,6 +64,7 @@ export function ConvocatoriasAdmin() {
   // Postulantes modal
   const [viewingApplicantsId, setViewingApplicantsId] = useState<string | null>(null);
   const [applicants, setApplicants] = useState<Postulacion[]>([]);
+  const [convToDeleteId, setConvToDeleteId] = useState<string | null>(null);
 
   // ── Load data ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -150,9 +151,12 @@ export function ConvocatoriasAdmin() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas eliminar esta convocatoria?')) return;
-    await convocatoriaService.deleteConvocatoria(id);
-    await loadData();
+    try {
+      await convocatoriaService.deleteConvocatoria(id);
+      await loadData();
+    } catch (err: any) {
+      setError(err.message || 'Error al eliminar la convocatoria.');
+    }
   };
 
   const handleClose = async (id: string) => {
@@ -335,7 +339,7 @@ export function ConvocatoriasAdmin() {
                 <Edit2 size={18} />
               </button>
               <button 
-                onClick={() => handleDelete(conv.id)}
+                onClick={() => setConvToDeleteId(conv.id)}
                 className="p-3 bg-white/5 border border-white/10 rounded-2xl text-slate-400 hover:text-red-400 transition-all" title="Eliminar"
               >
                 <Trash2 size={18} />
@@ -524,6 +528,52 @@ export function ConvocatoriasAdmin() {
                     <p className="text-[10px] font-black uppercase tracking-widest">No hay postulantes aún</p>
                   </div>
                 )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Custom Delete Confirmation Modal ───────────────────────── */}
+      <AnimatePresence>
+        {convToDeleteId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/25 dark:bg-black/60 backdrop-blur-sm dark:backdrop-blur-md" onClick={() => setConvToDeleteId(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-md p-10 relative overflow-hidden text-center space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setConvToDeleteId(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500">
+                <Trash2 size={32} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Eliminar convocatoria</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">Esta acción eliminará la convocatoria seleccionada. ¿Deseas continuar?</p>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setConvToDeleteId(null)}
+                  className="flex-1 h-12 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-black uppercase tracking-widest text-slate-400 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (convToDeleteId) {
+                      await handleDelete(convToDeleteId);
+                      setConvToDeleteId(null);
+                    }
+                  }}
+                  className="flex-1 h-12 rounded-xl bg-red-500 text-black hover:bg-red-600 text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+                >
+                  Eliminar
+                </button>
               </div>
             </motion.div>
           </div>

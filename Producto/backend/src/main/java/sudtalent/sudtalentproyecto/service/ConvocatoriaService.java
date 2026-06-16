@@ -3,7 +3,9 @@ package sudtalent.sudtalentproyecto.service;
 import sudtalent.sudtalentproyecto.dto.ConvocatoriaDTO;
 import sudtalent.sudtalentproyecto.dto.ConvocatoriaRequestDTO;
 import sudtalent.sudtalentproyecto.model.Convocatoria;
+import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.repository.ConvocatoriaRepository;
+import sudtalent.sudtalentproyecto.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,6 +22,8 @@ import java.util.stream.Collectors;
 public class ConvocatoriaService {
 
     private final ConvocatoriaRepository convocatoriaRepository;
+    private final UserRepository userRepository;
+    private final NotificacionService notificacionService;
 
     // ── Create ───────────────────────────────────────────────────────────
 
@@ -33,7 +37,11 @@ public class ConvocatoriaService {
                 .fechaLimite(request.getFechaLimite())
                 .estado(request.getEstado() != null ? request.getEstado() : "ACTIVA")
                 .build();
-        return toDTO(convocatoriaRepository.save(conv));
+        Convocatoria saved = convocatoriaRepository.save(conv);
+        if ("ACTIVA".equals(saved.getEstado())) {
+            notificarNuevaConvocatoria(saved);
+        }
+        return toDTO(saved);
     }
 
     // ── Read ─────────────────────────────────────────────────────────────
@@ -73,6 +81,8 @@ public class ConvocatoriaService {
         Convocatoria conv = convocatoriaRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Convocatoria no encontrada"));
 
+        String estadoAnterior = conv.getEstado();
+
         if (request.getTitulo() != null) conv.setTitulo(request.getTitulo());
         if (request.getDescripcion() != null) conv.setDescripcion(request.getDescripcion());
         if (request.getCategoria() != null) conv.setCategoria(request.getCategoria());
@@ -81,7 +91,37 @@ public class ConvocatoriaService {
         if (request.getFechaLimite() != null) conv.setFechaLimite(request.getFechaLimite());
         if (request.getEstado() != null) conv.setEstado(request.getEstado());
 
-        return toDTO(convocatoriaRepository.save(conv));
+        Convocatoria saved = convocatoriaRepository.save(conv);
+
+        boolean sePublica = "ACTIVA".equals(saved.getEstado()) && !"ACTIVA".equals(estadoAnterior);
+        if (sePublica) {
+            notificarNuevaConvocatoria(saved);
+        }
+
+        return toDTO(saved);
+    }
+
+    private void notificarNuevaConvocatoria(Convocatoria conv) {
+        try {
+            List<User> alumnos = userRepository.findByRoleAndActiveTrueAndDeletedAtIsNullAndStatusNot(
+                    User.Role.ALUMNO, 
+                    User.ProfileStatus.INACTIVE
+            );
+            if (alumnos != null && !alumnos.isEmpty()) {
+                String titulo = "Nueva convocatoria disponible";
+                String mensaje = "Nueva convocatoria disponible: " + conv.getTitulo();
+                notificacionService.crearNotificacionesParaUsuarios(
+                        alumnos,
+                        titulo,
+                        mensaje,
+                        "CONVOCATORIA",
+                        conv.getId(),
+                        "CONVOCATORIA"
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("Error enviando notificaciones para nueva convocatoria: " + e.getMessage());
+        }
     }
 
     // ── Delete ───────────────────────────────────────────────────────────

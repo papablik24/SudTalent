@@ -147,6 +147,14 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
       } else {
         onNavigate('/cursos');
       }
+    } else if (notif.tipo === 'CONVOCATORIA') {
+      if (role === 'ADMIN') {
+        onNavigate('/admin/convocatorias');
+      } else if (role === 'PROFESOR') {
+        onNavigate('/profesor?view=dashboard');
+      } else {
+        onNavigate('/convocatorias');
+      }
     } else {
       if (role === 'ADMIN') {
         onNavigate('/admin');
@@ -250,7 +258,9 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
                                   ? 'bg-sud-orange/10 text-sud-orange border-sud-orange/20'
                                   : notif.tipo === 'CURSO'
                                     ? 'bg-sud-turquoise/10 text-sud-turquoise border-sud-turquoise/20'
-                                    : 'bg-sud-blue/10 text-sud-blue border-sud-blue/20'
+                                    : notif.tipo === 'CONVOCATORIA'
+                                      ? 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                                      : 'bg-sud-blue/10 text-sud-blue border-sud-blue/20'
                               }`}>
                                 {notif.tipo}
                               </span>

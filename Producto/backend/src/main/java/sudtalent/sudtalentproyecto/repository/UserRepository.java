@@ -1,5 +1,6 @@
 package sudtalent.sudtalentproyecto.repository;
 
+import java.util.List;
 import java.util.Optional;
 import org.springframework.data.jpa.repository.Query;
 import sudtalent.sudtalentproyecto.model.User;
@@ -17,4 +18,6 @@ public interface UserRepository extends SoftDeleteRepository<User> {
     Optional<User> findByPhoneActive(String phone);
     
     boolean existsByEmail(String email);
+
+    List<User> findByRoleAndActiveTrueAndDeletedAtIsNullAndStatusNot(User.Role role, User.ProfileStatus status);
 }

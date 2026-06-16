@@ -6,6 +6,7 @@ import sudtalent.sudtalentproyecto.model.Convocatoria;
 import sudtalent.sudtalentproyecto.model.Postulacion;
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.model.VoiceAudio;
+import sudtalent.sudtalentproyecto.model.Audicion;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -130,6 +131,17 @@ public class PostulacionService {
                 throw new org.springframework.security.access.AccessDeniedException("No tienes permisos para editar esta postulación");
             }
             
+            // Verificar si la postulación tiene audiciones evaluadas
+            List<Audicion> audiciones = entityManager.createQuery(
+                    "SELECT a FROM Audicion a WHERE a.postulacion.id = :postulacionId", Audicion.class)
+                    .setParameter("postulacionId", id)
+                    .getResultList();
+            boolean tieneAudicionEvaluada = audiciones.stream()
+                    .anyMatch(a -> "EVALUADA".equals(a.getEstado()));
+            if (tieneAudicionEvaluada) {
+                throw new RuntimeException("No se puede cancelar ni editar una postulación que ya tiene una audición evaluada");
+            }
+
             boolean isCanceling = "CANCELADA".equals(nuevoEstado);
             if (isCanceling) {
                 // Para cancelar, el estado actual debe ser PENDIENTE o EN_REVISION
@@ -138,9 +150,10 @@ public class PostulacionService {
                     throw new RuntimeException("Solo se pueden cancelar postulaciones en estado PENDIENTE o EN_REVISION");
                 }
             } else {
-                // Si está editando (mensaje o demo), la postulación debe estar en estado PENDIENTE
-                if (!"PENDIENTE".equals(postulacion.getEstado())) {
-                    throw new RuntimeException("Solo se pueden editar postulaciones en estado PENDIENTE");
+                // Si está editando (mensaje o demo), la postulación debe estar en estado PENDIENTE o EN_REVISION
+                String currentEstado = postulacion.getEstado();
+                if (!"PENDIENTE".equals(currentEstado) && !"EN_REVISION".equals(currentEstado)) {
+                    throw new RuntimeException("Solo se pueden editar postulaciones en estado PENDIENTE o EN_REVISION");
                 }
                 // El alumno no puede cambiar el estado de la postulación a otra cosa
                 if (nuevoEstado != null && !nuevoEstado.equals(postulacion.getEstado())) {

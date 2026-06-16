@@ -25,6 +25,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
   const [userDemos, setUserDemos] = useState<any[]>([]);
   const [selectedDemoId, setSelectedDemoId] = useState<string>('');
   const [saving, setSaving] = useState(false);
+  const [postToCancelId, setPostToCancelId] = useState<string | null>(null);
 
   // Detail state
   const [selectedPost, setSelectedPost] = useState<Postulacion | null>(null);
@@ -57,14 +58,19 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
     }
   };
 
-  const handleCancel = async (id: string) => {
-    if (!confirm('¿Estás seguro de que deseas cancelar esta postulación?')) return;
+  const handleCancel = (id: string) => {
+    setPostToCancelId(id);
+  };
+
+  const confirmCancel = async () => {
+    if (!postToCancelId) return;
     try {
-      await postulacionService.updatePostulacion(id, { estado: 'CANCELADA' });
-      // Actualizar la lista localmente
-      setPostulaciones(prev => prev.map(p => p.id === id ? { ...p, estado: 'CANCELADA' as any } : p));
+      await postulacionService.updatePostulacion(postToCancelId, { estado: 'CANCELADA' });
+      setPostulaciones(prev => prev.map(p => p.id === postToCancelId ? { ...p, estado: 'CANCELADA' as any } : p));
     } catch (err: any) {
       alert(err.message || 'Error al cancelar la postulación.');
+    } finally {
+      setPostToCancelId(null);
     }
   };
 
@@ -76,8 +82,8 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
         mensaje: editMensaje,
       };
       
-      // Permitir cambiar la demo solo si la postulación está PENDIENTE
-      if (editingPost.estado === 'PENDIENTE' && selectedDemoId) {
+      // Permitir cambiar la demo si la postulación está PENDIENTE o EN_REVISION
+      if ((editingPost.estado === 'PENDIENTE' || editingPost.estado === 'EN_REVISION') && selectedDemoId) {
         payload.voiceAudioId = selectedDemoId;
       }
 
@@ -252,43 +258,29 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
               </div>
               
               <div className="flex flex-wrap items-center gap-2">
-                {/* Editar */}
-                {(post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION') ? (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      setEditingPost(post);
-                      setEditMensaje(post.mensaje || '');
-                      setSelectedDemoId(post.voiceAudioId || '');
-                    }}
-                    className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all cursor-pointer"
-                  >
-                    Editar
-                  </button>
-                ) : (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate('/demos');
-                    }}
-                    className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-500 transition-all cursor-pointer"
-                    title="Esta postulación no es editable. Ir a Mis Demos."
-                  >
-                    Editar
-                  </button>
-                )}
-
-                {/* Cancelar */}
                 {(post.estado === 'PENDIENTE' || post.estado === 'EN_REVISION') && (
-                  <button 
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleCancel(post.id);
-                    }}
-                    className="px-4 py-2 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all cursor-pointer"
-                  >
-                    Cancelar
-                  </button>
+                  <>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setEditingPost(post);
+                        setEditMensaje(post.mensaje || '');
+                        setSelectedDemoId(post.voiceAudioId || '');
+                      }}
+                      className="px-4 py-2 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all cursor-pointer"
+                    >
+                      Editar
+                    </button>
+                    <button 
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleCancel(post.id);
+                      }}
+                      className="px-4 py-2 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all cursor-pointer"
+                    >
+                      Cancelar
+                    </button>
+                  </>
                 )}
               </div>
             </div>
@@ -340,7 +332,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                 />
               </div>
 
-              {editingPost.estado === 'PENDIENTE' && (
+              {(editingPost.estado === 'PENDIENTE' || editingPost.estado === 'EN_REVISION') && (
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Cambiar Demo de Voz</label>
                   {userDemos.length > 0 ? (
@@ -367,7 +359,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
 
               <button 
                 onClick={handleSaveEdit}
-                disabled={saving || (editingPost.estado === 'PENDIENTE' && userDemos.length === 0)}
+                disabled={saving || ((editingPost.estado === 'PENDIENTE' || editingPost.estado === 'EN_REVISION') && userDemos.length === 0)}
                 className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all disabled:opacity-50 disabled:pointer-events-none"
               >
                 {saving ? (
@@ -454,9 +446,9 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
               </div>
 
               {/* Botones de acción dentro del modal de detalle */}
-              <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-white/10">
-                {/* Cancelar */}
-                {(selectedPost.estado === 'PENDIENTE' || selectedPost.estado === 'EN_REVISION') && (
+              {(selectedPost.estado === 'PENDIENTE' || selectedPost.estado === 'EN_REVISION') && (
+                <div className="flex flex-col sm:flex-row gap-4 pt-6 border-t border-white/10">
+                  {/* Cancelar */}
                   <button 
                     onClick={() => {
                       handleCancel(selectedPost.id);
@@ -466,10 +458,8 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                   >
                     Cancelar Postulación
                   </button>
-                )}
 
-                {/* Editar */}
-                {(selectedPost.estado === 'PENDIENTE' || selectedPost.estado === 'EN_REVISION') ? (
+                  {/* Editar */}
                   <button 
                     onClick={() => {
                       setEditingPost(selectedPost);
@@ -481,17 +471,48 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                   >
                     Editar Mensaje / Demo <Sparkles size={14} />
                   </button>
-                ) : (
-                  <button 
-                    onClick={() => {
-                      navigate('/demos');
-                      setSelectedPost(null);
-                    }}
-                    className="flex-1 px-6 py-4 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-black uppercase tracking-widest text-slate-400 transition-all cursor-pointer text-center"
-                  >
-                    Ir a Mis Demos
-                  </button>
-                )}
+                </div>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Custom Cancel Confirmation Modal ───────────────────────── */}
+      <AnimatePresence>
+        {postToCancelId && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => setPostToCancelId(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-md p-10 relative overflow-hidden text-center space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setPostToCancelId(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500">
+                <AlertCircle size={32} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">¿Cancelar Postulación?</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">¿Estás seguro de que deseas cancelar esta postulación? Esta acción no se puede deshacer.</p>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setPostToCancelId(null)}
+                  className="flex-1 h-12 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-black uppercase tracking-widest text-slate-400 transition-all"
+                >
+                  No, mantener
+                </button>
+                <button 
+                  onClick={confirmCancel}
+                  className="flex-1 h-12 rounded-xl bg-red-500 text-black hover:bg-red-600 text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Sí, cancelar
+                </button>
               </div>
             </motion.div>
           </div>

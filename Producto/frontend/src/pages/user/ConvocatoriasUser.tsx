@@ -53,6 +53,8 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const [userDemos, setUserDemos] = useState<any[]>([]);
   const [selectedDemoId, setSelectedDemoId] = useState<string>('');
   const [showDemoSelectorModal, setShowDemoSelectorModal] = useState(false);
+  const [editingPostulacion, setEditingPostulacion] = useState<Postulacion | null>(null);
+  const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
 
   // Filters
   const [searchTerm, setSearchTerm] = useState('');
@@ -75,6 +77,34 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   // Applying state
   const [applyingId, setApplyingId] = useState<string | null>(null);
   const [applySuccess, setApplySuccess] = useState<string | null>(null);
+  const [postToCancel, setPostToCancel] = useState<{ id: string; convocatoriaId: string } | null>(null);
+
+  const handleCancel = (id: string, convocatoriaId: string) => {
+    setPostToCancel({ id, convocatoriaId });
+  };
+
+  const handleEditPostulacion = async (post: Postulacion, conv: Convocatoria) => {
+    setLoadingEditId(post.id);
+    try {
+      const audios = await fetchAPI<any[]>(`/voice-audios/user/${user.uid}?category=demo`);
+      if (!audios || audios.length === 0) {
+        setShowNoDemosModal(true);
+        return;
+      }
+      setUserDemos(audios);
+      setApplyingConv(conv);
+      setEditingPostulacion(post);
+      const matchedDemoId = post?.voiceAudioId || (audios.length > 0 ? audios[0].id : '');
+      setSelectedDemoId(matchedDemoId);
+      setShowDemoSelectorModal(true);
+      setSelectedConv(null);
+    } catch (err: any) {
+      setError(err.message || 'Error al cargar demos.');
+      setTimeout(() => setError(null), 5000);
+    } finally {
+      setLoadingEditId(null);
+    }
+  };
 
   // ── Load data ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +179,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       setApplyingConv(conv);
       setSelectedDemoId(audios[0].id); // Seleccionar la primera por defecto
       setShowDemoSelectorModal(true);
+      setSelectedConv(null); // Cerrar modal de detalles
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -157,22 +188,37 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   };
 
   const confirmApply = async () => {
-    if (!applyingConv || !selectedDemoId) return;
+    if (!applyingConv || !selectedDemoId) {
+      console.warn('confirmApply blocked because applyingConv or selectedDemoId is missing:', applyingConv, selectedDemoId);
+      return;
+    }
     setApplyingId(applyingConv.id);
     try {
-      const post = await postulacionService.createPostulacion({
-        convocatoriaId: applyingConv.id,
-        alumnoId: user.uid,
-        voiceAudioId: selectedDemoId,
-      });
-      setMyPostulaciones(prev => ({ ...prev, [applyingConv.id]: post }));
-      setApplySuccess(applyingConv.id);
-      setSelectedConv(null); // Cerrar modal de detalles
-      setShowDemoSelectorModal(false);
-      setApplyingConv(null);
+      if (editingPostulacion) {
+        const updated = await postulacionService.updatePostulacion(editingPostulacion.id, {
+          voiceAudioId: selectedDemoId,
+        });
+        setMyPostulaciones(prev => ({ ...prev, [applyingConv.id]: updated }));
+        setApplySuccess(applyingConv.id);
+        setShowDemoSelectorModal(false);
+        setApplyingConv(null);
+        setEditingPostulacion(null);
+      } else {
+        const post = await postulacionService.createPostulacion({
+          convocatoriaId: applyingConv.id,
+          alumnoId: user.uid,
+          voiceAudioId: selectedDemoId,
+        });
+        setMyPostulaciones(prev => ({ ...prev, [applyingConv.id]: post }));
+        setApplySuccess(applyingConv.id);
+        setSelectedConv(null); // Cerrar modal de detalles
+        setShowDemoSelectorModal(false);
+        setApplyingConv(null);
+      }
       setTimeout(() => setApplySuccess(null), 3000);
     } catch (err: any) {
-      setError(err.message);
+      setError(err.message || 'Error al procesar la postulación.');
+      setTimeout(() => setError(null), 5000);
     } finally {
       setApplyingId(null);
     }
@@ -260,6 +306,29 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
         )}
       </AnimatePresence>
 
+      {/* Error toast */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-6 right-6 z-[10001] p-5 bg-red-500/10 border border-red-500/30 rounded-2xl flex items-center gap-3 shadow-2xl backdrop-blur-md"
+          >
+            <AlertCircle size={20} className="text-red-400" />
+            <div className="flex flex-col gap-1">
+              <span className="text-red-300 font-bold text-sm">{error}</span>
+              <button 
+                onClick={() => setError(null)} 
+                className="text-[10px] text-red-400 underline uppercase tracking-widest font-bold text-left"
+              >
+                Cerrar
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         {filtered.map(conv => {
@@ -308,10 +377,33 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                 </div>
 
                 {hasApplied ? (
-                  <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-slate-500">
-                    <CheckCircle2 size={16} />
-                    <span className="text-xs font-black uppercase tracking-widest">Postulación Enviada</span>
-                    <StatusBadge status={myPostulaciones[conv.id].estado} />
+                  <div className="space-y-3">
+                    <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-white/5 border border-white/10 text-slate-500">
+                      <CheckCircle2 size={16} />
+                      <span className="text-xs font-black uppercase tracking-widest">Postulación Enviada</span>
+                      <StatusBadge status={myPostulaciones[conv.id].estado} />
+                    </div>
+                    {(myPostulaciones[conv.id].estado === 'PENDIENTE' || myPostulaciones[conv.id].estado === 'EN_REVISION') && (
+                      <div className="flex gap-3" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleCancel(myPostulaciones[conv.id].id, conv.id); }}
+                          className="flex-1 py-3.5 rounded-xl border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-[10px] font-black uppercase tracking-widest text-red-400 transition-all text-center"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleEditPostulacion(myPostulaciones[conv.id], conv); }}
+                          disabled={loadingEditId === myPostulaciones[conv.id].id}
+                          className="flex-1 py-3.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all text-center flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none"
+                        >
+                          {loadingEditId === myPostulaciones[conv.id].id ? (
+                            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto" />
+                          ) : (
+                            <>Editar Demo <Sparkles size={12} /></>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : days <= 0 ? (
                   <div className="w-full h-16 rounded-[1.5rem] flex items-center justify-center gap-3 bg-red-500/5 border border-red-500/20 text-red-400/70">
@@ -408,15 +500,39 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                   </div>
 
                   {selectedPostulacion ? (
-                    <div className="p-5 md:p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4">
-                      <CheckCircle2 size={24} className="text-emerald-400 shrink-0" />
-                      <div className="text-center sm:text-left">
-                        <p className="text-emerald-300 font-bold text-sm">Ya has postulado a esta convocatoria</p>
-                        <div className="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
-                          <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Estado:</span>
-                          <StatusBadge status={selectedPostulacion.estado} size="md" />
+                    <div className="space-y-6">
+                      <div className="p-5 md:p-6 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                        <CheckCircle2 size={24} className="text-emerald-400 shrink-0" />
+                        <div className="text-center sm:text-left">
+                          <p className="text-emerald-300 font-bold text-sm">Ya has postulado a esta convocatoria</p>
+                          <div className="mt-2 flex flex-wrap items-center justify-center sm:justify-start gap-2">
+                            <span className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">Estado:</span>
+                            <StatusBadge status={selectedPostulacion.estado} size="md" />
+                          </div>
                         </div>
                       </div>
+                      
+                      {(selectedPostulacion.estado === 'PENDIENTE' || selectedPostulacion.estado === 'EN_REVISION') && (
+                        <div className="flex flex-col sm:flex-row gap-4">
+                          <button
+                            onClick={(e) => { e.stopPropagation(); selectedConv && handleCancel(selectedPostulacion.id, selectedConv.id); }}
+                            className="flex-1 h-14 rounded-[1.5rem] flex items-center justify-center gap-2 border border-red-500/20 bg-red-500/5 hover:bg-red-500/10 text-xs font-black uppercase tracking-widest text-red-400 transition-all cursor-pointer text-center"
+                          >
+                            Cancelar Postulación
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); selectedConv && handleEditPostulacion(selectedPostulacion, selectedConv); }}
+                            disabled={loadingEditId === selectedPostulacion.id}
+                            className="flex-1 h-14 rounded-[1.5rem] flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all cursor-pointer text-center disabled:opacity-50 disabled:pointer-events-none"
+                          >
+                            {loadingEditId === selectedPostulacion.id ? (
+                              <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                            ) : (
+                              <>Editar Demo <Sparkles size={16} /></>
+                            )}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   ) : daysRemaining(selectedConvFechaLimite) <= 0 ? (
                     <div className="p-5 md:p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex flex-col sm:flex-row items-center sm:items-start gap-4">
@@ -485,66 +601,121 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       </AnimatePresence>
 
       {/* ── Demo Selector Modal ─────────────────────────────────────── */}
+      {createPortal(
+        <AnimatePresence>
+          {showDemoSelectorModal && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => { setShowDemoSelectorModal(false); setEditingPostulacion(null); }}>
+              <motion.div 
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="sud-glass-panel w-full max-w-lg p-10 relative overflow-hidden space-y-6"
+                onClick={e => e.stopPropagation()}
+              >
+                <button onClick={() => { setShowDemoSelectorModal(false); setEditingPostulacion(null); }} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+                
+                <div className="space-y-2">
+                  <h3 className="text-2xl font-black text-white uppercase tracking-tight">Selecciona tu Demo de Voz</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Para {editingPostulacion ? 'editar tu postulación' : 'postular'} a <span className="text-sud-orange font-bold">"{applyingConv?.titulo}"</span>, debes seleccionar cuál de tus demos de voz deseas enviar al equipo de casting.
+                  </p>
+                </div>
+
+                <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                  {userDemos.map(demo => (
+                    <div 
+                      key={demo.id} 
+                      onClick={() => setSelectedDemoId(demo.id)}
+                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
+                        selectedDemoId === demo.id 
+                          ? 'bg-sud-turquoise/10 border-sud-turquoise text-white' 
+                          : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05]'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2.5 rounded-xl ${selectedDemoId === demo.id ? 'bg-sud-turquoise/20 text-sud-turquoise' : 'bg-white/5 text-slate-500'}`}>
+                          <Briefcase size={16} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-sm font-bold truncate max-w-[200px]">{demo.title}</p>
+                          <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{demo.category || 'Demo'}</p>
+                        </div>
+                      </div>
+                      
+                      <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
+                        selectedDemoId === demo.id ? 'border-sud-turquoise' : 'border-slate-700'
+                      }`}>
+                        {selectedDemoId === demo.id && <div className="w-2.5 h-2.5 rounded-full bg-sud-turquoise" />}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button 
+                  onClick={confirmApply}
+                  disabled={applyingId === applyingConv?.id || !selectedDemoId}
+                  className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all"
+                >
+                  {applyingId === applyingConv?.id ? (
+                    <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                  ) : (
+                    <>{editingPostulacion ? 'Guardar Cambios' : 'Confirmar Postulación'} <Sparkles size={16} /></>
+                  )}
+                </button>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
+
+      {/* ── Custom Cancel Confirmation Modal ───────────────────────── */}
       <AnimatePresence>
-        {showDemoSelectorModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => setShowDemoSelectorModal(false)}>
+        {postToCancel && (
+          <div className="fixed inset-0 z-[10000] flex items-center justify-center p-6 backdrop-blur-md bg-black/60" onClick={() => setPostToCancel(null)}>
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.9, opacity: 0 }}
-              className="sud-glass-panel w-full max-w-lg p-10 relative overflow-hidden space-y-6"
+              className="sud-glass-panel w-full max-w-md p-10 relative overflow-hidden text-center space-y-6"
               onClick={e => e.stopPropagation()}
             >
-              <button onClick={() => setShowDemoSelectorModal(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              <button onClick={() => setPostToCancel(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
               
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500">
+                <AlertCircle size={32} />
+              </div>
+
               <div className="space-y-2">
-                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Selecciona tu Demo de Voz</h3>
-                <p className="text-xs text-slate-400 leading-relaxed">
-                  Para postular a <span className="text-sud-orange font-bold">"{applyingConv?.titulo}"</span>, debes seleccionar cuál de tus demos de voz deseas enviar al equipo de casting.
-                </p>
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">¿Cancelar Postulación?</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">¿Estás seguro de que deseas cancelar esta postulación? Esta acción no se puede deshacer.</p>
               </div>
 
-              <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
-                {userDemos.map(demo => (
-                  <div 
-                    key={demo.id} 
-                    onClick={() => setSelectedDemoId(demo.id)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                      selectedDemoId === demo.id 
-                        ? 'bg-sud-turquoise/10 border-sud-turquoise text-white' 
-                        : 'bg-white/[0.02] border-white/5 text-slate-400 hover:bg-white/[0.05]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2.5 rounded-xl ${selectedDemoId === demo.id ? 'bg-sud-turquoise/20 text-sud-turquoise' : 'bg-white/5 text-slate-500'}`}>
-                        <Briefcase size={16} />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-sm font-bold truncate max-w-[200px]">{demo.title}</p>
-                        <p className="text-[9px] text-slate-500 font-bold uppercase tracking-widest mt-0.5">{demo.category || 'Demo'}</p>
-                      </div>
-                    </div>
-                    
-                    <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ${
-                      selectedDemoId === demo.id ? 'border-sud-turquoise' : 'border-slate-700'
-                    }`}>
-                      {selectedDemoId === demo.id && <div className="w-2.5 h-2.5 rounded-full bg-sud-turquoise" />}
-                    </div>
-                  </div>
-                ))}
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setPostToCancel(null)}
+                  className="flex-1 h-12 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-black uppercase tracking-widest text-slate-400 transition-all"
+                >
+                  No, mantener
+                </button>
+                <button 
+                  onClick={async () => {
+                    if (!postToCancel) return;
+                    try {
+                      const updated = await postulacionService.updatePostulacion(postToCancel.id, { estado: 'CANCELADA' });
+                      setMyPostulaciones(prev => ({ ...prev, [postToCancel.convocatoriaId]: updated }));
+                    } catch (err: any) {
+                      setError(err.message || 'Error al cancelar la postulación.');
+                    } finally {
+                      setPostToCancel(null);
+                      setSelectedConv(null);
+                    }
+                  }}
+                  className="flex-1 h-12 rounded-xl bg-red-500 text-black hover:bg-red-600 text-xs font-black uppercase tracking-widest transition-all"
+                >
+                  Sí, cancelar
+                </button>
               </div>
-
-              <button 
-                onClick={confirmApply}
-                disabled={applyingId === applyingConv?.id || !selectedDemoId}
-                className="w-full h-14 rounded-2xl flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all"
-              >
-                {applyingId === applyingConv?.id ? (
-                  <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
-                ) : (
-                  <>Confirmar Postulación <Sparkles size={16} /></>
-                )}
-              </button>
             </motion.div>
           </div>
         )}

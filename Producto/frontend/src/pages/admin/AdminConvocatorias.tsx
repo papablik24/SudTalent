@@ -357,7 +357,7 @@ export function ConvocatoriasAdmin() {
       {/* ── Modal Crear/Editar ────────────────────────────────────────── */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/25 dark:bg-black/60 backdrop-blur-sm dark:backdrop-blur-md">
             <motion.div 
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
@@ -429,12 +429,16 @@ export function ConvocatoriasAdmin() {
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Fecha Límite *</label>
-                    <input 
-                      type="date" 
-                      value={formData.fechaLimite}
-                      onChange={e => setFormData({...formData, fechaLimite: e.target.value})}
-                      className="sud-input w-full"
-                    />
+                    <div className="relative group">
+                      <Calendar size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 group-focus-within:text-sud-turquoise transition-colors pointer-events-none" />
+                      <input 
+                        type="date" 
+                        value={formData.fechaLimite}
+                        onChange={e => setFormData({...formData, fechaLimite: e.target.value})}
+                        onClick={(e) => (e.currentTarget as HTMLInputElement).showPicker?.()}
+                        className="sud-input w-full pl-12 cursor-pointer"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -468,7 +472,7 @@ export function ConvocatoriasAdmin() {
 
         {/* ── Modal Postulantes ─────────────────────────────────────── */}
         {viewingApplicantsId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 backdrop-blur-md bg-black/60">
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/25 dark:bg-black/60 backdrop-blur-sm dark:backdrop-blur-md">
             <motion.div 
               initial={{ y: 20, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}

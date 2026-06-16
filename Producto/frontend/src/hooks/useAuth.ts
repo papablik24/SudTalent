@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { UserProfile, UserRole, ProfileStatus } from '../types';
 import { authService, AuthResponse } from '../services/backendService';
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+const API_BASE = import.meta.env.VITE_BACKEND_URL?.replace('/api', '') || import.meta.env.VITE_API_URL || 'http://localhost:8080';
 const DEV_OTP = '000000';
 
 function mapAuthResponseToUser(res: any): UserProfile {

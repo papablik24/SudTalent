@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, Briefcase, ArrowRight, X, AudioLines, Sparkles } from 'lucide-react';
+import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, CheckCircle, XCircle, Briefcase, ArrowRight, X, AudioLines, Sparkles } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -27,6 +27,19 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
   const [selectedDemoId, setSelectedDemoId] = useState<string>('');
   const [saving, setSaving] = useState(false);
   const [postToCancelId, setPostToCancelId] = useState<string | null>(null);
+
+  // ── Toast notification ───────────────────────────────────────────────
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'error') => {
+    setToast({ type, message });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 5000);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   // Detail state
   const [selectedPost, setSelectedPost] = useState<Postulacion | null>(null);
@@ -69,7 +82,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
       await postulacionService.updatePostulacion(postToCancelId, { estado: 'CANCELADA' });
       setPostulaciones(prev => prev.map(p => p.id === postToCancelId ? { ...p, estado: 'CANCELADA' as any } : p));
     } catch (err: any) {
-      alert(err.message || 'Error al cancelar la postulación.');
+      showToast(err.message || 'Error al cancelar la postulación.');
     } finally {
       setPostToCancelId(null);
     }
@@ -98,7 +111,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
       } : p));
       setEditingPost(null);
     } catch (err: any) {
-      alert(err.message || 'Error al guardar cambios.');
+      showToast(err.message || 'Error al guardar cambios.');
     } finally {
       setSaving(false);
     }
@@ -517,6 +530,31 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
           </div>
         )}
       </AnimatePresence>
+      {/* ── Toast de feedback visual ─────────────────────────────── */}
+      {toast && (
+        <div
+          role="alert"
+          className={`fixed top-6 right-6 z-[99999] flex items-start gap-3 px-5 py-4 rounded-2xl border backdrop-blur-md shadow-2xl max-w-sm w-full transition-all duration-300 ${
+            toast.type === 'success'
+              ? 'bg-emerald-500/10 border-emerald-500/25 text-emerald-300'
+              : 'bg-red-500/10 border-red-500/25 text-red-300'
+          }`}
+        >
+          {toast.type === 'success' ? (
+            <CheckCircle size={18} className="shrink-0 mt-0.5 text-emerald-400" />
+          ) : (
+            <XCircle size={18} className="shrink-0 mt-0.5 text-red-400" />
+          )}
+          <p className="flex-1 text-[11px] font-bold uppercase tracking-wider leading-snug">{toast.message}</p>
+          <button
+            onClick={() => setToast(null)}
+            className="shrink-0 mt-0.5 hover:opacity-70 transition-opacity cursor-pointer"
+            aria-label="Cerrar"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

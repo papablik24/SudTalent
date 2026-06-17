@@ -8,11 +8,38 @@ import { AudioPlayer } from '../../components/ui/AudioPlayer';
 interface AdminStudentsProps {
   whitelist: WhitelistEntry[];
   users: UserProfile[];
-  onAdd: (phone: string, name: string, category: ProfileCategory, email?: string, role?: string) => void;
+  onAdd: (phone: string, name: string, category: ProfileCategory, email?: string, role?: string) => Promise<void>;
   onRemove: (phone: string) => void;
   onUpdate: (phone: string, updates: any) => void;
   onUpdateStatus?: (userId: string, status: ProfileStatus) => void;
 }
+
+// ── Helpers ───────────────────────────────────────────────────
+const formatPhone = (phone?: string) => {
+  if (!phone) return null;
+  const digits = phone.replace(/\D/g, '');
+  const local = digits.startsWith('56') ? digits.slice(2) : digits;
+  const n = local.startsWith('9') ? local.slice(1) : local;
+  if (n.length < 8) return phone;
+  return `+56 9 ${n.slice(0, 4)} ${n.slice(4, 8)}`;
+};
+
+const getCategoryLabel = (cat?: ProfileCategory) => {
+  switch (cat) {
+    case 'ADULT': return 'Adulto';
+    case 'MINOR': return 'Menor';
+    case 'BOTH': return 'Ambos';
+    default: return 'Sin categoría';
+  }
+};
+
+const getStatusInfo = (entry: any) => {
+  if (entry.status === 'APPROVED') return { label: 'Aprobado', cls: 'text-sud-turquoise bg-sud-turquoise/10 border-sud-turquoise/20', Icon: CheckCircle };
+  if (entry.status === 'INACTIVE') return { label: 'Inactivo', cls: 'text-red-400 bg-red-400/10 border-red-400/20', Icon: XCircle };
+  if (entry.status === 'PENDING' || entry.type === 'REGISTERED') return { label: 'En Revisión', cls: 'text-sud-yellow bg-sud-yellow/10 border-sud-yellow/20', Icon: Clock };
+  if (entry.type === 'WHITELIST' && !entry.uid) return { label: 'Sin registrar', cls: 'text-slate-500 bg-white/5 border-white/10', Icon: Clock };
+  return null;
+};
 
 export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onUpdateStatus }: AdminStudentsProps) {
   const [newPhone, setNewPhone] = useState('');
@@ -23,6 +50,88 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [searchTerm, setSearchTerm] = useState('');
   const [exportingExcel, setExportingExcel] = useState(false);
   const [demoCounts, setDemoCounts] = useState<Record<string, number>>({});
+
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  type SortOption = 'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'MOST_DEMOS' | 'FEWEST_DEMOS' | 'CATEGORY' | 'ROLE';
+  const [sortField, setSortField] = useState<'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'DEMOS' | 'CATEGORY' | 'ROLE'>('NAME');
+  const [sortDirection, setSortDirection] = useState<'ASC' | 'DESC'>('ASC');
+
+  const toggleSort = (field: 'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'DEMOS' | 'CATEGORY' | 'ROLE') => {
+    if (sortField === field) {
+      setSortDirection(prev => prev === 'ASC' ? 'DESC' : 'ASC');
+    } else {
+      setSortField(field);
+      setSortDirection(field === 'DEMOS' ? 'DESC' : 'ASC');
+    }
+  };
+
+  const getDropdownValue = (): SortOption => {
+    if (sortField === 'NAME') return 'NAME';
+    if (sortField === 'PHONE') return 'PHONE';
+    if (sortField === 'EMAIL') return 'EMAIL';
+    if (sortField === 'STATUS') return 'STATUS';
+    if (sortField === 'DEMOS') {
+      return sortDirection === 'DESC' ? 'MOST_DEMOS' : 'FEWEST_DEMOS';
+    }
+    if (sortField === 'CATEGORY') return 'CATEGORY';
+    if (sortField === 'ROLE') return 'ROLE';
+    return 'NAME';
+  };
+
+  const handleSortByChange = (val: string) => {
+    if (val === 'NAME') {
+      setSortField('NAME');
+      setSortDirection('ASC');
+    } else if (val === 'PHONE') {
+      setSortField('PHONE');
+      setSortDirection('ASC');
+    } else if (val === 'EMAIL') {
+      setSortField('EMAIL');
+      setSortDirection('ASC');
+    } else if (val === 'STATUS') {
+      setSortField('STATUS');
+      setSortDirection('ASC');
+    } else if (val === 'MOST_DEMOS') {
+      setSortField('DEMOS');
+      setSortDirection('DESC');
+    } else if (val === 'FEWEST_DEMOS') {
+      setSortField('DEMOS');
+      setSortDirection('ASC');
+    } else if (val === 'CATEGORY') {
+      setSortField('CATEGORY');
+      setSortDirection('ASC');
+    } else if (val === 'ROLE') {
+      setSortField('ROLE');
+      setSortDirection('ASC');
+    }
+  };
+
+  const renderHeader = (label: string, field: 'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'DEMOS' | 'CATEGORY' | 'ROLE') => {
+    const isActive = sortField === field;
+    return (
+      <th 
+        onClick={() => toggleSort(field)}
+        className={`px-4 py-4 cursor-pointer select-none hover:text-white transition-colors group ${
+          isActive ? 'text-sud-turquoise font-black' : 'text-white/20'
+        }`}
+      >
+        <div className="flex items-center gap-1.5">
+          <span>{label}</span>
+          {isActive ? (
+            <span className="text-sud-turquoise font-black text-[9px] select-none">
+              {sortDirection === 'ASC' ? '▲' : '▼'}
+            </span>
+          ) : (
+            <span className="opacity-0 group-hover:opacity-40 transition-opacity text-slate-500 text-[9px] select-none">
+              ▲
+            </span>
+          )}
+        </div>
+      </th>
+    );
+  };
 
   const [allCursos, setAllCursos] = useState<any[]>([]);
 
@@ -96,11 +205,72 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
       })),
   ];
 
-  const filteredList = displayUsers.filter(e =>
-    e.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    e.phone?.includes(searchTerm) ||
-    e.email?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredList = displayUsers
+    .filter(e =>
+      e.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      e.phone?.includes(searchTerm) ||
+      e.email?.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+    .sort((a, b) => {
+      let comparison = 0;
+      
+      if (sortField === 'NAME') {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB);
+      } else if (sortField === 'PHONE') {
+        const phoneA = (a.phone || '').replace(/\D/g, '');
+        const phoneB = (b.phone || '').replace(/\D/g, '');
+        comparison = phoneA.localeCompare(phoneB);
+      } else if (sortField === 'EMAIL') {
+        const emailA = (a.email || '').toLowerCase();
+        const emailB = (b.email || '').toLowerCase();
+        comparison = emailA.localeCompare(emailB);
+      } else if (sortField === 'STATUS') {
+        const getStatusOrder = (entry: any) => {
+          const statusVal = entry.status || '';
+          if (statusVal === 'APPROVED') return 1;
+          if (statusVal === 'PENDING' || entry.type === 'REGISTERED') return 2;
+          if (entry.type === 'WHITELIST' && !entry.uid) return 3;
+          if (statusVal === 'INACTIVE') return 4;
+          return 5;
+        };
+        const orderA = getStatusOrder(a);
+        const orderB = getStatusOrder(b);
+        comparison = orderA - orderB;
+      } else if (sortField === 'DEMOS') {
+        const countA = a.uid ? (demoCounts[a.uid] || 0) : 0;
+        const countB = b.uid ? (demoCounts[b.uid] || 0) : 0;
+        comparison = countA - countB;
+      } else if (sortField === 'CATEGORY') {
+        const catA = getCategoryLabel(a.category).toLowerCase();
+        const catB = getCategoryLabel(b.category).toLowerCase();
+        comparison = catA.localeCompare(catB);
+      } else if (sortField === 'ROLE') {
+        const getRoleString = (entry: any) => {
+          const registeredUser = users.find(u =>
+            u.uid === entry.uid ||
+            (u.email && entry.email && u.email.toLowerCase() === entry.email.toLowerCase()) ||
+            (u.phone && entry.phone && u.phone.replace(/\D/g, '').slice(-8) === entry.phone.replace(/\D/g, '').slice(-8))
+          );
+          if (registeredUser?.role === 'ADMIN') return 'Administrador';
+          if (registeredUser?.profileType) return registeredUser.profileType;
+          if (entry.category && entry.category !== 'NONE') return entry.category;
+          return entry.role || 'ALUMNO';
+        };
+        const roleA = getRoleString(a).toLowerCase();
+        const roleB = getRoleString(b).toLowerCase();
+        comparison = roleA.localeCompare(roleB);
+      }
+
+      if (comparison === 0) {
+        const nameA = (a.name || '').toLowerCase();
+        const nameB = (b.name || '').toLowerCase();
+        comparison = nameA.localeCompare(nameB);
+      }
+
+      return sortDirection === 'ASC' ? comparison : -comparison;
+    });
 
   useEffect(() => {
     const fetchAllDemoCounts = async () => {
@@ -118,8 +288,8 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
         await Promise.all(
           batch.map(async (uid) => {
             try {
-              const audios = await fetchAPI<any[]>(`/voice-audios/user/${uid}`);
-              batchCounts[uid] = audios ? audios.length : 0;
+              const audios = await fetchAPI<any[]>(`/voice-audios/user/${uid}?category=demo`);
+              batchCounts[uid] = audios ? audios.filter((d: any) => d.category === 'demo').length : 0;
             } catch (err) {
               console.error(`Error al obtener demos del usuario ${uid}:`, err);
               batchCounts[uid] = 0;
@@ -142,8 +312,8 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
           let demoCount: string | number = 0;
           if (entry.uid) {
             try {
-              const audios = await fetchAPI<any[]>(`/voice-audios/user/${entry.uid}`);
-              demoCount = audios ? audios.length : 0;
+              const audios = await fetchAPI<any[]>(`/voice-audios/user/${entry.uid}?category=demo`);
+              demoCount = audios ? audios.filter((d: any) => d.category === 'demo').length : 0;
             } catch (err) {
               console.error(`Error al obtener demos de ${entry.name}:`, err);
               demoCount = 'No disponible';
@@ -215,6 +385,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [editPhone, setEditPhone] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [editCategory, setEditCategory] = useState<ProfileCategory>('NONE');
+  const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
 
   // Panel de perfil
   const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
@@ -242,14 +413,52 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   // (Lista unificada y filtrada movida arriba para evitar temporal dead zone)
 
   // ── Añadir ────────────────────────────────────────────────────
-  const handleAdd = (e: React.FormEvent) => {
+  const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault();
+    setFeedback(null);
+
+    const nameTrimmed = newName.trim();
     const digitsOnly = newPhone.replace(/\D/g, '');
-    if (digitsOnly.length >= 8 && newName.trim()) {
-      onAdd(`569${digitsOnly}`, newName.trim(), newCategory, newEmail.trim(), newRole);
-      setNewPhone(''); setNewName(''); setNewEmail(''); setNewCategory('NONE'); setNewRole('ALUMNO');
-    } else {
-      alert('Por favor ingrese un nombre y 8 dígitos de teléfono.');
+    const emailTrimmed = newEmail.trim();
+
+    if (!nameTrimmed) {
+      setFeedback({ type: 'error', message: 'El nombre del alumno es obligatorio.' });
+      return;
+    }
+
+    if (digitsOnly.length < 8) {
+      setFeedback({ type: 'error', message: 'El teléfono debe tener 8 dígitos.' });
+      return;
+    }
+
+    if (!emailTrimmed) {
+      setFeedback({ type: 'error', message: 'El correo del alumno es obligatorio.' });
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailTrimmed)) {
+      setFeedback({ type: 'error', message: 'Ingresa un correo válido.' });
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await onAdd(`569${digitsOnly}`, nameTrimmed, newCategory, emailTrimmed, newRole);
+      setNewPhone('');
+      setNewName('');
+      setNewEmail('');
+      setNewCategory('NONE');
+      setNewRole('ALUMNO');
+      setFeedback({ type: 'success', message: 'Alumno autorizado correctamente.' });
+    } catch (err) {
+      console.error('Error al autorizar alumno:', err);
+      setFeedback({
+        type: 'error',
+        message: 'No se pudo autorizar el alumno. Verifica si el teléfono o correo ya existen.'
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -259,6 +468,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
     setEditName(entry.name || '');
     setEditEmail(entry.email || '');
     setEditCategory(entry.category || 'NONE');
+    setIsCategoryDropdownOpen(false);
     const digits = (entry.phone || '').replace(/\D/g, '');
     const local = digits.startsWith('56') ? digits.slice(2) : digits;
     const n = local.startsWith('9') ? local.slice(1) : local;
@@ -293,34 +503,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
     }
 
     setEditingEntry(null);
+    setIsCategoryDropdownOpen(false);
   };
 
-  // ── Helpers ───────────────────────────────────────────────────
-  const formatPhone = (phone?: string) => {
-    if (!phone) return null;
-    const digits = phone.replace(/\D/g, '');
-    const local = digits.startsWith('56') ? digits.slice(2) : digits;
-    const n = local.startsWith('9') ? local.slice(1) : local;
-    if (n.length < 8) return phone;
-    return `+56 9 ${n.slice(0, 4)} ${n.slice(4, 8)}`;
-  };
 
-  const getCategoryLabel = (cat?: ProfileCategory) => {
-    switch (cat) {
-      case 'ADULT': return 'Adulto';
-      case 'MINOR': return 'Menor';
-      case 'BOTH': return 'Ambos';
-      default: return 'Sin categoría';
-    }
-  };
-
-  const getStatusInfo = (entry: any) => {
-    if (entry.status === 'APPROVED') return { label: 'Aprobado', cls: 'text-sud-turquoise bg-sud-turquoise/10 border-sud-turquoise/20', Icon: CheckCircle };
-    if (entry.status === 'INACTIVE') return { label: 'Inactivo', cls: 'text-red-400 bg-red-400/10 border-red-400/20', Icon: XCircle };
-    if (entry.status === 'PENDING' || entry.type === 'REGISTERED') return { label: 'En Revisión', cls: 'text-sud-yellow bg-sud-yellow/10 border-sud-yellow/20', Icon: Clock };
-    if (entry.type === 'WHITELIST' && !entry.uid) return { label: 'Sin registrar', cls: 'text-slate-500 bg-white/5 border-white/10', Icon: Clock };
-    return null;
-  };
 
   // ── Render ────────────────────────────────────────────────────
   return (
@@ -344,7 +530,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
               <Plus className="text-sud-orange" size={20} />
               Añadir Nuevo Alumno
             </h3>
-            <form onSubmit={handleAdd} className="space-y-4">
+            <form onSubmit={handleAdd} noValidate className="space-y-4">
               <div className="space-y-2">
                 <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Nombre del Alumno</label>
                 <input type="text" value={newName} onChange={e => setNewName(e.target.value)}
@@ -380,13 +566,30 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
               </div>
               <div className="space-y-2">
                 <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
-                  Correo <span className="text-slate-700">(opcional)</span>
+                  Correo
                 </label>
                 <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                  className="sud-input w-full" placeholder="alumno@ejemplo.cl" />
+                  className="sud-input w-full" placeholder="alumno@ejemplo.cl" required />
               </div>
-              <button type="submit" className="w-full sud-btn-primary py-4 text-xs font-black uppercase tracking-widest">
-                Autorizar Alumno
+
+              {/* Mensajes de Feedback */}
+              {feedback && (
+                <div className={`p-4 rounded-2xl border flex items-start gap-2.5 text-[11px] font-bold leading-normal transition-all ${
+                  feedback.type === 'success'
+                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                    : 'bg-red-500/10 border-red-500/20 text-red-400'
+                }`}>
+                  {feedback.type === 'success' ? (
+                    <CheckCircle className="shrink-0 mt-0.5" size={16} />
+                  ) : (
+                    <XCircle className="shrink-0 mt-0.5" size={16} />
+                  )}
+                  <span className="flex-1 uppercase tracking-wider">{feedback.message}</span>
+                </div>
+              )}
+
+              <button type="submit" disabled={isSubmitting} className="w-full sud-btn-primary py-4 text-xs font-black uppercase tracking-widest disabled:opacity-50 disabled:cursor-not-allowed">
+                {isSubmitting ? 'Autorizando...' : 'Autorizar Alumno'}
               </button>
             </form>
           </section>
@@ -423,6 +626,23 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                   )}
                   {exportingExcel ? 'Exportando...' : 'Exportar Excel'}
                 </button>
+                <div className="relative flex items-center bg-black/40 border border-white/5 rounded-full px-3 py-1.5 focus-within:border-white/20 transition-all">
+                  <span className="text-[9px] uppercase font-bold text-slate-500 tracking-widest mr-2 select-none">Ordenar:</span>
+                  <select
+                    value={getDropdownValue()}
+                    onChange={e => handleSortByChange(e.target.value)}
+                    className="bg-transparent text-[9px] font-bold text-white outline-none cursor-pointer uppercase tracking-widest pr-4 select-none"
+                  >
+                    <option value="NAME" className="bg-[#0f0f0f] text-white">Nombre A-Z</option>
+                    <option value="PHONE" className="bg-[#0f0f0f] text-white">Teléfono</option>
+                    <option value="EMAIL" className="bg-[#0f0f0f] text-white">Correo</option>
+                    <option value="STATUS" className="bg-[#0f0f0f] text-white">Estado</option>
+                    <option value="MOST_DEMOS" className="bg-[#0f0f0f] text-white">Más demos</option>
+                    <option value="FEWEST_DEMOS" className="bg-[#0f0f0f] text-white">Menos demos</option>
+                    <option value="CATEGORY" className="bg-[#0f0f0f] text-white">Categoría</option>
+                    <option value="ROLE" className="bg-[#0f0f0f] text-white">Rol / Perfil</option>
+                  </select>
+                </div>
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20" size={16} />
                   <input placeholder="Buscar alumno..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
@@ -435,13 +655,13 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
               <table className="w-full text-left">
                 <thead className="text-[10px] uppercase text-white/20 bg-white/[0.02] font-black tracking-widest">
                   <tr>
-                    <th className="px-4 py-4">Alumno</th>
-                    <th className="px-4 py-4">Teléfono</th>
-                    <th className="px-4 py-4">Correo</th>
-                    <th className="px-4 py-4">Estado</th>
-                    <th className="px-4 py-4">Demos</th>
-                    <th className="px-4 py-4">Categoría</th>
-                    <th className="px-4 py-4 text-right">Acciones</th>
+                    {renderHeader('Alumno', 'NAME')}
+                    {renderHeader('Teléfono', 'PHONE')}
+                    {renderHeader('Correo', 'EMAIL')}
+                    {renderHeader('Estado', 'STATUS')}
+                    {renderHeader('Demos', 'DEMOS')}
+                    {renderHeader('Categoría', 'CATEGORY')}
+                    <th className="px-4 py-4 text-right select-none text-white/20">Acciones</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
@@ -561,20 +781,107 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                               ? 'text-sud-turquoise border-sud-turquoise/20 bg-sud-turquoise/5 font-black'
                               : 'text-slate-500 border-white/5 bg-white/5'
                             }`}>
-                            {entry.uid ? (demoCounts[entry.uid] !== undefined ? (demoCounts[entry.uid] > 0 ? `${demoCounts[entry.uid]} demos` : 'Sin demos') : 'Cargando...') : 'Sin demos'}
+                            {entry.uid ? (
+                              demoCounts[entry.uid] !== undefined ? (
+                                demoCounts[entry.uid] === 0 ? 'Sin demos' :
+                                demoCounts[entry.uid] === 1 ? '1 demo' :
+                                `${demoCounts[entry.uid]} demos`
+                              ) : 'Cargando...'
+                            ) : 'Sin demos'}
                           </span>
                         </td>
 
                         {/* Categoría */}
                         <td className="px-4 py-3">
                           {isEditing ? (
-                            <select value={editCategory} onChange={e => setEditCategory(e.target.value as ProfileCategory)}
-                              className="bg-white/5 border border-white/10 rounded-lg px-2 py-1.5 text-[10px] font-black text-white uppercase tracking-tight outline-none cursor-pointer focus:border-sud-turquoise/30">
-                              <option value="NONE">Sin Cat.</option>
-                              <option value="ADULT">Adulto</option>
-                              <option value="MINOR">Menor</option>
-                              <option value="BOTH">Ambos</option>
-                            </select>
+                            <div className="relative inline-block text-left">
+                              <button
+                                type="button"
+                                onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                                className="flex items-center justify-between gap-1.5 border border-white/20 rounded-lg px-2 py-1.5 text-[10px] font-black uppercase tracking-tight outline-none cursor-pointer bg-black/60 hover:bg-black/80 hover:border-sud-turquoise/40 focus:border-sud-turquoise/50 transition-colors w-[110px]"
+                              >
+                                <span className={
+                                  editCategory === 'ADULT' ? 'text-blue-400' :
+                                  editCategory === 'MINOR' ? 'text-pink-400' :
+                                  editCategory === 'BOTH' ? 'text-purple-400' :
+                                  'text-slate-400'
+                                }>
+                                  {editCategory === 'NONE' ? 'Sin Cat.' :
+                                   editCategory === 'ADULT' ? 'Adulto' :
+                                   editCategory === 'MINOR' ? 'Menor' :
+                                   editCategory === 'BOTH' ? 'Ambos' : 'Sin Cat.'}
+                                </span>
+                                <span className="text-white/40 text-[7px]">▼</span>
+                              </button>
+
+                              {isCategoryDropdownOpen && (
+                                <>
+                                  {/* Underlay invisible to detect click outside */}
+                                  <div 
+                                    className="fixed inset-0 z-10" 
+                                    onClick={() => setIsCategoryDropdownOpen(false)}
+                                  />
+                                  <div className="absolute left-0 mt-1.5 w-[110px] rounded-lg border border-white/10 bg-[#0f0f0f]/95 backdrop-blur-md shadow-2xl z-20 py-1 overflow-hidden transition-all duration-100 ease-out">
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditCategory('NONE');
+                                        setIsCategoryDropdownOpen(false);
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 text-[10px] font-black uppercase tracking-tight transition-colors flex items-center justify-between ${
+                                        editCategory === 'NONE' 
+                                          ? 'bg-white/5 text-slate-200' 
+                                          : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                                      }`}
+                                    >
+                                      Sin Cat.
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditCategory('ADULT');
+                                        setIsCategoryDropdownOpen(false);
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 text-[10px] font-black uppercase tracking-tight transition-colors flex items-center justify-between ${
+                                        editCategory === 'ADULT' 
+                                          ? 'bg-blue-400/10 text-blue-400' 
+                                          : 'text-blue-400/80 hover:bg-blue-400/5 hover:text-blue-400'
+                                      }`}
+                                    >
+                                      Adulto
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditCategory('MINOR');
+                                        setIsCategoryDropdownOpen(false);
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 text-[10px] font-black uppercase tracking-tight transition-colors flex items-center justify-between ${
+                                        editCategory === 'MINOR' 
+                                          ? 'bg-pink-400/10 text-pink-400' 
+                                          : 'text-pink-400/80 hover:bg-pink-400/5 hover:text-pink-400'
+                                      }`}
+                                    >
+                                      Menor
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setEditCategory('BOTH');
+                                        setIsCategoryDropdownOpen(false);
+                                      }}
+                                      className={`w-full text-left px-2.5 py-1.5 text-[10px] font-black uppercase tracking-tight transition-colors flex items-center justify-between ${
+                                        editCategory === 'BOTH' 
+                                          ? 'bg-purple-400/10 text-purple-400' 
+                                          : 'text-purple-400/80 hover:bg-purple-400/5 hover:text-purple-400'
+                                      }`}
+                                    >
+                                      Ambos
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </div>
                           ) : (
                             <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-md border border-current/10 ${entry.category === 'ADULT' ? 'text-blue-400 bg-blue-400/5' :
                                 entry.category === 'MINOR' ? 'text-pink-400 bg-pink-400/5' :
@@ -595,7 +902,7 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                                   className="p-2 text-green-400 hover:bg-green-400/10 rounded-lg transition-colors" title="Guardar">
                                   <CheckCircle2 size={18} />
                                 </button>
-                                <button onClick={() => setEditingEntry(null)}
+                                <button onClick={() => { setEditingEntry(null); setIsCategoryDropdownOpen(false); }}
                                   className="p-2 text-slate-500 hover:bg-white/5 rounded-lg transition-colors" title="Cancelar">
                                   <LogOut size={18} className="rotate-180" />
                                 </button>

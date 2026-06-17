@@ -348,6 +348,57 @@
   }
 }
 
+/* ── Scrollbar global ────────────────────────────────────────────── */
+
+/* Webkit: Chrome, Edge, Safari */
+::-webkit-scrollbar {
+  width: 4px;
+  height: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 999px;
+  transition: background 0.2s ease;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(45, 212, 191, 0.35);
+}
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.08) transparent;
+}
+
+/* Modo claro */
+:root.light ::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+}
+:root.light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(13, 148, 136, 0.4);
+}
+:root.light * {
+  scrollbar-color: rgba(0, 0, 0, 0.12) transparent;
+}
+
+/* Clase utilitaria para scrollbars con acento turquesa (listas internas) */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 3px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: rgba(45, 212, 191, 0.2);
+  border-radius: 999px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: rgba(45, 212, 191, 0.45);
+}
+
 /* ── Notification Bell Animation ── */
 @keyframes swing {
   0%, 100% { transform: rotate(0); }

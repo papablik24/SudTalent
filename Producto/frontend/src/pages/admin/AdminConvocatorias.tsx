@@ -50,10 +50,11 @@ export function ConvocatoriasAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Filters
+  // Filters and Sorting
   const [searchTerm, setSearchTerm] = useState('');
-  const [filterEstado, setFilterEstado] = useState<ConvocatoriaEstado | 'TODAS'>('TODAS');
+  const [filterEstado, setFilterEstado] = useState<string>('TODAS');
   const [filterCategoria, setFilterCategoria] = useState<ConvocatoriaCategoria | 'TODAS'>('TODAS');
+  const [orderBy, setOrderBy] = useState<'recientes' | 'estado' | 'cierre' | 'titulo'>('recientes');
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -97,17 +98,90 @@ export function ConvocatoriasAdmin() {
     return map;
   }, [postulaciones]);
 
-  // ── Filtered list ────────────────────────────────────────────────────
+  // ── Filtered and sorted list ─────────────────────────────────────────
+  const getVisualEstado = (conv: Convocatoria): string => {
+    if (conv.estado === 'ACTIVA' && conv.fechaLimite) {
+      const todayStr = new Date().toLocaleDateString('sv-SE');
+      if (conv.fechaLimite < todayStr) {
+        return 'VENCIDA';
+      }
+    }
+    return conv.estado;
+  };
+
   const filtered = useMemo(() => {
     let result = [...convocatorias];
-    if (filterEstado !== 'TODAS') result = result.filter(c => c.estado === filterEstado);
-    if (filterCategoria !== 'TODAS') result = result.filter(c => c.categoria === filterCategoria);
+    
+    // 1. Text filter
     if (searchTerm) {
       const low = searchTerm.toLowerCase();
       result = result.filter(c => c.titulo.toLowerCase().includes(low) || c.descripcion.toLowerCase().includes(low));
     }
+
+    // 2. Category filter
+    if (filterCategoria !== 'TODAS') {
+      result = result.filter(c => c.categoria === filterCategoria);
+    }
+
+    // 3. Status filter (incorporating the virtual status 'VENCIDA')
+    if (filterEstado !== 'TODAS') {
+      const todayStr = new Date().toLocaleDateString('sv-SE');
+      if (filterEstado === 'ACTIVAS') {
+        result = result.filter(c => c.estado === 'ACTIVA' && (!c.fechaLimite || c.fechaLimite >= todayStr));
+      } else if (filterEstado === 'VENCIDAS') {
+        result = result.filter(c => c.estado === 'ACTIVA' && c.fechaLimite && c.fechaLimite < todayStr);
+      } else if (filterEstado === 'CERRADAS') {
+        result = result.filter(c => c.estado === 'CERRADA');
+      } else if (filterEstado === 'BORRADORES') {
+        result = result.filter(c => c.estado === 'BORRADOR');
+      } else if (filterEstado === 'ARCHIVADAS') {
+        result = result.filter(c => c.estado === 'ARCHIVADA');
+      }
+    }
+
+    // 4. Sort logic
+    result.sort((a, b) => {
+      if (orderBy === 'recientes') {
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }
+
+      if (orderBy === 'estado') {
+        const stateOrder: Record<string, number> = {
+          ACTIVA: 1,
+          VENCIDA: 2,
+          CERRADA: 3,
+          BORRADOR: 4,
+          ARCHIVADA: 5,
+        };
+        const orderA = stateOrder[getVisualEstado(a)] || 99;
+        const orderB = stateOrder[getVisualEstado(b)] || 99;
+        if (orderA !== orderB) {
+          return orderA - orderB;
+        }
+        // Sub-sort by newest first if state is the same
+        const dateA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const dateB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return dateB - dateA;
+      }
+
+      if (orderBy === 'cierre') {
+        if (!a.fechaLimite && !b.fechaLimite) return 0;
+        if (!a.fechaLimite) return 1;
+        if (!b.fechaLimite) return -1;
+        return a.fechaLimite.localeCompare(b.fechaLimite);
+      }
+
+      if (orderBy === 'titulo') {
+        return a.titulo.localeCompare(b.titulo);
+      }
+
+      return 0;
+    });
+
     return result;
-  }, [convocatorias, filterEstado, filterCategoria, searchTerm]);
+  }, [convocatorias, filterEstado, filterCategoria, searchTerm, orderBy]);
 
   // ── CRUD handlers ────────────────────────────────────────────────────
   const handleSave = async (e: React.FormEvent) => {
@@ -240,7 +314,7 @@ export function ConvocatoriasAdmin() {
         </button>
       </header>
 
-      {/* Filters */}
+      {/* Filters and Sorting */}
       <div className="flex flex-col md:flex-row gap-4">
         <div className="relative flex-1">
           <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-600" />
@@ -255,11 +329,15 @@ export function ConvocatoriasAdmin() {
         <div className="relative">
           <select
             value={filterEstado}
-            onChange={e => setFilterEstado(e.target.value as any)}
+            onChange={e => setFilterEstado(e.target.value)}
             className="sud-input appearance-none pr-10 min-w-[160px]"
           >
             <option value="TODAS">Todos los estados</option>
-            {CONVOCATORIA_ESTADOS.map(e => <option key={e} value={e}>{e}</option>)}
+            <option value="ACTIVAS">Activas</option>
+            <option value="VENCIDAS">Plazo Vencido</option>
+            <option value="CERRADAS">Cerradas</option>
+            <option value="BORRADORES">Borradores</option>
+            <option value="ARCHIVADAS">Archivadas</option>
           </select>
           <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         </div>
@@ -274,17 +352,42 @@ export function ConvocatoriasAdmin() {
           </select>
           <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
         </div>
+        <div className="relative">
+          <select
+            value={orderBy}
+            onChange={e => setOrderBy(e.target.value as any)}
+            className="sud-input appearance-none pr-10 min-w-[180px]"
+          >
+            <option value="recientes">Más recientes</option>
+            <option value="estado">Ordenar por Estado</option>
+            <option value="cierre">Fecha de cierre próxima</option>
+            <option value="titulo">Título A-Z</option>
+          </select>
+          <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+        </div>
       </div>
 
       {/* List */}
       <div className="grid grid-cols-1 gap-6">
         {filtered.map(conv => (
-          <div key={conv.id} className="sud-glass-panel p-8 group relative overflow-hidden flex flex-col md:flex-row gap-8 items-start md:items-center">
-            <div className={`absolute top-0 left-0 w-1 h-full ${conv.estado === 'ACTIVA' ? 'bg-emerald-400' : conv.estado === 'BORRADOR' ? 'bg-slate-600' : conv.estado === 'CERRADA' ? 'bg-red-400' : 'bg-slate-800'}`} />
+          <div key={conv.id} className={`sud-glass-panel p-8 group relative overflow-hidden flex flex-col md:flex-row gap-8 items-start md:items-center ${
+            getVisualEstado(conv) === 'VENCIDA' ? 'border-red-500/10' : ''
+          }`}>
+            <div className={`absolute top-0 left-0 w-1 h-full ${
+              getVisualEstado(conv) === 'VENCIDA'
+                ? 'bg-rose-500'
+                : conv.estado === 'ACTIVA'
+                ? 'bg-emerald-400'
+                : conv.estado === 'BORRADOR'
+                ? 'bg-slate-600'
+                : conv.estado === 'CERRADA'
+                ? 'bg-red-400'
+                : 'bg-slate-800'
+            }`} />
             
             <div className="flex-1 space-y-3">
               <div className="flex items-center gap-3 flex-wrap">
-                <StatusBadge status={conv.estado} />
+                <StatusBadge status={getVisualEstado(conv)} />
                 <span className="text-[8px] font-black uppercase tracking-widest px-2 py-1 rounded-md bg-sud-orange/10 text-sud-orange border border-sud-orange/20">
                   {conv.categoria}
                 </span>
@@ -298,9 +401,11 @@ export function ConvocatoriasAdmin() {
               <p className="text-xs text-slate-500 line-clamp-2 leading-relaxed">{conv.descripcion}</p>
               
               <div className="flex items-center gap-6 pt-2">
-                <div className="flex items-center gap-2 text-[10px] text-slate-600 font-bold uppercase tracking-widest">
+                <div className={`flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest ${
+                  getVisualEstado(conv) === 'VENCIDA' ? 'text-rose-400' : 'text-slate-600'
+                }`}>
                   <Calendar size={14} />
-                  <span>Cierre: {formatFecha(conv.fechaLimite)}</span>
+                  <span>Cierre: {formatFecha(conv.fechaLimite)} {getVisualEstado(conv) === 'VENCIDA' && '(PLAZO VENCIDO)'}</span>
                 </div>
                 <div className="flex items-center gap-2 text-[10px] text-sud-turquoise font-bold uppercase tracking-widest">
                   <Users size={14} />

@@ -3,7 +3,7 @@ import React from 'react';
 type BadgeVariant = 
   | 'ACTIVA' | 'BORRADOR' | 'CERRADA' | 'ARCHIVADA'
   | 'PENDIENTE' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA'
-  | 'APPROVED' | 'INACTIVE' | 'PENDING';
+  | 'APPROVED' | 'INACTIVE' | 'PENDING' | 'VENCIDA';
 
 interface StatusBadgeProps {
   status: string;
@@ -16,6 +16,7 @@ const BADGE_CONFIG: Record<string, { label: string; bg: string; text: string; bo
   BORRADOR:   { label: 'Borrador',    bg: 'bg-slate-500/10',   text: 'text-slate-400',   border: 'border-slate-500/20' },
   CERRADA:    { label: 'Cerrada',     bg: 'bg-red-500/10',     text: 'text-red-400',     border: 'border-red-500/20' },
   ARCHIVADA:  { label: 'Archivada',   bg: 'bg-slate-700/10',   text: 'text-slate-500',   border: 'border-slate-700/20' },
+  VENCIDA:    { label: 'Plazo Vencido', bg: 'bg-red-500/10',    text: 'text-red-400',     border: 'border-red-500/20' },
   // Postulacion states
   PENDIENTE:    { label: 'Pendiente',    bg: 'bg-amber-500/10',    text: 'text-amber-400',    border: 'border-amber-500/20' },
   EN_REVISION:  { label: 'En Revisión',  bg: 'bg-sky-500/10',      text: 'text-sky-400',      border: 'border-sky-500/20' },

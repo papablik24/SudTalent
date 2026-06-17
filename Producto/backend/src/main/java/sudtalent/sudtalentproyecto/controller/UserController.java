@@ -1,11 +1,24 @@
 package sudtalent.sudtalentproyecto.controller;
 
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import sudtalent.sudtalentproyecto.model.User;
+import sudtalent.sudtalentproyecto.model.Alumno;
+import sudtalent.sudtalentproyecto.model.ConvocatoriaFavorita;
+import sudtalent.sudtalentproyecto.model.Notificacion;
 import sudtalent.sudtalentproyecto.service.SoftDeleteService;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.repository.WhitelistNumberRepository;
+import sudtalent.sudtalentproyecto.repository.AlumnoRepository;
+import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
+import sudtalent.sudtalentproyecto.repository.AudicionRepository;
+import sudtalent.sudtalentproyecto.repository.VoiceAudioRepository;
+import sudtalent.sudtalentproyecto.repository.CursoRepository;
+import sudtalent.sudtalentproyecto.repository.ConvocatoriaFavoritaRepository;
+import sudtalent.sudtalentproyecto.repository.NotificacionRepository;
+import org.springframework.dao.DataIntegrityViolationException;
 import lombok.RequiredArgsConstructor;
 import java.util.Map;
 import java.util.UUID;
@@ -17,6 +30,14 @@ public class UserController {
 
     private final UserRepository userRepository;
     private final SoftDeleteService softDeleteService;
+    private final WhitelistNumberRepository whitelistRepository;
+    private final AlumnoRepository alumnoRepository;
+    private final PostulacionRepository postulacionRepository;
+    private final AudicionRepository audicionRepository;
+    private final VoiceAudioRepository voiceAudioRepository;
+    private final CursoRepository cursoRepository;
+    private final ConvocatoriaFavoritaRepository favoritaRepository;
+    private final NotificacionRepository notificacionRepository;
 
     // ─── Admin endpoints ──────────────────────────────────────────
     
@@ -123,13 +144,71 @@ public class UserController {
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    @org.springframework.transaction.annotation.Transactional
     public ResponseEntity<?> deleteUser(@PathVariable UUID id) {
-        try {
-            softDeleteService.softDeleteUser(id);
-            return ResponseEntity.ok(Map.of("message", "Usuario eliminado"));
-        } catch (IllegalArgumentException e) {
-            return ResponseEntity.notFound().build();
-        }
+        return userRepository.findById(id).map(user -> {
+            try {
+                // Verificar si tiene dependencias críticas
+                boolean isAlumno = alumnoRepository.existsById(id);
+                boolean hasPostulaciones = isAlumno && postulacionRepository.countAllByAlumnoId(id) > 0;
+                boolean hasAudiciones = isAlumno && audicionRepository.countAllByAlumnoId(id) > 0;
+                boolean hasVoiceAudios = voiceAudioRepository.countAllByUserId(id) > 0;
+                boolean hasCursos = isAlumno && !cursoRepository.findByAlumnoId(id).isEmpty();
+
+                if (hasPostulaciones || hasAudiciones || hasVoiceAudios || hasCursos) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                        "error", "CONSTRAINTS_VIOLATION",
+                        "message", "No se pudo eliminar el usuario porque tiene registros asociados. Puedes desactivarlo en su lugar."
+                    ));
+                }
+
+                // 1. Buscar y eliminar registros en whitelist vinculados a este usuario
+                whitelistRepository.findAll().stream()
+                    .filter(w -> {
+                        if (w.getUser() != null && id.equals(w.getUser().getId())) {
+                            return true;
+                        }
+                        if (user.getPhone() != null) {
+                            String cleanPhone = user.getPhone().replaceAll("[^0-9]", "");
+                            String wClean = w.getPhone() != null ? w.getPhone().replaceAll("[^0-9]", "") : "";
+                            if (!cleanPhone.isEmpty() && cleanPhone.equals(wClean)) {
+                                return true;
+                            }
+                        }
+                        if (user.getEmail() != null && w.getEmail() != null) {
+                            if (user.getEmail().equalsIgnoreCase(w.getEmail())) {
+                                return true;
+                            }
+                        }
+                        return false;
+                    })
+                    .forEach(whitelistRepository::delete);
+
+                // 2. Eliminar notificaciones
+                notificacionRepository.deleteAll(notificacionRepository.findByUsuarioIdOrderByFechaCreacionDesc(id));
+
+                // 3. Eliminar favoritos
+                favoritaRepository.deleteAll(favoritaRepository.findByUsuarioId(id));
+
+                // 4. Intentar hacer delete de alumnos/user
+                if (isAlumno) {
+                    Alumno alumno = alumnoRepository.findById(id).orElseThrow();
+                    alumnoRepository.delete(alumno);
+                } else {
+                    userRepository.delete(user);
+                }
+                userRepository.flush(); // Forzar ejecución SQL para capturar excepciones de integridad
+
+                return ResponseEntity.ok(Map.of("message", "Usuario eliminado"));
+            } catch (DataIntegrityViolationException e) {
+                return ResponseEntity.status(HttpStatus.CONFLICT).body(Map.of(
+                    "error", "CONSTRAINTS_VIOLATION",
+                    "message", "No se pudo eliminar el usuario porque tiene registros asociados. Puedes desactivarlo en su lugar."
+                ));
+            } catch (Exception e) {
+                return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            }
+        }).orElse(ResponseEntity.notFound().build());
     }
 
     @PutMapping("/{id}/restore")

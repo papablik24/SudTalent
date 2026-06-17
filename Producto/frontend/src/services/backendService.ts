@@ -226,6 +226,13 @@ export const backendService = {
     return fetchAPI<any>(`/users/${id}`, { method: 'GET' });
   },
 
+  // DELETE - Delete user by UID (admin)
+  async deleteUser(uid: string): Promise<void> {
+    return fetchAPI<void>(`/users/${encodeURIComponent(uid)}`, {
+      method: 'DELETE',
+    });
+  },
+
   // ==================== WHITELIST ====================
 
   async getWhitelist(): Promise<any[]> {

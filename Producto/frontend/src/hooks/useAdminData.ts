@@ -208,14 +208,23 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
     }
   };
 
-  // Remover de whitelist
-  const removeFromWhitelist = async (phone: string) => {
+  // Remover de whitelist y/o tabla users si tiene uid
+  const removeFromWhitelist = async (phone: string, uid?: string) => {
     try {
       setError(null);
-      await backendService.removeFromWhitelist(phone);
+      if (uid) {
+        await backendService.deleteUser(uid);
+        setAllUsers(prev => prev.filter(u => u.uid !== uid));
+      }
+      try {
+        await backendService.removeFromWhitelist(phone);
+      } catch (err) {
+        console.warn('No se pudo eliminar de la whitelist:', err);
+        if (!uid) throw err;
+      }
       setWhitelist(prev => prev.filter(e => e.phone !== phone));
     } catch (err: any) {
-      setError(err.message || 'Error al eliminar de whitelist');
+      setError(err.message || 'Error al eliminar');
       throw err;
     }
   };

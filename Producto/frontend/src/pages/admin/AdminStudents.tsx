@@ -9,7 +9,7 @@ interface AdminStudentsProps {
   whitelist: WhitelistEntry[];
   users: UserProfile[];
   onAdd: (phone: string, name: string, category: ProfileCategory, email?: string, role?: string) => Promise<void>;
-  onRemove: (phone: string) => void;
+  onRemove: (phone: string, uid?: string) => Promise<void> | void;
   onUpdate: (phone: string, updates: any) => void;
   onUpdateStatus?: (userId: string, status: ProfileStatus) => void;
 }
@@ -386,6 +386,41 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [editEmail, setEditEmail] = useState('');
   const [editCategory, setEditCategory] = useState<ProfileCategory>('NONE');
   const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
+  const [deletingEntryConfirm, setDeletingEntryConfirm] = useState<any | null>(null);
+  const [isDeletingUser, setIsDeletingUser] = useState(false);
+  const [toast, setToast] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showToast = (message: string, type: 'success' | 'error' = 'success') => {
+    setToast({ message, type });
+  };
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  const handleExecuteDelete = async () => {
+    if (!deletingEntryConfirm) return;
+    setIsDeletingUser(true);
+    try {
+      const result: any = onRemove(deletingEntryConfirm.phone, deletingEntryConfirm.uid);
+      if (result && typeof result.then === 'function') {
+        await result;
+      }
+      showToast('Usuario eliminado correctamente.', 'success');
+      setDeletingEntryConfirm(null);
+    } catch (error: any) {
+      const msg = error?.message || '';
+      if (msg.includes('registros asociados') || msg.includes('CONSTRAINTS_VIOLATION')) {
+        showToast('No se pudo eliminar el usuario porque tiene registros asociados. Puedes desactivarlo en su lugar.', 'error');
+      } else {
+        showToast('No se pudo eliminar el usuario. Intenta nuevamente.', 'error');
+      }
+    } finally {
+      setIsDeletingUser(false);
+    }
+  };
 
   // Panel de perfil
   const [selectedEntry, setSelectedEntry] = useState<any | null>(null);
@@ -924,8 +959,8 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                                   title="Editar">
                                   <Settings size={18} />
                                 </button>
-                                <button onClick={() => onRemove(entry.phone)}
-                                  className="p-2 text-white/10 hover:text-red-400 hover:bg-red-400/5 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100"
+                                <button onClick={() => setDeletingEntryConfirm(entry)}
+                                  className="p-2 text-white/10 hover:text-red-400 hover:bg-red-400/5 rounded-lg transition-colors md:opacity-0 group-hover:opacity-100 cursor-pointer"
                                   title="Eliminar">
                                   <Trash2 size={18} />
                                 </button>
@@ -1153,6 +1188,75 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
             </div>
           </div>
         </>
+      )}
+
+      {/* ── Modal de Confirmación de Eliminación ── */}
+      {deletingEntryConfirm && (
+        <>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => !isDeletingUser && setDeletingEntryConfirm(null)}>
+            <div className="bg-[#0f0f0f] border border-white/10 rounded-3xl w-full max-w-md overflow-hidden shadow-2xl transform scale-100 transition-all" onClick={e => e.stopPropagation()}>
+              <div className="p-6 border-b border-white/5 flex items-center justify-between">
+                <h3 className="text-sm font-black uppercase tracking-widest text-red-400 flex items-center gap-2">
+                  <Trash2 size={16} /> Confirmar eliminación
+                </h3>
+                <button 
+                  onClick={() => !isDeletingUser && setDeletingEntryConfirm(null)}
+                  disabled={isDeletingUser}
+                  className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50"
+                >
+                  <X size={14} className="text-white/60" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4">
+                <p className="text-sm font-black uppercase tracking-tight text-white leading-normal">
+                  ¿Estás seguro de que quieres eliminar a <span className="text-red-400">{deletingEntryConfirm.name || 'este alumno'}</span>?
+                </p>
+                <p className="text-[10px] font-bold text-slate-500 leading-relaxed uppercase tracking-wider text-justify">
+                  Esta acción eliminará el usuario de la base de datos. Si solo quieres impedir el acceso, usa Desactivar.
+                </p>
+              </div>
+
+              <div className="p-6 bg-white/[0.02] border-t border-white/5 flex gap-3 justify-end">
+                <button
+                  type="button"
+                  disabled={isDeletingUser}
+                  onClick={() => setDeletingEntryConfirm(null)}
+                  className="px-4 py-2.5 rounded-xl border border-white/10 hover:bg-white/5 text-[10px] font-black uppercase tracking-widest text-slate-400 transition-colors disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingUser}
+                  onClick={handleExecuteDelete}
+                  className="px-4 py-2.5 rounded-xl bg-red-500/20 hover:bg-red-500/35 border border-red-500/30 hover:border-red-500/50 text-red-400 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {isDeletingUser ? 'Eliminando...' : 'Eliminar usuario'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ── Toast de Feedback Visual ── */}
+      {toast && (
+        <div className={`fixed top-24 right-6 z-[9999] p-4 rounded-2xl border backdrop-blur-md shadow-2xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest transition-all duration-300 transform translate-y-0 ${
+          toast.type === 'success'
+            ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+            : 'bg-red-500/10 border-red-500/20 text-red-400'
+        }`}>
+          {toast.type === 'success' ? (
+            <CheckCircle className="shrink-0 text-emerald-400" size={16} />
+          ) : (
+            <XCircle className="shrink-0 text-red-400" size={16} />
+          )}
+          <span>{toast.message}</span>
+          <button onClick={() => setToast(null)} className="ml-2 hover:opacity-70 transition-opacity cursor-pointer">
+            <X size={14} className="text-white/40" />
+          </button>
+        </div>
       )}
     </div>
   );

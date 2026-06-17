@@ -71,8 +71,7 @@ public class WhitelistService {
 
     // Actualizar por teléfono
     public WhitelistNumberDTO updateByPhone(String phone, WhitelistNumberDTO updates) {
-        WhitelistNumber number = repository.findByPhone(phone)
-            .orElseThrow(() -> new RuntimeException("Número no encontrado: " + phone));
+        WhitelistNumber number = getWhitelistNumberByPhoneRobust(phone);
         
         if(updates.getName() != null) {
             number.setName(updates.getName());
@@ -117,10 +116,27 @@ public class WhitelistService {
         repository.deleteById(id);
     }
 
+    private WhitelistNumber getWhitelistNumberByPhoneRobust(String phone) {
+        String cleanPhone = phone != null ? phone.replaceAll("[^0-9]", "") : "";
+        return repository.findByPhone(phone)
+            .or(() -> {
+                if (!cleanPhone.isEmpty()) {
+                    return repository.findByPhone(cleanPhone);
+                }
+                return java.util.Optional.empty();
+            })
+            .or(() -> {
+                if (!cleanPhone.isEmpty()) {
+                    return repository.findByPhone("+" + cleanPhone);
+                }
+                return java.util.Optional.empty();
+            })
+            .orElseThrow(() -> new RuntimeException("Número no encontrado: " + phone));
+    }
+
     // Eliminar por teléfono
     public void deleteByPhone(String phone) {
-        WhitelistNumber number = repository.findByPhone(phone)
-            .orElseThrow(() -> new RuntimeException("Número no encontrado: " + phone));
+        WhitelistNumber number = getWhitelistNumberByPhoneRobust(phone);
         repository.deleteById(number.getId());
     }
 

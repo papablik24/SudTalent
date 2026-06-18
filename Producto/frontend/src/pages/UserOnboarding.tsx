@@ -63,7 +63,7 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
       setStep(2);
     } else if (step === 2) {
       if (!firstName.trim()) { setValidationError('El nombre es requerido.'); return; }
-      if (!lastName.trim()) { setValidationError('El apellido es requerido.'); return; }
+      // Apellido es opcional: no bloqueamos si está vacío
       if (email && !email.includes('@')) { setValidationError('El correo no es válido.'); return; }
       if (profileType === 'PARENT') {
         if (!childName.trim()) { setValidationError('El nombre del menor es requerido.'); return; }
@@ -83,7 +83,10 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
     setValidationError(null);
     if (specialties.length === 0) { setValidationError('Selecciona al menos una especialidad.'); return; }
     setSaving(true);
-    const fullName = `${firstName.trim()} ${lastName.trim()}`;
+    // Nombre completo: si hay apellido, concatenar; si no, solo el primer nombre
+    const fullName = lastName.trim()
+      ? `${firstName.trim()} ${lastName.trim()}`
+      : firstName.trim();
     const parsedAge = profileType === 'PERSONAL' && age ? parseInt(age) : undefined;
     const userData: Partial<UserProfile> = {
       name: fullName,
@@ -101,7 +104,10 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
       age: parsedAge,
       childName: profileType === 'PARENT' ? childName.trim() : undefined,
       childAge: profileType === 'PARENT' && childAge ? parseInt(childAge) : undefined,
+      // Reutilizamos 'location' para disponibilidad y añadimos campos extra
       location: availability.trim() || undefined,
+      experience: experience.trim() || undefined,
+      availability: availability.trim() || undefined,
     };
     await onComplete(userData, profileData);
     setSaving(false);
@@ -189,13 +195,22 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                   <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="sud-input w-full" placeholder="Ej: Roberto" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Apellido <span className="text-red-400">*</span></label>
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Apellido <span className="text-slate-700">(opcional)</span></label>
                   <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="sud-input w-full" placeholder="Ej: Pérez" />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Teléfono {phone ? <span className="text-slate-700">(validado)</span> : <span className="text-slate-700">(opcional)</span>}</label>
-                  {phone && userPhone ? (
-                    <input type="text" value={phone} disabled className="sud-input w-full opacity-50 cursor-not-allowed" />
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                    Teléfono
+                    {phone ? (
+                      <span className="ml-1 text-sud-turquoise text-[9px] font-black tracking-widest"> ✓ Autorizado</span>
+                    ) : null}
+                  </label>
+                  {phone ? (
+                    // Teléfono ya validado por whitelist en el registro — solo lectura
+                    <div className="flex items-center gap-2 bg-white/[0.03] border border-sud-turquoise/20 rounded-xl px-4 py-2.5">
+                      <span className="text-sud-turquoise font-mono text-sm">{phone}</span>
+                      <span className="text-[9px] text-slate-600 uppercase font-bold tracking-wider ml-auto">Solo lectura</span>
+                    </div>
                   ) : (
                     <div className="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden focus-within:border-sud-orange transition-all">
                       <span className="px-3 py-2 text-slate-500 font-mono text-sm border-r border-white/10 select-none">+56 9</span>

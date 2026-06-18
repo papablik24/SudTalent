@@ -88,6 +88,25 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
       const p = JSON.parse(saved);
       setProfile(p);
     }
+    // También intentar cargar datos extras desde el backend
+    const loadExtrasFromBackend = async () => {
+      try {
+        const data = await fetchAPI<any>('/profile');
+        // Sincronizar especialidades si el backend las devuelve
+        if (data.specialties) {
+          const saved2 = localStorage.getItem(`profile_${user.uid}`);
+          const existing = saved2 ? JSON.parse(saved2) : {};
+          const merged = { ...existing, specialties: data.specialties.split ? data.specialties.split(',').map((s: string) => s.trim()).filter(Boolean) : (Array.isArray(data.specialties) ? data.specialties : []) };
+          if (data.experience) merged.experience = data.experience;
+          if (data.availability) merged.availability = data.availability;
+          localStorage.setItem(`profile_${user.uid}`, JSON.stringify(merged));
+          setProfile(prev => ({ ...existing, ...merged } as any));
+        }
+      } catch {
+        // Fallback silencioso
+      }
+    };
+    loadExtrasFromBackend();
   }, [user.uid]);
 
 
@@ -528,6 +547,49 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
             </button>
           )}
         </div>
+      </div>
+
+      {/* ── Perfil Vocal ── */}
+      <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
+        <h3 className="text-xl font-black uppercase tracking-tighter text-white">Perfil Vocal</h3>
+
+        {/* Especialidades */}
+        <div>
+          <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-3">Especialidades</p>
+          {profile?.specialties && profile.specialties.length > 0 ? (
+            <div className="flex flex-wrap gap-2">
+              {profile.specialties.map((s: string) => (
+                <span key={s} className="px-4 py-1.5 rounded-2xl bg-sud-turquoise/10 border border-sud-turquoise/30 text-sud-turquoise text-[10px] font-black uppercase tracking-wider">
+                  {s}
+                </span>
+              ))}
+            </div>
+          ) : (
+            <p className="text-slate-600 italic text-sm">Sin especialidades registradas.</p>
+          )}
+        </div>
+
+        {/* Experiencia */}
+        {profile?.experience ? (
+          <div className="pt-4 border-t border-white/5">
+            <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2">Experiencia Previa</p>
+            <p className="text-sm text-slate-300 leading-relaxed">{profile.experience}</p>
+          </div>
+        ) : null}
+
+        {/* Disponibilidad */}
+        {(profile?.availability || profile?.location) ? (
+          <div className="pt-4 border-t border-white/5">
+            <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2">Disponibilidad</p>
+            <p className="text-sm text-slate-300 leading-relaxed">{profile.availability || profile.location}</p>
+          </div>
+        ) : null}
+
+        {!profile?.specialties?.length && !profile?.experience && !profile?.availability && !profile?.location && (
+          <p className="text-[9px] text-slate-700 uppercase font-bold tracking-widest italic">
+            Completa el onboarding para ver tu perfil vocal aquí.
+          </p>
+        )}
       </div>
 
       {/* ── Feed de Instagram ── */}

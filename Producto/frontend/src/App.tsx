@@ -98,8 +98,18 @@ function AppRoutes() {
       onboarded: true,
     };
 
-    // 2. Persistir localmente
+    // 2. Persistir usuario localmente
     localStorage.setItem('sud_current_user', JSON.stringify(updatedUser));
+
+    // 2b. Persistir profileData (especialidades, bio, experience, availability) para Mi Perfil
+    const existingProfileStr = localStorage.getItem(`profile_${updatedUser.uid}`);
+    const existingProfile = existingProfileStr ? JSON.parse(existingProfileStr) : {};
+    const mergedProfile = {
+      ...existingProfile,
+      ...profileData,
+      userId: updatedUser.uid,
+    };
+    localStorage.setItem(`profile_${updatedUser.uid}`, JSON.stringify(mergedProfile));
 
     // 3. Actualizar sud_registered_users para que re-login local no resetee onboarded
     const regStr = localStorage.getItem('sud_registered_users');

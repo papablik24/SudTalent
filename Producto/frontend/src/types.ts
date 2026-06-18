@@ -66,6 +66,8 @@ export interface TalentProfile {
   specialties: string[];
   bio?: string;
   location?: string;
+  experience?: string;
+  availability?: string;
 }
 
 export interface VoiceDemo {

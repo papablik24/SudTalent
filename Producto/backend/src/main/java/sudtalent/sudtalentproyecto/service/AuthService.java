@@ -59,20 +59,70 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request, HttpServletResponse response) {
-        if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("El email ya está registrado");
+        // 1. Normalizar teléfono
+        String phone = normalizePhone(request.phone());
+        if (phone.length() < 8 || phone.length() > 15) {
+            throw new IllegalArgumentException("El número de teléfono no es válido.");
         }
 
+        // 2. Verificar que el teléfono esté en whitelist
+        var whitelistEntry = whitelistRepository.findByPhone(phone);
+        if (whitelistEntry.isEmpty()) {
+            throw new IllegalArgumentException(
+                "Este número no está autorizado para registrarse en SudTalent. Contacta a la administración de Sudamerican Voices.");
+        }
+
+        WhitelistNumber wl = whitelistEntry.get();
+
+        // 3. Verificar que no esté inactivo
+        if (wl.getStatus() == WhitelistNumber.Status.INACTIVO) {
+            throw new IllegalArgumentException(
+                "Este número no está autorizado para registrarse en SudTalent. Contacta a la administración de Sudamerican Voices.");
+        }
+
+        // 4. Verificar si ya existe un usuario con este teléfono
+        var existingUserByPhone = userRepository.findByPhoneActive(phone);
+        if (existingUserByPhone.isPresent()) {
+            throw new IllegalArgumentException(
+                "Este número ya tiene una cuenta registrada. Inicia sesión.");
+        }
+
+        // 5. Verificar si el email ya está registrado
+        if (userRepository.existsByEmail(request.email())) {
+            throw new IllegalArgumentException("El correo electrónico ya está registrado.");
+        }
+
+        // 6. Usar el nombre de la whitelist si el del request no es confiable
+        String finalName = (request.name() != null && !request.name().isBlank())
+            ? request.name().trim()
+            : (wl.getName() != null && !wl.getName().isBlank() ? wl.getName() : "");
+
+        // 7. Crear usuario
         var user = User.builder()
-                .name(request.name())
+                .name(finalName)
                 .email(request.email())
                 .password(passwordEncoder.encode(request.password()))
+                .phone(phone)
+                .role(User.Role.ALUMNO)
+                .onboarded(false)
                 .build();
 
-        userRepository.save(user);
+        user = userRepository.save(user);
 
-        // Crear entrada en whitelist con estado PENDIENTE para que aparezca en el panel admin
-        createWhitelistEntryForUser(user);
+        // 8. Vincular la entrada whitelist con el nuevo usuario
+        wl.setUser(user);
+        if (wl.getName() == null || wl.getName().isBlank()) {
+            wl.setName(finalName);
+        }
+        if (wl.getEmail() == null || wl.getEmail().isBlank()) {
+            wl.setEmail(request.email());
+        }
+        if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
+            wl.setStatus(WhitelistNumber.Status.ACTIVO);
+        }
+        whitelistRepository.save(wl);
+
+        System.out.println("✅ Usuario registrado y vinculado a whitelist: " + phone);
 
         var userDetails = userDetailsService.loadUserByUsername(request.email());
         String token = jwtUtils.generateToken(userDetails);

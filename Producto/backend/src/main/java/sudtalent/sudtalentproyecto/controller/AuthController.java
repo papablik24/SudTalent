@@ -44,9 +44,17 @@ public class AuthController {
     }
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request,
-                                                  HttpServletResponse response) {
-        return ResponseEntity.ok(authService.register(request, response));
+    public ResponseEntity<?> register(@Valid @RequestBody RegisterRequest request,
+                                      HttpServletResponse response) {
+        try {
+            return ResponseEntity.ok(authService.register(request, response));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(Map.of("message", e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("message", "Error al crear la cuenta: " + e.getMessage()));
+        }
     }
 
     @PostMapping("/phone")

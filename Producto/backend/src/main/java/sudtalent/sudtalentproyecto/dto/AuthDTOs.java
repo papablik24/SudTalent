@@ -15,7 +15,8 @@ public class AuthDTOs {
     public record RegisterRequest(
             @NotBlank String name,
             @Email @NotBlank String email,
-            @NotBlank String password
+            @NotBlank String password,
+            @NotBlank String phone
     ) {}
 
     public record PhoneLoginRequest(

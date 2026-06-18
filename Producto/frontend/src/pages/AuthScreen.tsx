@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertTriangle, UserPlus, CheckCircle, KeyRound, ArrowLeft, ShieldCheck, Sun, Moon } from 'lucide-react';
+import { Mail, Lock, ChevronRight, Eye, EyeOff, AlertTriangle, UserPlus, CheckCircle, KeyRound, ArrowLeft, ShieldCheck, Sun, Moon, Phone } from 'lucide-react';
 import { authService } from '../services/backendService';
 import { useTheme } from '../contexts/ThemeContext';
 
 interface AuthScreenProps {
   onLogin: (email: string, password: string) => Promise<any>;
-  onRegister: (email: string, password: string, name: string) => Promise<any>;
+  onRegister: (email: string, password: string, name: string, phone: string) => Promise<any>;
   onForgotPassword?: (email: string, otp: string, newPassword: string) => Promise<any>;
   loading: boolean;
   error: string | null;
@@ -21,6 +21,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
+  const [phone, setPhone] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -85,10 +86,12 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
     e.preventDefault();
     setLocalError(null);
     if (!name.trim()) { setLocalError('Ingresa tu nombre completo.'); return; }
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (!phoneDigits || phoneDigits.length < 8) { setLocalError('Ingresa tu número de teléfono válido.'); return; }
     if (!email || !email.includes('@')) { setLocalError('Ingresa un correo electrónico válido.'); return; }
     if (!password || password.length < 6) { setLocalError('La contraseña debe tener al menos 6 caracteres.'); return; }
     if (password !== confirmPassword) { setLocalError('Las contraseñas no coinciden.'); return; }
-    await onRegister(email, password, name.trim());
+    await onRegister(email, password, name.trim(), phone.trim());
   };
 
   // Forgot-password handlers
@@ -263,7 +266,15 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                 <div className="text-center mb-8">
                   <h3 className="text-white font-black uppercase tracking-widest text-xs mb-2">Crear Cuenta</h3>
                   <p className="text-slate-500 text-[9px] uppercase tracking-widest font-black leading-relaxed">
-                    Regístrate para acceder<br />a la plataforma SudTalent
+                    Solo disponible para miembros<br />autorizados de Sudamerican Voices
+                  </p>
+                </div>
+
+                {/* Aviso whitelist */}
+                <div className="flex items-start gap-2 mb-5 p-3 rounded-xl bg-sud-turquoise/5 border border-sud-turquoise/15">
+                  <ShieldCheck size={13} className="text-sud-turquoise shrink-0 mt-0.5" />
+                  <p className="text-[9px] text-slate-400 font-bold leading-relaxed">
+                    Tu número de teléfono debe estar autorizado previamente por la administración.
                   </p>
                 </div>
 
@@ -273,6 +284,23 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                     <div className="relative group">
                       <div className="absolute left-5 top-1/2 -translate-y-1/2"><UserPlus className="text-slate-600 group-focus-within:text-sud-turquoise transition-colors" size={16} /></div>
                       <input type="text" placeholder="Ej: Roberto Pérez" value={name} onChange={e => setName(e.target.value)} disabled={loading} className="sud-input w-full pl-14 tracking-wide" required />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Teléfono Autorizado <span className="text-sud-turquoise">*</span></label>
+                    <div className="relative group">
+                      <div className="absolute left-5 top-1/2 -translate-y-1/2"><Phone className="text-slate-600 group-focus-within:text-sud-turquoise transition-colors" size={16} /></div>
+                      <input
+                        type="tel"
+                        placeholder="Ej: +56 9 1234 5678"
+                        value={phone}
+                        onChange={e => setPhone(e.target.value)}
+                        disabled={loading}
+                        className="sud-input w-full pl-14 tracking-wide"
+                        autoComplete="tel"
+                        required
+                      />
                     </div>
                   </div>
 

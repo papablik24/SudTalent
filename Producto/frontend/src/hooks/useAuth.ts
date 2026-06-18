@@ -343,7 +343,7 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
   // ═══════════════════════════════════════════════════════════════
   // REGISTER — create new USER account
   // ═══════════════════════════════════════════════════════════════
-  const registerUser = async (email: string, password: string, name: string): Promise<UserProfile | false> => {
+  const registerUser = async (email: string, password: string, name: string, phone: string): Promise<UserProfile | false> => {
     setLoading(true);
     setError(null);
 
@@ -363,41 +363,50 @@ const loginWithEmail = async (email: string, password: string): Promise<UserProf
       setLoading(false);
       return false;
     }
+    const phoneDigits = phone.replace(/\D/g, '');
+    if (!phoneDigits || phoneDigits.length < 8) {
+      setError('Ingresa un número de teléfono válido.');
+      setLoading(false);
+      return false;
+    }
 
     try {
       const res = await fetch(`${API_BASE}/api/auth/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password, name }),
+        body: JSON.stringify({ email, password, name: name.trim(), phone }),
       });
 
+      const body = await res.json().catch(() => ({}));
+
       if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
         setError(body.message || body.error || 'Error al crear la cuenta.');
         setLoading(false);
         return false;
       }
 
-      const data = await res.json();
+      // Soportar estructura anidada (body.user) o plana
       const userData: UserProfile = {
-        uid: String(data.id),
-        phone: data.phone || '',
+        uid: String((body.user ?? body).id),
+        phone: (body.user ?? body).phone || phone,
         role: 'USER',
-        name: data.name || name,
-        email: data.email || email,
+        name: (body.user ?? body).name || name,
+        email: (body.user ?? body).email || email,
         onboarded: false,
         createdAt: new Date().toISOString(),
         status: 'PENDING',
       };
 
-      if (data.token) localStorage.setItem('sud_jwt_token', data.token);
+      if (body.token) localStorage.setItem('sud_jwt_token', body.token);
       localStorage.setItem('sud_current_user', JSON.stringify(userData));
       setCurrentUser(userData);
       setRole('USER');
       return userData;
     } catch {
-      // Backend unreachable — create local account
-      return registerUserLocal(email, password, name);
+      // Backend no disponible — bloquear registro (no se puede validar whitelist offline)
+      setError('No se pudo conectar con el servidor. Verifica tu conexión e intenta nuevamente.');
+      setLoading(false);
+      return false;
     } finally {
       setLoading(false);
     }

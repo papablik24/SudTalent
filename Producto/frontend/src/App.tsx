@@ -137,7 +137,7 @@ function AppRoutes() {
             currentUser ? <Navigate to="/" replace /> : (
               <AuthScreen 
                 onLogin={async (email, pass) => await loginWithEmail(email, pass)}
-                onRegister={async (email, pass, name) => await registerUser(email, pass, name)}
+                onRegister={async (email, pass, name, phone) => await registerUser(email, pass, name, phone)}
                 loading={loading}
                 error={error}
               />

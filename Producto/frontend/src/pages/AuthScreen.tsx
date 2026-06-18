@@ -12,6 +12,10 @@ interface AuthScreenProps {
   error: string | null;
 }
 
+/** Validates email: must have local@domain.tld where tld is 2–10 chars */
+const isValidEmail = (v: string): boolean =>
+  /^[a-zA-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*\.[a-zA-Z]{2,10}$/.test(v.trim());
+
 const normalizeChileanPhoneInput = (raw: string): string => {
   let d = raw.replace(/\D/g, '');
   if (d.startsWith('569')) {
@@ -92,7 +96,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLocalError(null);
-    if (!email || !email.includes('@')) { setLocalError('Ingresa un correo electrónico válido.'); return; }
+    if (!email || !isValidEmail(email)) { setLocalError('Ingresa un correo electrónico válido (ej: nombre@dominio.com).'); return; }
     if (!password || password.length < 6) { setLocalError('La contraseña debe tener al menos 6 caracteres.'); return; }
     await onLogin(email, password);
   };
@@ -103,7 +107,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
     if (!name.trim()) { setLocalError('Ingresa tu nombre completo.'); return; }
     const phoneDigits = phone.replace(/\D/g, '');
     if (phoneDigits.length !== 11 || !phoneDigits.startsWith('569')) { setLocalError('El teléfono debe tener 8 dígitos después de +56 9.'); return; }
-    if (!email || !email.includes('@')) { setLocalError('Ingresa un correo electrónico válido.'); return; }
+    if (!email || !isValidEmail(email)) { setLocalError('El correo no es válido. Ej: nombre@dominio.com'); return; }
     if (!password || password.length < 6) { setLocalError('La contraseña debe tener al menos 6 caracteres.'); return; }
     if (password !== confirmPassword) { setLocalError('Las contraseñas no coinciden.'); return; }
     await onRegister(email, password, name.trim(), phone.trim());

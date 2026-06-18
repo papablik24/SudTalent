@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { User, Baby, AudioLines, Settings, Loader, Camera, Phone, Mail, Calendar, Sparkles } from 'lucide-react';
+import { User, Baby, AudioLines, Settings, Loader, Camera, Phone, Mail, Calendar, Sparkles, GraduationCap, Link2, ExternalLink, BookOpen } from 'lucide-react';
 import { UserProfile, TalentProfile } from '../../types';
 import { fetchAPI } from '../../services/backendService';
 import { InstagramFeed } from '../../components/InstagramFeed';
+import { cursoService, CursoDTO } from '../../services/cursoService';
 
 interface UserProfileViewProps {
   user: UserProfile;
@@ -28,6 +29,13 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
   const [avatarError, setAvatarError] = useState<string | null>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
+
+  // Cursos del alumno
+  const [cursos, setCursos] = useState<CursoDTO[]>([]);
+  const [cursosLoading, setCursosLoading] = useState(true);
+
+  // Enlace externo (carpeta de demos)
+  const [externalLink, setExternalLink] = useState<string>('');
 
   // Avatar Cropping states
   const [cropModalOpen, setCropModalOpen] = useState(false);
@@ -62,6 +70,8 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
           bio: data.bio || prev.bio,
         }));
         if (data.profileImageUrl) setAvatarUrl(data.profileImageUrl);
+        // Cargar enlace externo de carpeta
+        if (data.profileAudioUrl) setExternalLink(data.profileAudioUrl);
         // Actualizar localStorage con datos frescos
         const savedUser = localStorage.getItem('sud_current_user');
         if (savedUser) {
@@ -88,11 +98,10 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
       const p = JSON.parse(saved);
       setProfile(p);
     }
-    // También intentar cargar datos extras desde el backend
+    // Cargar especialidades y extras desde el backend
     const loadExtrasFromBackend = async () => {
       try {
         const data = await fetchAPI<any>('/profile');
-        // Sincronizar especialidades si el backend las devuelve
         if (data.specialties) {
           const saved2 = localStorage.getItem(`profile_${user.uid}`);
           const existing = saved2 ? JSON.parse(saved2) : {};
@@ -107,6 +116,11 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
       }
     };
     loadExtrasFromBackend();
+    // Cargar cursos del alumno
+    cursoService.getMisCursos()
+      .then(data => setCursos(data || []))
+      .catch(() => setCursos([]))
+      .finally(() => setCursosLoading(false));
   }, [user.uid]);
 
 
@@ -583,6 +597,92 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
         </div>
       </div>
 
+      {/* ── Cursos del Alumno ── */}
+      <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-4">
+        <div className="flex items-center gap-3 mb-2">
+          <GraduationCap size={18} className="text-sud-turquoise" />
+          <h3 className="text-base font-black uppercase tracking-tighter text-white">Mis Cursos</h3>
+          {!cursosLoading && (
+            <span className="ml-auto text-[10px] font-black uppercase tracking-widest text-slate-600">{cursos.length} asignado{cursos.length !== 1 ? 's' : ''}</span>
+          )}
+        </div>
+
+        {cursosLoading ? (
+          <div className="flex items-center gap-3 py-4">
+            <Loader size={14} className="animate-spin text-slate-600" />
+            <span className="text-xs text-slate-600 font-bold uppercase tracking-widest">Cargando cursos...</span>
+          </div>
+        ) : cursos.length === 0 ? (
+          <div className="flex items-center gap-3 py-3 px-4 rounded-2xl bg-white/[0.02] border border-dashed border-white/10">
+            <BookOpen size={16} className="text-slate-700 shrink-0" />
+            <p className="text-[11px] text-slate-600 font-bold uppercase tracking-widest">Sin cursos asignados todavía.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {cursos.map(curso => (
+              <div key={curso.id} className="flex items-center gap-4 p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-white/20 transition-all">
+                <div className="w-10 h-10 rounded-xl bg-sud-turquoise/10 border border-sud-turquoise/20 flex items-center justify-center shrink-0">
+                  <BookOpen size={16} className="text-sud-turquoise" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-white uppercase tracking-tight truncate">{curso.titulo}</p>
+                  <div className="flex items-center gap-3 mt-0.5 flex-wrap">
+                    {curso.profesorNombre && (
+                      <span className="text-[9px] text-slate-500 uppercase tracking-widest font-bold">Prof. {curso.profesorNombre}</span>
+                    )}
+                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${
+                      curso.modalidad === 'PRESENCIAL' ? 'text-emerald-400 bg-emerald-500/10' :
+                      curso.modalidad === 'ONLINE' ? 'text-sky-400 bg-sky-400/10' :
+                      'text-violet-400 bg-violet-400/10'
+                    }`}>{curso.modalidad}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* ── Carpeta Externa / Material ── */}
+      <section className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl">
+        <div className="flex items-center gap-3 mb-4">
+          <Link2 size={18} className="text-sud-turquoise" />
+          <h3 className="text-base font-black uppercase tracking-tighter text-white">Material Externo</h3>
+        </div>
+
+        {externalLink ? (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] text-slate-600 font-black uppercase tracking-widest mb-1">Carpeta de demos configurada</p>
+              <p className="text-xs text-slate-400 truncate font-mono">
+                {(() => { try { return new URL(externalLink).hostname; } catch { return externalLink; } })()}
+              </p>
+            </div>
+            <a
+              href={externalLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 px-5 py-3 rounded-2xl bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise hover:bg-sud-turquoise/20 transition-all text-[10px] font-black uppercase tracking-widest shrink-0"
+            >
+              <ExternalLink size={13} />
+              Abrir carpeta
+            </a>
+          </div>
+        ) : (
+          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex items-center gap-3 flex-1">
+              <ExternalLink size={14} className="text-slate-700 shrink-0" />
+              <p className="text-[11px] text-slate-600 font-bold uppercase tracking-widest">Sin carpeta externa configurada.</p>
+            </div>
+            <button
+              onClick={onNavigateToDemos}
+              className="text-[10px] font-black text-sud-turquoise uppercase tracking-widest hover:text-white transition-colors shrink-0"
+            >
+              Ir a Mis Demos →
+            </button>
+          </div>
+        )}
+      </section>
 
       {/* ── Feed de Instagram ── */}
       <InstagramFeed />

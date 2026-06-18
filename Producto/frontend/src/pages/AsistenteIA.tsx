@@ -16,6 +16,7 @@ export function AsistenteIA() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [userContext, setUserContext] = useState<string>('');
+  const [confirmClear, setConfirmClear] = useState(false);
   
   // Detectar si la clave de API está configurada en la compilación / entorno de Vite
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean>(true);
@@ -125,6 +126,21 @@ DATOS GENERALES DE LA PLATAFORMA (VISTA ADMINISTRADOR):
 - Total de Usuarios Registrados: ${allUsersCount}
 - Total de Convocatorias en la Plataforma: ${allConvocatoriasCount}
 - Total de Postulaciones en la Plataforma: ${allPostulacionesCount}
+
+MÓDULOS DISPONIBLES PARA ADMINISTRADOR:
+- Dashboard (Estadísticas globales)
+- Gestión Alumnos / Lista de Acceso (whitelist, agregar manualmente, Importar WhatsApp masivo)
+- Revisión Casting / Talent Review (aprobar perfiles de talento)
+- Convocatorias (crear, editar, publicar y cerrar convocatorias de casting)
+- Postulaciones (ver y gestionar postulaciones recibidas)
+- Profesores (gestionar perfiles y cursos de docentes)
+- Cursos (catálogo de cursos de la plataforma)
+- Reportería (exportar listas de alumnos en PDF y Excel)
+- Asistente IA (este chat)
+
+FUNCIONALIDAD "IMPORTAR WHATSAPP" (disponible en esta plataforma):
+Ubicación: Admin → Gestión Alumnos → Lista de Acceso → botón "Importar WhatsApp".
+Permite: subir una captura de WhatsApp Web (PNG/JPG/WEBP) o pegar texto directamente, la IA extrae teléfonos, se normaliza, se detectan duplicados/existentes, se muestra preview y el admin confirma antes de guardar.
 `;
         } else if (currentUser.role === 'PROFESOR') {
           contextText += `
@@ -254,7 +270,7 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
   };
 
   const handleClearChat = () => {
-    if (window.confirm('¿Seguro que deseas limpiar la conversación actual?')) {
+    if (confirmClear) {
       setMessages([
         {
           role: 'model',
@@ -262,6 +278,10 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
         }
       ]);
       setError(null);
+      setConfirmClear(false);
+    } else {
+      setConfirmClear(true);
+      setTimeout(() => setConfirmClear(false), 4000);
     }
   };
 
@@ -280,11 +300,17 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
         {apiKeyConfigured && messages.length > 1 && (
           <button
             onClick={handleClearChat}
-            className="sud-btn-secondary !px-3 !py-2 md:!px-4 md:!py-3 flex items-center gap-2 hover:text-red-400 hover:border-red-500/20"
-            title="Limpiar chat"
+            className={`sud-btn-secondary !px-3 !py-2 md:!px-4 md:!py-3 flex items-center gap-2 transition-colors ${
+              confirmClear
+                ? 'text-red-400 border-red-500/30 bg-red-500/10 hover:bg-red-500/20'
+                : 'hover:text-red-400 hover:border-red-500/20'
+            }`}
+            title={confirmClear ? 'Haz clic de nuevo para confirmar' : 'Limpiar chat'}
           >
             <Trash2 size={13} />
-            <span className="hidden sm:inline text-[9px] md:text-[10px]">Limpiar chat</span>
+            <span className="hidden sm:inline text-[9px] md:text-[10px]">
+              {confirmClear ? 'Confirmar limpiar' : 'Limpiar chat'}
+            </span>
           </button>
         )}
       </header>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bot, Send, Trash2, AlertTriangle, Sparkles, RefreshCw, User as UserIcon } from 'lucide-react';
+import { Bot, Send, Trash2, AlertTriangle, Sparkles, RefreshCw, User as UserIcon, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ChatMessage, sendMessageToGemini } from '../services/geminiService';
 import { useAuth } from '../hooks/useAuth';
@@ -8,6 +8,7 @@ import { demoService } from '../services/demoService';
 import { postulacionService } from '../services/postulacionService';
 import { convocatoriaService } from '../services/convocatoriaService';
 import { cursoService } from '../services/cursoService';
+import { aiHistoryService } from '../services/aiHistoryService';
 
 export function AsistenteIA() {
   const { currentUser } = useAuth();
@@ -21,6 +22,61 @@ export function AsistenteIA() {
   const [apiKeyConfigured, setApiKeyConfigured] = useState<boolean>(true);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+
+  // Historial e IA Persistence States
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  const loadHistory = async () => {
+    if (!currentUser) return;
+    setLoadingHistory(true);
+    setHistoryError(null);
+    try {
+      const history = await aiHistoryService.getHistory();
+      if (history && history.length > 0) {
+        setMessages(history);
+      } else {
+        // Generar bienvenida inicial
+        let welcomeText = '';
+        if (currentUser.role === 'PROFESOR') {
+          welcomeText = `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
+        } else if (currentUser.role === 'ADMIN') {
+          welcomeText = '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
+        } else {
+          welcomeText = `¡Hola, ${currentUser.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+        }
+        setMessages([
+          {
+            role: 'model',
+            text: welcomeText
+          }
+        ]);
+      }
+    } catch (err: any) {
+      console.warn('Error al cargar historial del Asistente IA:', err);
+      setHistoryError('No se pudo cargar el historial del chat desde el servidor.');
+      
+      // Fallback bienvenida
+      let welcomeText = '';
+      if (currentUser.role === 'PROFESOR') {
+        welcomeText = `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
+      } else if (currentUser.role === 'ADMIN') {
+        welcomeText = '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
+      } else {
+        welcomeText = `¡Hola, ${currentUser.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+      }
+      setMessages([
+        {
+          role: 'model',
+          text: welcomeText
+        }
+      ]);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
 
   // Cargar contexto del usuario actual
   useEffect(() => {
@@ -195,25 +251,11 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
     }
   }, []);
 
-  // Mensaje de bienvenida inicial personalizado por rol
+  // Cargar historial del usuario actual o mensaje de bienvenida
   useEffect(() => {
-    if (!apiKeyConfigured || !currentUser) return;
-    
-    let welcomeText = '';
-    if (currentUser.role === 'PROFESOR') {
-      welcomeText = `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
-    } else if (currentUser.role === 'ADMIN') {
-      welcomeText = '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
-    } else {
-      welcomeText = `¡Hola, ${currentUser.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+    if (currentUser && apiKeyConfigured) {
+      loadHistory();
     }
-    
-    setMessages([
-      {
-        role: 'model',
-        text: welcomeText
-      }
-    ]);
   }, [currentUser, apiKeyConfigured]);
 
   // Hacer scroll automático al último mensaje
@@ -234,6 +276,15 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
     setInput('');
     setLoading(true);
     setError(null);
+    setSaveError(null);
+
+    // Persistir mensaje de usuario (tolerante a fallos)
+    try {
+      await aiHistoryService.addMessage('user', userMessage.text, userContext ? 'Contexto cargado' : undefined);
+    } catch (saveErr) {
+      console.warn('No se pudo guardar el mensaje del usuario en el historial:', saveErr);
+      setSaveError('No se pudo guardar el historial de la conversación en el servidor.');
+    }
 
     try {
       // Enviamos el historial completo para mantener el contexto básico de la conversación
@@ -241,6 +292,21 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
       const botResponse = await sendMessageToGemini(historyToSend, userContext);
       
       setMessages(prev => [...prev, { role: 'model', text: botResponse }]);
+
+      // Persistir respuesta de modelo (tolerante a fallos)
+      try {
+        await aiHistoryService.addMessage('model', botResponse);
+      } catch (saveErr) {
+        console.warn('No se pudo guardar la respuesta del asistente en el historial:', saveErr);
+        setSaveError('No se pudo guardar el historial de la conversación en el servidor.');
+      }
+
+      // Logear consulta exitosa
+      try {
+        await aiHistoryService.logQuery(userMessage.text, botResponse, userContext, 'SUCCESS');
+      } catch (logErr) {
+        console.warn('Error al registrar log de consulta exitosa:', logErr);
+      }
     } catch (err: any) {
       console.error('Error al enviar el mensaje:', err);
       if (err.message === 'API_KEY_MISSING') {
@@ -248,21 +314,20 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
       } else {
         setError('No se pudo obtener respuesta de la IA. Intenta nuevamente.');
       }
+
+      // Logear consulta fallida
+      try {
+        await aiHistoryService.logQuery(userMessage.text, err.message || 'Error', userContext, 'ERROR');
+      } catch (logErr) {
+        console.warn('Error al registrar log de consulta fallida:', logErr);
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleClearChat = () => {
-    if (window.confirm('¿Seguro que deseas limpiar la conversación actual?')) {
-      setMessages([
-        {
-          role: 'model',
-          text: 'Historial limpio. ¿En qué más te puedo asistir sobre SudTalent?'
-        }
-      ]);
-      setError(null);
-    }
+    setShowClearConfirm(true);
   };
 
   return (
@@ -407,6 +472,22 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
               </motion.div>
             )}
 
+            {/* Mensaje de Advertencia sobre Historial */}
+            {saveError && (
+              <div className="p-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 text-amber-400 text-[10px] font-bold flex items-center gap-2 max-w-md mx-auto">
+                <AlertTriangle size={12} className="shrink-0" />
+                <span>{saveError}</span>
+              </div>
+            )}
+
+            {/* Aviso de error al cargar historial */}
+            {historyError && (
+              <div className="p-2.5 rounded-xl border border-white/5 bg-white/[0.02] text-slate-500 text-[10px] font-medium flex items-center gap-2 max-w-md mx-auto">
+                <AlertTriangle size={12} className="shrink-0 text-amber-500/50" />
+                <span>Uso local habilitado: {historyError}</span>
+              </div>
+            )}
+
             {/* Mensaje de Error */}
             {error && (
               <div className="p-3 md:p-4 rounded-xl border border-red-500/20 bg-red-500/5 text-red-400 text-xs font-bold flex items-center gap-2 max-w-md mx-auto">
@@ -441,6 +522,71 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
           </form>
         </div>
       )}
+
+      {/* ── Custom Confirm Modal ───────────────────────── */}
+      <AnimatePresence>
+        {showClearConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-slate-950/25 dark:bg-black/60 backdrop-blur-sm dark:backdrop-blur-md" onClick={() => setShowClearConfirm(false)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-md p-10 relative overflow-hidden text-center space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setShowClearConfirm(false)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="w-16 h-16 mx-auto rounded-full bg-red-500/10 border border-red-500/30 flex items-center justify-center text-red-500">
+                <Trash2 size={32} />
+              </div>
+
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Limpiar Historial</h3>
+                <p className="text-sm text-slate-400 leading-relaxed">¿Estás seguro de que deseas limpiar todo tu historial de conversación? Esta acción no se puede deshacer.</p>
+              </div>
+
+              <div className="flex gap-4">
+                <button 
+                  onClick={() => setShowClearConfirm(false)}
+                  className="flex-1 h-12 rounded-xl border border-white/10 hover:bg-white/5 text-xs font-black uppercase tracking-widest text-slate-400 transition-all cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  onClick={async () => {
+                    setShowClearConfirm(false);
+                    try {
+                      await aiHistoryService.clearHistory();
+                      let welcomeText = '';
+                      if (currentUser?.role === 'PROFESOR') {
+                        welcomeText = `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
+                      } else if (currentUser?.role === 'ADMIN') {
+                        welcomeText = '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
+                      } else {
+                        welcomeText = `¡Hola, ${currentUser?.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+                      }
+                      setMessages([
+                        {
+                          role: 'model',
+                          text: welcomeText
+                        }
+                      ]);
+                      setError(null);
+                      setSaveError(null);
+                    } catch (err) {
+                      console.error('Error al limpiar historial en backend:', err);
+                      setSaveError('No se pudo limpiar el historial en el servidor.');
+                    }
+                  }}
+                  className="flex-1 h-12 rounded-xl bg-red-500 text-black hover:bg-red-600 text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
+                >
+                  Confirmar
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

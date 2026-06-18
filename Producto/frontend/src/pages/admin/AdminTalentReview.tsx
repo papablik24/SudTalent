@@ -854,7 +854,7 @@ export function AdminTalentReview({ users, talentProfiles, allDemos, onClose, on
                 </button>
               </div>
 
-              <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar px-10 pb-10 space-y-12">
+              <div className="flex-1 overflow-y-auto min-h-0 custom-scrollbar px-10 pb-32 space-y-12">
                 {/* Profile Main Info */}
                 <section className="flex flex-col md:flex-row gap-10 items-start">
                   <div className="w-32 h-32 rounded-[2.5rem] bg-sud-gradient p-[1px] shrink-0">

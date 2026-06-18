@@ -405,6 +405,7 @@ public class ProfesorController {
                     .age(s.getAge())
                     .childName(s.getChildName())
                     .childAge(s.getChildAge())
+                    .profileImageUrl(s.getProfileImageUrl())
                     .cursos(sharedCourses)
                     .build());
         }

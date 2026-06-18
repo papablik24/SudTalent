@@ -773,7 +773,9 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                               {/* Student Header */}
                               <div className="flex items-center gap-3">
                                 <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center overflow-hidden shrink-0">
-                                  {student.childName ? (
+                                  {student.profileImageUrl ? (
+                                    <img src={student.profileImageUrl} alt="" className="w-full h-full object-cover" />
+                                  ) : student.childName ? (
                                     <span className="text-xs font-black text-slate-400 uppercase">
                                       {student.childName.substring(0, 2).toUpperCase()}
                                     </span>

@@ -19,6 +19,7 @@ public class ProfesorAlumnoDTO {
     private Integer age;
     private String childName;
     private Integer childAge;
+    private String profileImageUrl;
     private List<CursoResumenDTO> cursos;
 
     @Getter

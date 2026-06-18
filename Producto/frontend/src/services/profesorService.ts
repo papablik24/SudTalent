@@ -87,6 +87,7 @@ export interface ProfesorAlumnoDTO {
   age?: number;
   childName?: string;
   childAge?: number;
+  profileImageUrl?: string;
   cursos: {
     id: string;
     titulo: string;

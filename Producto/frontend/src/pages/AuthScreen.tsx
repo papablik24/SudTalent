@@ -12,6 +12,21 @@ interface AuthScreenProps {
   error: string | null;
 }
 
+const normalizeChileanPhoneInput = (raw: string): string => {
+  let d = raw.replace(/\D/g, '');
+  if (d.startsWith('569')) {
+    d = d.slice(3);
+  } else if (d.startsWith('56')) {
+    d = d.slice(2);
+    if (d.startsWith('9')) {
+      d = d.slice(1);
+    }
+  } else if (d.length === 9 && d.startsWith('9')) {
+    d = d.slice(1);
+  }
+  return d.slice(0, 8);
+};
+
 export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenProps) {
   const { theme, toggleTheme } = useTheme();
   const [mode, setMode] = useState<'login' | 'register' | 'forgot-password'>('login');
@@ -87,7 +102,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
     setLocalError(null);
     if (!name.trim()) { setLocalError('Ingresa tu nombre completo.'); return; }
     const phoneDigits = phone.replace(/\D/g, '');
-    if (!phoneDigits || phoneDigits.length < 8) { setLocalError('Ingresa tu número de teléfono válido.'); return; }
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('569')) { setLocalError('El teléfono debe tener 8 dígitos después de +56 9.'); return; }
     if (!email || !email.includes('@')) { setLocalError('Ingresa un correo electrónico válido.'); return; }
     if (!password || password.length < 6) { setLocalError('La contraseña debe tener al menos 6 caracteres.'); return; }
     if (password !== confirmPassword) { setLocalError('Las contraseñas no coinciden.'); return; }
@@ -289,16 +304,26 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
 
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Teléfono Autorizado <span className="text-sud-turquoise">*</span></label>
-                    <div className="relative group">
-                      <div className="absolute left-5 top-1/2 -translate-y-1/2"><Phone className="text-slate-600 group-focus-within:text-sud-turquoise transition-colors" size={16} /></div>
+                    <div className="flex items-center bg-black/85 border border-white/15 rounded-2xl focus-within:border-sud-turquoise/60 focus-within:ring-1 focus-within:ring-sud-turquoise/25 transition-all overflow-hidden h-[52px]">
+                      {/* Ícono */}
+                      <div className="flex items-center justify-center pl-5 pr-2 shrink-0 self-stretch">
+                        <Phone className="text-slate-600 group-focus-within:text-sud-turquoise transition-colors" size={16} />
+                      </div>
+                      {/* Prefijo fijo — nunca se quiebra */}
+                      <span className="whitespace-nowrap min-w-[52px] pr-3 text-slate-400 font-mono text-sm select-none border-r border-white/10 self-stretch flex items-center">+56 9</span>
+                      {/* Input solo 8 dígitos */}
                       <input
                         type="tel"
-                        placeholder="Ej: +56 9 1234 5678"
-                        value={phone}
-                        onChange={e => setPhone(e.target.value)}
+                        inputMode="numeric"
+                        placeholder="1234 5678"
+                        value={phone.startsWith('569') ? phone.slice(3) : phone}
+                        onChange={e => {
+                          const digits = normalizeChileanPhoneInput(e.target.value);
+                          setPhone(digits ? `569${digits}` : '');
+                        }}
                         disabled={loading}
-                        className="sud-input w-full pl-14 tracking-wide"
-                        autoComplete="tel"
+                        className="flex-1 bg-transparent px-3 text-white outline-none font-mono tracking-widest text-sm placeholder-slate-600 min-w-0"
+                        maxLength={20}
                         required
                       />
                     </div>

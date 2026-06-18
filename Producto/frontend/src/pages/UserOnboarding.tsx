@@ -14,29 +14,32 @@ interface UserOnboardingProps {
 
 const SPECIALTIES = ['Doblaje', 'Locución', 'Podcast', 'Presentación', 'Narración', 'Canto', 'Actuación Vocal', 'Producción Vocal'];
 
+const normalizeChileanPhoneInput = (raw: string): string => {
+  let d = raw.replace(/\D/g, '');
+  if (d.startsWith('569')) {
+    d = d.slice(3);
+  } else if (d.startsWith('56')) {
+    d = d.slice(2);
+    if (d.startsWith('9')) {
+      d = d.slice(1);
+    }
+  } else if (d.length === 9 && d.startsWith('9')) {
+    d = d.slice(1);
+  }
+  return d.slice(0, 8);
+};
+
 export function UserOnboarding({ onComplete, userPhone, userEmail, userName, initialBio, initialAge }: UserOnboardingProps) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [saving, setSaving] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
-
-  // Split name if provided
-  const splitName = (name?: string) => {
-    if (!name) return { first: '', last: '' };
-    const parts = name.trim().split(/\s+/);
-    if (parts.length === 1) return { first: parts[0], last: '' };
-    const first = parts[0];
-    const last = parts.slice(1).join(' ');
-    return { first, last };
-  };
-
-  const initialName = splitName(userName);
+  const [ageError, setAgeError] = useState<string | null>(null);
 
   // Step 1 — Profile type
   const [profileType, setProfileType] = useState<ProfileType | null>(null);
 
   // Step 2 — Personal data
-  const [firstName, setFirstName] = useState(initialName.first);
-  const [lastName, setLastName] = useState(initialName.last);
+  const [name, setName] = useState(userName || '');
   const [email, setEmail] = useState(userEmail || '');
   const [phone, setPhone] = useState(userPhone || '');
   const [age, setAge] = useState(initialAge?.toString() || '');
@@ -56,18 +59,43 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
     setSpecialties(prev => prev.includes(spec) ? prev.filter(s => s !== spec) : [...prev, spec]);
   };
 
+  const formatDisplayPhone = (rawPhone: string) => {
+    const digits = rawPhone.replace(/\D/g, '');
+    if (digits.length === 11 && digits.startsWith('569')) {
+      return `+56 9 ${digits.slice(3, 7)} ${digits.slice(7, 11)}`;
+    }
+    if (digits.length === 9 && digits.startsWith('9')) {
+      return `+56 9 ${digits.slice(1, 5)} ${digits.slice(5, 9)}`;
+    }
+    if (digits.length === 8) {
+      return `+56 9 ${digits.slice(0, 4)} ${digits.slice(4, 8)}`;
+    }
+    return rawPhone;
+  };
+
   const goNext = () => {
     setValidationError(null);
     if (step === 1) {
       if (!profileType) { setValidationError('Selecciona un tipo de perfil.'); return; }
       setStep(2);
     } else if (step === 2) {
-      if (!firstName.trim()) { setValidationError('El nombre es requerido.'); return; }
-      // Apellido es opcional: no bloqueamos si está vacío
+      if (!name.trim()) { setValidationError('El nombre completo es requerido.'); return; }
       if (email && !email.includes('@')) { setValidationError('El correo no es válido.'); return; }
+      if (profileType === 'PERSONAL' && age) {
+        const n = parseInt(age, 10);
+        if (isNaN(n) || n < 1 || n > 120) {
+          setValidationError('La edad debe estar entre 1 y 120 años.');
+          setAgeError('La edad debe estar entre 1 y 120 años.');
+          return;
+        }
+      }
       if (profileType === 'PARENT') {
         if (!childName.trim()) { setValidationError('El nombre del menor es requerido.'); return; }
-        if (!childAge || parseInt(childAge) < 1) { setValidationError('Ingresa la edad del menor.'); return; }
+        const cAge = parseInt(childAge, 10);
+        if (isNaN(cAge) || cAge < 1 || cAge > 17) {
+          setValidationError('La edad del menor debe estar entre 1 y 17 años.');
+          return;
+        }
       }
       setStep(3);
     }
@@ -83,10 +111,7 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
     setValidationError(null);
     if (specialties.length === 0) { setValidationError('Selecciona al menos una especialidad.'); return; }
     setSaving(true);
-    // Nombre completo: si hay apellido, concatenar; si no, solo el primer nombre
-    const fullName = lastName.trim()
-      ? `${firstName.trim()} ${lastName.trim()}`
-      : firstName.trim();
+    const fullName = name.trim();
     const parsedAge = profileType === 'PERSONAL' && age ? parseInt(age) : undefined;
     const userData: Partial<UserProfile> = {
       name: fullName,
@@ -190,13 +215,9 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                 {profileType === 'PERSONAL' ? 'Datos personales del alumno' : 'Datos del apoderado'}
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Nombre <span className="text-red-400">*</span></label>
-                  <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="sud-input w-full" placeholder="Ej: Roberto" />
-                </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Apellido <span className="text-slate-700">(opcional)</span></label>
-                  <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="sud-input w-full" placeholder="Ej: Pérez" />
+                <div className="space-y-2 md:col-span-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Nombre Completo <span className="text-red-400">*</span></label>
+                  <input type="text" value={name} onChange={e => setName(e.target.value)} className="sud-input w-full" placeholder="Ej: Roberto Pérez" />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
@@ -206,24 +227,26 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                     ) : null}
                   </label>
                   {phone ? (
-                    // Teléfono ya validado por whitelist en el registro — solo lectura
-                    <div className="flex items-center gap-2 bg-white/[0.03] border border-sud-turquoise/20 rounded-xl px-4 py-2.5">
-                      <span className="text-sud-turquoise font-mono text-sm">{phone}</span>
-                      <span className="text-[9px] text-slate-600 uppercase font-bold tracking-wider ml-auto">Solo lectura</span>
+                    // Teléfono ya validado por whitelist — solo lectura, badge Autorizado
+                    <div className="flex items-center gap-3 bg-white/[0.03] border border-sud-turquoise/25 rounded-xl px-4 h-[46px]">
+                      <span className="text-sud-turquoise font-mono text-sm tracking-widest whitespace-nowrap">{formatDisplayPhone(phone)}</span>
+                      <span className="ml-auto whitespace-nowrap text-[9px] text-sud-turquoise uppercase font-black tracking-widest bg-sud-turquoise/10 border border-sud-turquoise/20 rounded-lg px-2 py-1">✓ Autorizado</span>
                     </div>
                   ) : (
-                    <div className="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden focus-within:border-sud-orange transition-all">
-                      <span className="px-3 py-2 text-slate-500 font-mono text-sm border-r border-white/10 select-none">+56 9</span>
+                    // Teléfono editable — prefijo fijo sin quiebre
+                    <div className="flex items-center bg-white/5 border border-white/10 rounded-xl overflow-hidden focus-within:border-sud-orange/60 transition-all h-[46px]">
+                      <span className="whitespace-nowrap min-w-[60px] px-3 text-slate-500 font-mono text-sm border-r border-white/10 select-none self-stretch flex items-center">+56 9</span>
                       <input
                         type="tel"
-                        value={phone.replace(/[^0-9]/g, '').replace(/^569?/, '')}
+                        inputMode="numeric"
+                        value={phone.startsWith('569') ? phone.slice(3) : phone}
                         onChange={e => {
-                          const digits = e.target.value.replace(/[^0-9]/g, '').slice(0, 8);
+                          const digits = normalizeChileanPhoneInput(e.target.value);
                           setPhone(digits ? `569${digits}` : '');
                         }}
-                        placeholder="XXXX XXXX"
-                        maxLength={8}
-                        className="bg-transparent px-3 py-2 w-full text-white outline-none font-mono tracking-widest"
+                        placeholder="1234 5678"
+                        maxLength={20}
+                        className="flex-1 bg-transparent px-3 text-white outline-none font-mono tracking-widest text-sm placeholder-slate-600 min-w-0"
                       />
                     </div>
                   )}
@@ -233,9 +256,34 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="sud-input w-full" placeholder="ejemplo@correo.cl" />
                 </div>
                 {profileType === 'PERSONAL' && (
-                  <div className="space-y-2">
+                  <div className="space-y-2 md:col-span-2">
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Edad</label>
-                    <input type="number" value={age} onChange={e => setAge(e.target.value)} className="sud-input w-full" placeholder="25" min="1" max="99" />
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={age}
+                      onChange={e => {
+                        const digits = e.target.value.replace(/\D/g, '').slice(0, 3);
+                        setAge(digits);
+                        if (digits) {
+                          const n = parseInt(digits, 10);
+                          if (n < 1 || n > 120) {
+                            setAgeError('La edad debe estar entre 1 y 120 años.');
+                          } else {
+                            setAgeError(null);
+                          }
+                        } else {
+                          setAgeError(null);
+                        }
+                      }}
+                      className={`sud-input w-full ${ageError ? 'border-red-500/50 focus:border-red-500' : ''}`}
+                      placeholder="25"
+                    />
+                    {ageError && (
+                      <p className="text-[10px] text-red-400 font-bold uppercase tracking-widest px-1 mt-1">
+                        {ageError}
+                      </p>
+                    )}
                   </div>
                 )}
               </div>
@@ -251,7 +299,14 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Edad del Menor <span className="text-red-400">*</span></label>
-                      <input type="number" value={childAge} onChange={e => setChildAge(e.target.value)} className="sud-input w-full" placeholder="12" min="1" max="17" />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        value={childAge}
+                        onChange={e => setChildAge(e.target.value.replace(/\D/g, '').slice(0, 2))}
+                        className="sud-input w-full"
+                        placeholder="12"
+                      />
                     </div>
                     <div className="space-y-2 md:col-span-2">
                       <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Relación con el Menor</label>

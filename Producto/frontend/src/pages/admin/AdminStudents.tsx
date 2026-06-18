@@ -313,13 +313,25 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const displayUsers = [
     ...whitelist
       .filter((w: any) => w.role !== 'ADMIN' && w.role !== 'PROFESOR' && w.role !== 'ROLE_ADMIN' && w.role !== 'ROLE_PROFESOR')
-      .map(w => ({
-        ...(w as any),
-        type: 'WHITELIST' as const,
-        category: (w as any).category || 'NONE',
-        uid: (w as any).uid,
-        status: (w as any).userStatus || (w as any).status,
-      })),
+      .map((w: any) => {
+        const registeredUser = users.find(u => 
+          (w.uid && String(u.uid) === String(w.uid)) ||
+          (w.phone && u.phone && w.phone.replace(/\D/g, '').slice(-8) === u.phone.replace(/\D/g, '').slice(-8))
+        );
+        return {
+          ...(w as any),
+          type: 'WHITELIST' as const,
+          category: (w as any).category || 'NONE',
+          uid: (w as any).uid || (registeredUser ? registeredUser.uid : undefined),
+          status: (w as any).userStatus || (registeredUser ? registeredUser.status : (w as any).status),
+          name: (registeredUser && registeredUser.name && registeredUser.name.trim()) 
+            ? registeredUser.name 
+            : (w.name || 'Sin Nombre'),
+          email: (registeredUser && registeredUser.email && registeredUser.email.trim()) 
+            ? registeredUser.email 
+            : (w.email || ''),
+        };
+      }),
     ...users
       .filter(u => u.role !== 'ADMIN' && u.role !== 'PROFESOR')
       .filter(u => {

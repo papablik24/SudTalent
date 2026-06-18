@@ -388,7 +388,7 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
         <div className="md:col-span-8 space-y-6">
           <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
             <div className="flex items-center justify-between">
-              <h3 className="text-xl font-black uppercase tracking-tighter text-white">Información General</h3>
+              <h3 className="text-xl font-black uppercase tracking-tighter text-white">Mi Perfil</h3>
               {isEditing && (
                 <button onClick={handleSave} disabled={isSaving}
                   className="px-6 py-2 bg-sud-orange text-black font-black text-[10px] uppercase tracking-widest rounded-full hover:bg-sud-orange/80 disabled:opacity-50 transition-all">
@@ -488,6 +488,40 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
                   </p>
                 )}
               </div>
+
+              {/* Especialidades */}
+              <div className="pt-4 border-t border-white/5">
+                <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2.5">Especialidades</p>
+                {profile?.specialties && profile.specialties.length > 0 ? (
+                  <div className="flex flex-wrap gap-2">
+                    {profile.specialties.map((s: string) => (
+                      <span key={s} className="px-3.5 py-1.5 rounded-full bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise text-[9px] font-black uppercase tracking-wider">
+                        {s}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-slate-600 italic text-[11px] uppercase tracking-wider">Sin especialidades registradas</p>
+                )}
+              </div>
+
+              {/* Experiencia y Disponibilidad */}
+              {(profile?.experience || profile?.availability || profile?.location) ? (
+                <div className="pt-4 border-t border-white/5 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {profile?.experience ? (
+                    <div>
+                      <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-1.5">Experiencia Previa</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{profile.experience}</p>
+                    </div>
+                  ) : null}
+                  {(profile?.availability || profile?.location) ? (
+                    <div>
+                      <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-1.5">Disponibilidad</p>
+                      <p className="text-xs text-slate-300 leading-relaxed">{profile.availability || profile.location}</p>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
           </div>
         </div>
@@ -549,48 +583,6 @@ export function UserProfileView({ user, onNavigateToDemos, onNavigateToConvocato
         </div>
       </div>
 
-      {/* ── Perfil Vocal ── */}
-      <div className="bg-white/[0.03] border border-white/10 rounded-[2.5rem] p-8 shadow-2xl space-y-6">
-        <h3 className="text-xl font-black uppercase tracking-tighter text-white">Perfil Vocal</h3>
-
-        {/* Especialidades */}
-        <div>
-          <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-3">Especialidades</p>
-          {profile?.specialties && profile.specialties.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {profile.specialties.map((s: string) => (
-                <span key={s} className="px-4 py-1.5 rounded-2xl bg-sud-turquoise/10 border border-sud-turquoise/30 text-sud-turquoise text-[10px] font-black uppercase tracking-wider">
-                  {s}
-                </span>
-              ))}
-            </div>
-          ) : (
-            <p className="text-slate-600 italic text-sm">Sin especialidades registradas.</p>
-          )}
-        </div>
-
-        {/* Experiencia */}
-        {profile?.experience ? (
-          <div className="pt-4 border-t border-white/5">
-            <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2">Experiencia Previa</p>
-            <p className="text-sm text-slate-300 leading-relaxed">{profile.experience}</p>
-          </div>
-        ) : null}
-
-        {/* Disponibilidad */}
-        {(profile?.availability || profile?.location) ? (
-          <div className="pt-4 border-t border-white/5">
-            <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest mb-2">Disponibilidad</p>
-            <p className="text-sm text-slate-300 leading-relaxed">{profile.availability || profile.location}</p>
-          </div>
-        ) : null}
-
-        {!profile?.specialties?.length && !profile?.experience && !profile?.availability && !profile?.location && (
-          <p className="text-[9px] text-slate-700 uppercase font-bold tracking-widest italic">
-            Completa el onboarding para ver tu perfil vocal aquí.
-          </p>
-        )}
-      </div>
 
       {/* ── Feed de Instagram ── */}
       <InstagramFeed />

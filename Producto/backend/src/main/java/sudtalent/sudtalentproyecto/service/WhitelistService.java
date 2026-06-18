@@ -523,11 +523,21 @@ public class WhitelistService {
     }
 
     private WhitelistNumberDTO toDTO(WhitelistNumber number) {
+        String displayName = number.getName();
+        String displayEmail = number.getEmail();
+        if (number.getUser() != null) {
+            if (number.getUser().getName() != null && !number.getUser().getName().isBlank()) {
+                displayName = number.getUser().getName();
+            }
+            if (number.getUser().getEmail() != null && !number.getUser().getEmail().isBlank()) {
+                displayEmail = number.getUser().getEmail();
+            }
+        }
         return WhitelistNumberDTO.builder()
             .id(number.getId())
             .phone(number.getPhone())
-            .name(number.getName())
-            .email(number.getEmail())
+            .name(displayName)
+            .email(displayEmail)
             .category(number.getCategory())
             .role(number.getRole() != null ? number.getRole().name() : null)
             .status(number.getStatus().toString())

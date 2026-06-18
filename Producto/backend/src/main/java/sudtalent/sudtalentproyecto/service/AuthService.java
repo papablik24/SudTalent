@@ -111,12 +111,8 @@ public class AuthService {
 
         // 8. Vincular la entrada whitelist con el nuevo usuario
         wl.setUser(user);
-        if (wl.getName() == null || wl.getName().isBlank()) {
-            wl.setName(finalName);
-        }
-        if (wl.getEmail() == null || wl.getEmail().isBlank()) {
-            wl.setEmail(request.email());
-        }
+        wl.setName(finalName);
+        wl.setEmail(request.email());
         if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
             wl.setStatus(WhitelistNumber.Status.ACTIVO);
         }
@@ -270,6 +266,12 @@ public class AuthService {
                 WhitelistNumber wl = wlOpt.get();
                 if (wl.getUser() == null) {
                     wl.setUser(user);
+                }
+                if (user.getName() != null && !user.getName().isBlank()) {
+                    wl.setName(user.getName());
+                }
+                if (user.getEmail() != null && !user.getEmail().isBlank()) {
+                    wl.setEmail(user.getEmail());
                 }
                 if (wl.getStatus() == WhitelistNumber.Status.PENDIENTE) {
                     wl.setStatus(WhitelistNumber.Status.ACTIVO);

@@ -39,12 +39,33 @@ public class PostulacionService {
     public PostulacionDTO createPostulacion(PostulacionRequestDTO request, Authentication authentication) {
         UUID userUUID = resolveUserId(request.getAlumnoId(), authentication);
 
-        // Verificar duplicado
-        boolean yaPostulo = postulacionRepository.findByAlumnoId(userUUID)
-                .stream()
-                .anyMatch(p -> p.getConvocatoria().getId().equals(request.getConvocatoriaId()));
-        if (yaPostulo) {
-            throw new RuntimeException("Ya existe una postulación activa para esta convocatoria");
+        // Verificar duplicado — incluye postulaciones canceladas/eliminadas
+        // para evitar violación de constraint UNIQUE en la BD
+        var existingAny = postulacionRepository.findAll().stream()
+                .filter(p -> p.getAlumno() != null
+                        && p.getAlumno().getId().equals(userUUID)
+                        && p.getConvocatoria() != null
+                        && p.getConvocatoria().getId().equals(request.getConvocatoriaId()))
+                .findFirst();
+
+        if (existingAny.isPresent()) {
+            Postulacion existing = existingAny.get();
+            if (existing.getDeletedAt() == null) {
+                throw new RuntimeException("Ya existe una postulación activa para esta convocatoria");
+            }
+            // Reactivar la postulación cancelada en lugar de crear una nueva
+            existing.setDeletedAt(null);
+            existing.setEstado("PENDIENTE");
+            existing.setFechaPostulacion(LocalDate.now());
+            existing.setUpdatedAt(java.time.LocalDateTime.now());
+            if (request.getMensaje() != null) existing.setMensaje(request.getMensaje());
+            if (request.getVoiceAudioId() != null) {
+                VoiceAudio audioRef = entityManager.find(VoiceAudio.class, request.getVoiceAudioId());
+                if (audioRef != null && !audioRef.isDeleted() && audioRef.getUser().getId().equals(userUUID)) {
+                    existing.setVoiceAudio(audioRef);
+                }
+            }
+            return toDTO(postulacionRepository.save(existing));
         }
 
         // Verificar que la convocatoria no haya vencido

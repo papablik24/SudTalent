@@ -143,28 +143,31 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
 
   const handleToggleCourse = async (cursoId: string, isEnrolled: boolean) => {
     if (!selectedEntry?.uid) return;
+    const alumnoId = String(selectedEntry.uid);
     try {
       const currentCursoIds = allCursos
-        .filter(c => c.alumnos?.some((a: any) => a.id === selectedEntry.uid))
+        .filter(c => c.alumnos?.some((a: any) => String(a.id || a.alumnoId) === alumnoId))
         .map(c => c.id);
-        
+
       let nextCursoIds: string[];
       if (isEnrolled) {
-        nextCursoIds = [...currentCursoIds, cursoId];
+        nextCursoIds = currentCursoIds.includes(cursoId)
+          ? currentCursoIds
+          : [...currentCursoIds, cursoId];
       } else {
         nextCursoIds = currentCursoIds.filter(id => id !== cursoId);
       }
-      
+
       await fetchAPI(`/cursos/asignar-alumno/${selectedEntry.uid}`, {
         method: 'PUT',
         body: JSON.stringify(nextCursoIds)
       });
-      
+
       setAllCursos(prev => prev.map(c => {
         if (c.id === cursoId) {
-          const updatedAlumnos = isEnrolled 
+          const updatedAlumnos = isEnrolled
             ? [...(c.alumnos || []), { id: selectedEntry.uid, nombreAlumno: selectedEntry.name }]
-            : (c.alumnos || []).filter((a: any) => a.id !== selectedEntry.uid);
+            : (c.alumnos || []).filter((a: any) => String(a.id || a.alumnoId) !== alumnoId);
           return { ...c, alumnos: updatedAlumnos };
         }
         return c;
@@ -1111,7 +1114,8 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                   </p>
                   <div className="max-h-48 overflow-y-auto border border-white/10 rounded-2xl p-4 bg-white/[0.01] space-y-2.5">
                     {allCursos.map(curso => {
-                      const isEnrolled = curso.alumnos?.some((a: any) => a.id === selectedEntry.uid);
+                      const alumnoId = String(selectedEntry?.uid || '');
+                      const isEnrolled = curso.alumnos?.some((a: any) => String(a.id || a.alumnoId) === alumnoId);
                       return (
                         <label
                           key={curso.id}

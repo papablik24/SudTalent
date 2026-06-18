@@ -126,3 +126,69 @@ Instrucciones adicionales:
     throw error;
   }
 }
+
+/**
+ * Extrae nombres y teléfonos visibles desde una imagen de captura de WhatsApp.
+ * Devuelve texto plano con formato "Nombre - Teléfono" (una línea por contacto).
+ */
+export async function extractPhoneContactsFromImage(imageFile: File): Promise<string> {
+  const currentKey = import.meta.env.VITE_GEMINI_API_KEY;
+
+  if (!currentKey) {
+    throw new Error('API_KEY_MISSING');
+  }
+
+  if (!ai) {
+    ai = new GoogleGenAI({ apiKey: currentKey });
+  }
+
+  // Convertir el archivo a base64
+  const arrayBuffer = await imageFile.arrayBuffer();
+  const uint8 = new Uint8Array(arrayBuffer);
+  let binary = '';
+  for (let i = 0; i < uint8.length; i++) {
+    binary += String.fromCharCode(uint8[i]);
+  }
+  const base64 = btoa(binary);
+
+  const mimeType = imageFile.type as 'image/png' | 'image/jpeg' | 'image/webp';
+
+  const prompt = `Analiza esta imagen de captura de pantalla de WhatsApp Web o similar.
+Tu única tarea es extraer TODOS los nombres y números de teléfono visibles en la imagen.
+Devuelve SOLO el texto plano, sin explicaciones, sin markdown, sin encabezados.
+Formato estricto de salida (una línea por contacto):
+Nombre - Número
+
+Si no hay nombre visible para un teléfono, usa "Desconocido" como nombre.
+Si solo hay teléfonos sin nombres, lista el teléfono igual.
+Si no encuentras ningún número de teléfono, responde únicamente con el texto: SIN_CONTACTOS`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: 'gemini-2.5-flash',
+      contents: [
+        {
+          role: 'user',
+          parts: [
+            {
+              inlineData: {
+                mimeType,
+                data: base64,
+              },
+            },
+            { text: prompt },
+          ],
+        },
+      ],
+    });
+
+    if (!response || !response.text) {
+      throw new Error('No se recibió respuesta de la IA.');
+    }
+
+    return response.text.trim();
+  } catch (error: any) {
+    console.error('Error al extraer contactos desde imagen con Gemini:', error);
+    throw error;
+  }
+}

@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen, FileText, MessageSquare } from 'lucide-react';
+import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen, FileText, MessageSquare, ImagePlus, AlertTriangle } from 'lucide-react';
 import { UserProfile, WhitelistEntry, ProfileCategory, ProfileStatus } from '../../types';
 import { generateAlumnosPDF, generateAlumnosExcel } from '../../services/reportService';
 import { fetchAPI, backendService, WhitelistCandidate, ImportSummary } from '../../services/backendService';
 import { AudioPlayer } from '../../components/ui/AudioPlayer';
+import { extractPhoneContactsFromImage } from '../../services/geminiService';
 
 interface AdminStudentsProps {
   whitelist: WhitelistEntry[];
@@ -67,6 +68,14 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
+  // Extracción desde imagen
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [extractingImage, setExtractingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageSuccess, setImageSuccess] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+
   const handleAnalyze = async () => {
     if (!importText.trim()) return;
     setAnalyzing(true);
@@ -125,6 +134,55 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
     setSelectedCandidateIndices([]);
     setSummary(null);
     setErrorMsg(null);
+    setImageFile(null);
+    setImagePreviewUrl(null);
+    setImageError(null);
+    setImageSuccess(false);
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const allowed = ['image/png', 'image/jpeg', 'image/webp'];
+    if (!allowed.includes(file.type)) {
+      setImageError('Formato no soportado. Usa PNG, JPG o WEBP.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setImageError('La imagen supera el límite de 5 MB.');
+      return;
+    }
+    setImageError(null);
+    setImageSuccess(false);
+    setImageFile(file);
+    setImagePreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleExtractFromImage = async () => {
+    if (!imageFile) return;
+    setExtractingImage(true);
+    setImageError(null);
+    setImageSuccess(false);
+    try {
+      const extracted = await extractPhoneContactsFromImage(imageFile);
+      if (!extracted || extracted === 'SIN_CONTACTOS') {
+        setImageError('La IA no detectó contactos visibles en la imagen. Intenta con una imagen más clara o ingresa el texto manualmente.');
+        return;
+      }
+      setImportText(prev => prev ? `${prev.trim()}\n${extracted}` : extracted);
+      setImageSuccess(true);
+    } catch (err: any) {
+      const msg: string = err?.message || '';
+      if (msg === 'API_KEY_MISSING') {
+        setImageError('Gemini no está configurado. Ingresa el texto manualmente.');
+      } else if (msg.includes('quota') || msg.includes('429')) {
+        setImageError('Cuota de IA agotada temporalmente. Ingresa el texto manualmente.');
+      } else {
+        setImageError('La extracción desde imagen falló. Puedes ingresar el texto manualmente.');
+      }
+    } finally {
+      setExtractingImage(false);
+    }
   };
 
   type SortOption = 'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'MOST_DEMOS' | 'FEWEST_DEMOS' | 'CATEGORY' | 'ROLE';
@@ -1373,25 +1431,114 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
               {/* Modal Body */}
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 {importStep === 'INPUT' && (
-                  <div className="space-y-4">
-                    <p className="text-sm text-slate-300">
-                      Pega la lista de contactos o texto copiado de WhatsApp. Nuestro analizador detectará automáticamente los números de teléfono chilenos y extraerá los nombres disponibles.
-                    </p>
-                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ejemplo de formatos soportados:</h4>
-                      <pre className="text-xs font-mono text-slate-500 space-y-1">
-                        {`+56 9 1234 5678 Juan Pérez\n987654321 - María José\n[10:30 AM] +56999998888: Hola\n+56911112222`}
-                      </pre>
+                  <div className="space-y-6">
+
+                    {/* ── Sección: Importar desde imagen ── */}
+                    <div className="border border-white/10 rounded-2xl overflow-hidden">
+                      <div className="flex items-center gap-3 px-4 py-3 bg-white/[0.03] border-b border-white/10">
+                        <ImagePlus size={15} className="text-sud-turquoise shrink-0" />
+                        <p className="text-[10px] font-black uppercase tracking-widest text-slate-300">Importar desde imagen <span className="text-slate-600 font-medium normal-case tracking-normal">(opcional)</span></p>
+                      </div>
+                      <div className="p-4 space-y-3">
+                        {/* Aviso de privacidad */}
+                        <div className="flex items-start gap-2 text-[10px] text-slate-500 font-medium">
+                          <AlertTriangle size={12} className="text-sud-yellow shrink-0 mt-0.5" />
+                          <span>La imagen se procesa con IA externa. Sube solo capturas autorizadas para gestión interna.</span>
+                        </div>
+                        <p className="text-[10px] text-slate-600">
+                          Recomendado: captura clara de WhatsApp Web, buen zoom, números visibles. La detección puede fallar si la imagen está borrosa o muy comprimida.
+                        </p>
+
+                        {/* Zona de subida */}
+                        {!imageFile ? (
+                          <button
+                            type="button"
+                            onClick={() => imageInputRef.current?.click()}
+                            className="w-full flex flex-col items-center justify-center gap-2 py-6 rounded-xl border-2 border-dashed border-white/10 hover:border-sud-turquoise/30 hover:bg-sud-turquoise/5 transition-all text-slate-500 hover:text-sud-turquoise cursor-pointer"
+                          >
+                            <ImagePlus size={24} />
+                            <span className="text-[10px] font-black uppercase tracking-widest">Subir captura</span>
+                            <span className="text-[9px] text-slate-700 font-medium">PNG · JPG · WEBP · máx 5 MB</span>
+                          </button>
+                        ) : (
+                          <div className="flex items-center gap-4">
+                            <img
+                              src={imagePreviewUrl!}
+                              alt="Captura seleccionada"
+                              className="w-20 h-20 object-cover rounded-xl border border-white/10 shrink-0"
+                            />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-xs text-white font-bold truncate">{imageFile.name}</p>
+                              <p className="text-[10px] text-slate-500">{(imageFile.size / 1024).toFixed(0)} KB</p>
+                              <button
+                                type="button"
+                                onClick={() => { setImageFile(null); setImagePreviewUrl(null); setImageError(null); setImageSuccess(false); if (imageInputRef.current) imageInputRef.current.value = ''; }}
+                                className="mt-1 text-[9px] text-red-400 hover:text-red-300 uppercase tracking-widest font-bold transition-colors"
+                              >
+                                Quitar imagen
+                              </button>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={handleExtractFromImage}
+                              disabled={extractingImage}
+                              className="flex items-center gap-2 px-4 py-2.5 bg-sud-turquoise hover:bg-sud-turquoise/80 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
+                            >
+                              {extractingImage
+                                ? <span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin" />
+                                : <ImagePlus size={14} />}
+                              {extractingImage ? 'Extrayendo...' : 'Extraer desde imagen'}
+                            </button>
+                          </div>
+                        )}
+
+                        {/* Feedback imagen */}
+                        {imageError && (
+                          <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl">
+                            <AlertTriangle size={13} className="text-red-400 shrink-0 mt-0.5" />
+                            <span className="text-xs text-red-400 font-bold">{imageError}</span>
+                          </div>
+                        )}
+                        {imageSuccess && (
+                          <div className="flex items-center gap-2 p-3 bg-sud-turquoise/10 border border-sud-turquoise/20 rounded-xl">
+                            <CheckCircle size={13} className="text-sud-turquoise shrink-0" />
+                            <span className="text-xs text-sud-turquoise font-bold">Contactos extraídos y añadidos al texto. Revisa el área de texto y luego haz clic en Analizar.</span>
+                          </div>
+                        )}
+
+                        {/* Input file oculto */}
+                        <input
+                          ref={imageInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp"
+                          onChange={handleImageSelect}
+                          className="hidden"
+                        />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Texto de WhatsApp</label>
-                      <textarea
-                        value={importText}
-                        onChange={(e) => setImportText(e.target.value)}
-                        placeholder="Pega el texto aquí..."
-                        className="w-full h-64 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-sud-turquoise/50 resize-none font-mono"
-                      />
+
+                    {/* ── Sección: Texto manual ── */}
+                    <div className="space-y-3">
+                      <p className="text-sm text-slate-300">
+                        Pega la lista de contactos o texto copiado de WhatsApp. Nuestro analizador detectará automáticamente los números de teléfono chilenos y extraerá los nombres disponibles.
+                      </p>
+                      <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                        <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ejemplo de formatos soportados:</h4>
+                        <pre className="text-xs font-mono text-slate-500 space-y-1">
+                          {`+56 9 1234 5678 Juan Pérez\n987654321 - María José\n[10:30 AM] +56999998888: Hola\n+56911112222`}
+                        </pre>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Texto de WhatsApp</label>
+                        <textarea
+                          value={importText}
+                          onChange={(e) => setImportText(e.target.value)}
+                          placeholder="Pega el texto aquí o usa la extracción desde imagen de arriba..."
+                          className="w-full h-48 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-sud-turquoise/50 resize-none font-mono"
+                        />
+                      </div>
                     </div>
+
                     {errorMsg && (
                       <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold uppercase tracking-wider">
                         {errorMsg}

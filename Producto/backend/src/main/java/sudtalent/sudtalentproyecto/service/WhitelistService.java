@@ -3,6 +3,11 @@ package sudtalent.sudtalentproyecto.service;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -14,6 +19,8 @@ import sudtalent.sudtalentproyecto.dto.StudentWhitelistDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistNumberDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistReportDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistStatsDTO;
+import sudtalent.sudtalentproyecto.dto.WhitelistCandidateDTO;
+import sudtalent.sudtalentproyecto.dto.ImportSummaryDTO;
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.model.WhitelistNumber;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
@@ -384,6 +391,135 @@ public class WhitelistService {
 
         System.out.println("ℹ️ Fix legacy passwords: " + fixed + " usuario(s) reparado(s).");
         return fixed;
+    }
+
+    public String normalizeChileanPhone(String raw) {
+        if (raw == null) return null;
+        String clean = raw.replaceAll("[^0-9]", "");
+        if (clean.length() == 9 && clean.startsWith("9")) {
+            return "56" + clean;
+        } else if (clean.length() == 11 && clean.startsWith("56")) {
+            return clean;
+        } else if (clean.length() == 8) {
+            return "569" + clean;
+        }
+        return clean.isEmpty() ? null : clean;
+    }
+
+    private boolean checkPhoneExistsInDB(String normalizedPhone) {
+        String clean = normalizedPhone.replaceAll("[^0-9]", "");
+        if (repository.findByPhone(normalizedPhone).isPresent()) return true;
+        if (repository.findByPhone(clean).isPresent()) return true;
+        if (repository.findByPhone("+" + clean).isPresent()) return true;
+        if (userRepository.findByPhoneActive(normalizedPhone).isPresent()) return true;
+        if (userRepository.findByPhoneActive(clean).isPresent()) return true;
+        return false;
+    }
+
+    public List<WhitelistCandidateDTO> previewImport(String text) {
+        List<WhitelistCandidateDTO> candidates = new ArrayList<>();
+        if (text == null || text.trim().isEmpty()) {
+            return candidates;
+        }
+
+        String[] lines = text.split("\\r?\\n");
+        Pattern phonePattern = Pattern.compile(
+            "(\\+?56\\s*9\\s*\\d{4}\\s*\\d{4})|(\\+?56\\s*9\\s*\\d{8})|(\\b9\\s*\\d{4}\\s*\\d{4}\\b)|(\\b9\\s*\\d{8}\\b)|(\\b\\d{8}\\b)"
+        );
+
+        Set<String> seenNormalized = new HashSet<>();
+
+        for (String line : lines) {
+            Matcher matcher = phonePattern.matcher(line);
+            if (matcher.find()) {
+                String rawPhone = matcher.group();
+                String rawName = line.replace(rawPhone, "")
+                    .replaceAll("[:\\-~()\\[\\]\\*\\_\\t\\r]", " ")
+                    .replaceAll("\\s+", " ")
+                    .trim();
+
+                String name = rawName.isEmpty() ? "Contacto WhatsApp" : rawName;
+                String normalized = normalizeChileanPhone(rawPhone);
+
+                String status;
+                String validationMessage = "";
+
+                if (normalized == null || normalized.length() != 11 || !normalized.startsWith("569")) {
+                    status = "INVALID";
+                    validationMessage = "Teléfono inválido (debe ser celular chileno)";
+                } else if (seenNormalized.contains(normalized)) {
+                    status = "DUPLICATE";
+                    validationMessage = "Duplicado en el texto pegado";
+                } else {
+                    boolean exists = checkPhoneExistsInDB(normalized);
+                    if (exists) {
+                        status = "ALREADY_EXISTS";
+                        validationMessage = "Ya está en la whitelist o registrado";
+                    } else {
+                        status = "VALID";
+                        validationMessage = "Listo para autorizar";
+                        seenNormalized.add(normalized);
+                    }
+                }
+
+                candidates.add(WhitelistCandidateDTO.builder()
+                    .name(name)
+                    .rawPhone(rawPhone)
+                    .normalizedPhone(normalized != null ? normalized : rawPhone)
+                    .status(status)
+                    .validationMessage(validationMessage)
+                    .build());
+            }
+        }
+        return candidates;
+    }
+
+    public ImportSummaryDTO confirmImport(List<WhitelistCandidateDTO> candidates) {
+        int agregados = 0;
+        int omitidosDuplicados = 0;
+        int invalidos = 0;
+        int yaExistentes = 0;
+
+        for (WhitelistCandidateDTO candidate : candidates) {
+            if ("INVALID".equals(candidate.getStatus())) {
+                invalidos++;
+                continue;
+            }
+            if ("DUPLICATE".equals(candidate.getStatus())) {
+                omitidosDuplicados++;
+                continue;
+            }
+
+            String normalized = normalizeChileanPhone(candidate.getNormalizedPhone());
+            if (normalized == null) {
+                invalidos++;
+                continue;
+            }
+
+            if (checkPhoneExistsInDB(normalized)) {
+                yaExistentes++;
+                continue;
+            }
+
+            // Crear entrada únicamente en whitelist, sin forzar usuario
+            WhitelistNumber wl = WhitelistNumber.builder()
+                .phone(normalized)
+                .name(candidate.getName() != null && !candidate.getName().equals("Contacto WhatsApp") ? candidate.getName().trim() : null)
+                .status(WhitelistNumber.Status.PENDIENTE)
+                .role(User.Role.ALUMNO.name())
+                .build();
+
+            linkUserToWhitelist(wl);
+            repository.save(wl);
+            agregados++;
+        }
+
+        return ImportSummaryDTO.builder()
+            .agregados(agregados)
+            .omitidosDuplicados(omitidosDuplicados)
+            .invalidos(invalidos)
+            .yaExistentes(yaExistentes)
+            .build();
     }
 
     private WhitelistNumberDTO toDTO(WhitelistNumber number) {

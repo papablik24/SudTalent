@@ -215,6 +215,21 @@ export const authService = {
 
 // ==================== USERS ====================
 
+export interface WhitelistCandidate {
+  name: string;
+  rawPhone: string;
+  normalizedPhone: string;
+  status: 'VALID' | 'INVALID' | 'DUPLICATE' | 'ALREADY_EXISTS';
+  validationMessage: string;
+}
+
+export interface ImportSummary {
+  agregados: number;
+  omitidosDuplicados: number;
+  invalidos: number;
+  yaExistentes: number;
+}
+
 export const backendService = {
   // READ - Get all users (admin)
   async getAllUsers(): Promise<any[]> {
@@ -280,6 +295,20 @@ export const backendService = {
     return fetchAPI<any>(`/voice-audios/${encodeURIComponent(demoId)}/visual-genre`, {
       method: 'PUT',
       body: JSON.stringify({ visualGenre }),
+    });
+  },
+
+  async previewWhitelistImport(text: string): Promise<WhitelistCandidate[]> {
+    return fetchAPI<WhitelistCandidate[]>('/whitelist/import/preview', {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+  },
+
+  async confirmWhitelistImport(candidates: WhitelistCandidate[]): Promise<ImportSummary> {
+    return fetchAPI<ImportSummary>('/whitelist/import/confirm', {
+      method: 'POST',
+      body: JSON.stringify(candidates),
     });
   },
 };

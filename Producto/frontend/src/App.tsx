@@ -58,7 +58,8 @@ function AppRoutes() {
     removeFromWhitelist,
     updateStudent,
     updateUserStatus,
-    updateDemoVisualGenre
+    updateDemoVisualGenre,
+    refreshData
   } = useAdminData(role, currentUser);
 
   // ── Onboarding handler ────────────────────────────────────────────
@@ -184,6 +185,7 @@ function AppRoutes() {
                   onRemove={removeFromWhitelist}
                   onUpdate={updateStudent}
                   onUpdateStatus={updateUserStatus}
+                  onRefresh={refreshData}
                 />
               </MainLayout>
             </ProtectedRoute>

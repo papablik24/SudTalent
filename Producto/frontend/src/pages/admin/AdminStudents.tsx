@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen, FileText } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Plus, Search, ShieldCheck, Settings, Trash2, CheckCircle2, LogOut, CheckCircle, XCircle, Clock, FileDown, X, User, Phone, Mail, Calendar, AudioLines, Play, Pause, ChevronRight, BookOpen, FileText, MessageSquare } from 'lucide-react';
 import { UserProfile, WhitelistEntry, ProfileCategory, ProfileStatus } from '../../types';
 import { generateAlumnosPDF, generateAlumnosExcel } from '../../services/reportService';
-import { fetchAPI } from '../../services/backendService';
+import { fetchAPI, backendService, WhitelistCandidate, ImportSummary } from '../../services/backendService';
 import { AudioPlayer } from '../../components/ui/AudioPlayer';
 
 interface AdminStudentsProps {
@@ -12,6 +13,7 @@ interface AdminStudentsProps {
   onRemove: (phone: string, uid?: string) => Promise<void> | void;
   onUpdate: (phone: string, updates: any) => void;
   onUpdateStatus?: (userId: string, status: ProfileStatus) => void;
+  onRefresh?: () => void;
 }
 
 // ── Helpers ───────────────────────────────────────────────────
@@ -41,7 +43,7 @@ const getStatusInfo = (entry: any) => {
   return null;
 };
 
-export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onUpdateStatus }: AdminStudentsProps) {
+export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onUpdateStatus, onRefresh }: AdminStudentsProps) {
   const [newPhone, setNewPhone] = useState('');
   const [newName, setNewName] = useState('');
   const [newEmail, setNewEmail] = useState('');
@@ -53,6 +55,77 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  // Carga masiva WhatsApp
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importStep, setImportStep] = useState<'INPUT' | 'PREVIEW' | 'SUMMARY'>('INPUT');
+  const [importText, setImportText] = useState('');
+  const [candidates, setCandidates] = useState<WhitelistCandidate[]>([]);
+  const [selectedCandidateIndices, setSelectedCandidateIndices] = useState<number[]>([]);
+  const [analyzing, setAnalyzing] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [summary, setSummary] = useState<ImportSummary | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  const handleAnalyze = async () => {
+    if (!importText.trim()) return;
+    setAnalyzing(true);
+    setErrorMsg(null);
+    try {
+      const result = await backendService.previewWhitelistImport(importText);
+      setCandidates(result);
+      // Seleccionar los "VALID" por defecto
+      const validIndices = result
+        .map((c, i) => c.status === 'VALID' ? i : -1)
+        .filter(idx => idx !== -1);
+      setSelectedCandidateIndices(validIndices);
+      setImportStep('PREVIEW');
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Error al analizar el texto.');
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    if (selectedCandidateIndices.length === 0) return;
+    setImporting(true);
+    setErrorMsg(null);
+    try {
+      const payload = candidates.map((c, idx) => {
+        if (selectedCandidateIndices.includes(idx)) {
+          return { ...c, status: 'VALID' as const };
+        } else {
+          return { ...c, status: (c.status === 'VALID' ? 'DUPLICATE' : c.status) as any };
+        }
+      });
+
+      const res = await backendService.confirmWhitelistImport(payload);
+      setSummary(res);
+      setImportStep('SUMMARY');
+      onRefresh?.();
+    } catch (err: any) {
+      console.error(err);
+      setErrorMsg(err.message || 'Error al confirmar la importación.');
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const handleEditCandidateName = (index: number, newName: string) => {
+    setCandidates(prev => prev.map((c, i) => i === index ? { ...c, name: newName } : c));
+  };
+
+  const handleCloseSummary = () => {
+    setShowImportModal(false);
+    setImportStep('INPUT');
+    setImportText('');
+    setCandidates([]);
+    setSelectedCandidateIndices([]);
+    setSummary(null);
+    setErrorMsg(null);
+  };
 
   type SortOption = 'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'MOST_DEMOS' | 'FEWEST_DEMOS' | 'CATEGORY' | 'ROLE';
   const [sortField, setSortField] = useState<'NAME' | 'PHONE' | 'EMAIL' | 'STATUS' | 'DEMOS' | 'CATEGORY' | 'ROLE'>('NAME');
@@ -643,6 +716,14 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                 <span className="text-slate-600 font-mono text-xs ml-1">({filteredList.length})</span>
               </h3>
               <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setShowImportModal(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sud-turquoise/10 hover:bg-sud-turquoise/20 border border-sud-turquoise/20 text-sud-turquoise font-black text-[10px] uppercase tracking-widest transition-all"
+                  title="Importar teléfonos masivamente desde WhatsApp"
+                >
+                  <MessageSquare size={15} />
+                  Importar WhatsApp
+                </button>
                 <button
                   onClick={() => generateAlumnosPDF(filteredList)}
                   className="flex items-center gap-2 px-4 py-2 rounded-xl bg-sud-orange/10 hover:bg-sud-orange/20 border border-sud-orange/20 text-sud-orange font-black text-[10px] uppercase tracking-widest transition-all"
@@ -1261,6 +1342,284 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
             <X size={14} className="text-white/40" />
           </button>
         </div>
+      )}
+
+      {/* ── Modal de Importación desde WhatsApp ── */}
+      {showImportModal && createPortal(
+        <>
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-md z-[150]" onClick={() => !importing && setShowImportModal(false)} />
+          <div className="fixed inset-0 flex items-center justify-center p-4 md:p-6 z-[160] pointer-events-none">
+            <div className="bg-[#121212]/95 border border-white/10 rounded-[2.5rem] w-full max-w-4xl max-h-[calc(100vh-4rem)] md:max-h-[calc(100vh-6rem)] flex flex-col overflow-hidden pointer-events-auto shadow-2xl glassmorphism">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between p-6 border-b border-white/10 shrink-0">
+                <div>
+                  <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-2">
+                    <MessageSquare className="text-sud-turquoise" size={20} />
+                    Importar desde WhatsApp
+                  </h3>
+                  <p className="text-[10px] text-slate-400 uppercase tracking-widest font-bold mt-0.5">
+                    Carga masiva de teléfonos a la whitelist
+                  </p>
+                </div>
+                <button 
+                  disabled={importing}
+                  onClick={() => setShowImportModal(false)}
+                  className="p-2 rounded-xl bg-white/5 hover:bg-white/10 transition-colors disabled:opacity-50 text-white"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                {importStep === 'INPUT' && (
+                  <div className="space-y-4">
+                    <p className="text-sm text-slate-300">
+                      Pega la lista de contactos o texto copiado de WhatsApp. Nuestro analizador detectará automáticamente los números de teléfono chilenos y extraerá los nombres disponibles.
+                    </p>
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4">
+                      <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Ejemplo de formatos soportados:</h4>
+                      <pre className="text-xs font-mono text-slate-500 space-y-1">
+                        {`+56 9 1234 5678 Juan Pérez\n987654321 - María José\n[10:30 AM] +56999998888: Hola\n+56911112222`}
+                      </pre>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Texto de WhatsApp</label>
+                      <textarea
+                        value={importText}
+                        onChange={(e) => setImportText(e.target.value)}
+                        placeholder="Pega el texto aquí..."
+                        className="w-full h-64 bg-black/40 border border-white/10 rounded-2xl p-4 text-sm text-white outline-none focus:border-sud-turquoise/50 resize-none font-mono"
+                      />
+                    </div>
+                    {errorMsg && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold uppercase tracking-wider">
+                        {errorMsg}
+                      </div>
+                    )}
+                    <div className="flex justify-end gap-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowImportModal(false)}
+                        className="px-6 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleAnalyze}
+                        disabled={analyzing || !importText.trim()}
+                        className="px-6 py-3 bg-sud-turquoise hover:bg-sud-turquoise/80 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                      >
+                        {analyzing && <span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin" />}
+                        Analizar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {importStep === 'PREVIEW' && (
+                  <div className="space-y-6">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 border border-white/10 rounded-2xl p-4">
+                      <div>
+                        <h4 className="text-sm font-bold text-white">Resultado del Análisis</h4>
+                        <p className="text-xs text-slate-400">Revisa la lista, edita los nombres y desmarca los que no deseas importar.</p>
+                      </div>
+                      <div className="flex gap-2 flex-wrap text-[10px] font-black uppercase tracking-wider font-mono">
+                        <span className="px-2 py-1 rounded bg-sud-turquoise/10 border border-sud-turquoise/20 text-sud-turquoise">
+                          Listos: {candidates.filter(c => c.status === 'VALID').length}
+                        </span>
+                        <span className="px-2 py-1 rounded bg-yellow-500/10 border border-yellow-500/20 text-yellow-500">
+                          Duplicados: {candidates.filter(c => c.status === 'DUPLICATE').length}
+                        </span>
+                        <span className="px-2 py-1 rounded bg-red-500/10 border border-red-500/20 text-red-400">
+                          Existentes: {candidates.filter(c => c.status === 'ALREADY_EXISTS').length}
+                        </span>
+                        <span className="px-2 py-1 rounded bg-slate-500/10 border border-slate-500/20 text-slate-400">
+                          Inválidos: {candidates.filter(c => c.status === 'INVALID').length}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="overflow-x-auto border border-white/10 rounded-2xl max-h-96">
+                      <table className="w-full min-w-[700px] text-left border-collapse">
+                        <thead className="text-[10px] uppercase text-white/40 bg-white/5 font-black tracking-widest sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 border-b border-white/10 w-12 text-center">
+                              <input
+                                type="checkbox"
+                                checked={selectedCandidateIndices.length === candidates.filter(c => c.status === 'VALID').length && selectedCandidateIndices.length > 0}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setSelectedCandidateIndices(
+                                      candidates
+                                        .map((c, i) => c.status === 'VALID' ? i : -1)
+                                        .filter(idx => idx !== -1)
+                                    );
+                                  } else {
+                                    setSelectedCandidateIndices([]);
+                                  }
+                                }}
+                                className="rounded border-white/10 bg-black/40 text-sud-turquoise focus:ring-0 cursor-pointer"
+                              />
+                            </th>
+                            <th className="px-4 py-3 border-b border-white/10">Nombre de Contacto (Editable)</th>
+                            <th className="px-4 py-3 border-b border-white/10 font-mono">Teléfono Original</th>
+                            <th className="px-4 py-3 border-b border-white/10 font-mono">Normalizado</th>
+                            <th className="px-4 py-3 border-b border-white/10">Estado</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/5 bg-black/20">
+                          {candidates.map((c, idx) => {
+                            const isSelected = selectedCandidateIndices.includes(idx);
+                            const isEditable = c.status === 'VALID' || c.status === 'DUPLICATE';
+                            
+                            let statusBadgeClass = 'text-slate-400 bg-slate-500/10 border-slate-500/20';
+                            let statusText = 'Inválido';
+                            if (c.status === 'VALID') {
+                              statusBadgeClass = 'text-sud-turquoise bg-sud-turquoise/10 border-sud-turquoise/20';
+                              statusText = 'Listo';
+                            } else if (c.status === 'ALREADY_EXISTS') {
+                              statusBadgeClass = 'text-red-400 bg-red-500/10 border-red-500/20';
+                              statusText = 'Ya existe';
+                            } else if (c.status === 'DUPLICATE') {
+                              statusBadgeClass = 'text-yellow-500 bg-yellow-500/10 border-yellow-500/20';
+                              statusText = 'Duplicado';
+                            }
+
+                            return (
+                              <tr key={idx} className={`hover:bg-white/[0.02] transition-colors ${!isSelected && c.status === 'VALID' ? 'opacity-60' : ''}`}>
+                                <td className="px-4 py-3 text-center">
+                                  <input
+                                    type="checkbox"
+                                    disabled={c.status === 'INVALID' || c.status === 'ALREADY_EXISTS'}
+                                    checked={isSelected}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedCandidateIndices(prev => [...prev, idx]);
+                                      } else {
+                                        setSelectedCandidateIndices(prev => prev.filter(i => i !== idx));
+                                      }
+                                    }}
+                                    className="rounded border-white/10 bg-black/40 text-sud-turquoise focus:ring-0 cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed"
+                                  />
+                                </td>
+                                <td className="px-4 py-3">
+                                  {isEditable ? (
+                                    <input
+                                      type="text"
+                                      value={c.name}
+                                      onChange={(e) => handleEditCandidateName(idx, e.target.value)}
+                                      className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white uppercase tracking-tight w-full outline-none focus:border-sud-turquoise/30"
+                                    />
+                                  ) : (
+                                    <span className="text-xs text-slate-500 italic uppercase">
+                                      {c.name || 'Sin nombre'}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-slate-400">
+                                  {c.rawPhone || '—'}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-white">
+                                  {c.normalizedPhone ? formatPhone(c.normalizedPhone) : '—'}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span
+                                    title={c.validationMessage}
+                                    className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border ${statusBadgeClass}`}
+                                  >
+                                    {statusText}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    {errorMsg && (
+                      <div className="p-3 bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl text-xs font-bold uppercase tracking-wider">
+                        {errorMsg}
+                      </div>
+                    )}
+
+                    <div className="flex items-center justify-between pt-2 border-t border-white/10">
+                      <button
+                        type="button"
+                        disabled={importing}
+                        onClick={() => setImportStep('INPUT')}
+                        className="px-5 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                      >
+                        Volver a pegar
+                      </button>
+                      <div className="flex gap-3">
+                        <button
+                          type="button"
+                          disabled={importing}
+                          onClick={() => setShowImportModal(false)}
+                          className="px-5 py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                        >
+                          Cancelar
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleConfirmImport}
+                          disabled={importing || selectedCandidateIndices.length === 0}
+                          className="px-6 py-3 bg-sud-turquoise hover:bg-sud-turquoise/80 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {importing && <span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin" />}
+                          Importar Seleccionados ({selectedCandidateIndices.length})
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {importStep === 'SUMMARY' && summary && (
+                  <div className="text-center py-6 space-y-6 max-w-md mx-auto">
+                    <div className="w-16 h-16 bg-sud-turquoise/10 border border-sud-turquoise/20 rounded-full flex items-center justify-center mx-auto text-sud-turquoise">
+                      <CheckCircle2 size={36} />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="text-xl font-black text-white uppercase tracking-tight">¡Importación Exitosa!</h4>
+                      <p className="text-xs text-slate-400">Los números telefónicos han sido autorizados en la lista blanca de SudTalent.</p>
+                    </div>
+
+                    <div className="bg-white/5 border border-white/10 rounded-2xl p-4 divide-y divide-white/5 text-left text-xs font-medium uppercase tracking-wider">
+                      <div className="flex justify-between py-2.5">
+                        <span className="text-slate-400">Teléfonos Agregados:</span>
+                        <span className="font-mono text-sud-turquoise font-black">{summary.agregados}</span>
+                      </div>
+                      <div className="flex justify-between py-2.5">
+                        <span className="text-slate-400">Omitidos por duplicados:</span>
+                        <span className="font-mono text-slate-400">{summary.omitidosDuplicados}</span>
+                      </div>
+                      <div className="flex justify-between py-2.5">
+                        <span className="text-slate-400">Ya existentes en Whitelist:</span>
+                        <span className="font-mono text-slate-400">{summary.yaExistentes}</span>
+                      </div>
+                      <div className="flex justify-between py-2.5">
+                        <span className="text-slate-400">Omitidos por inválidos:</span>
+                        <span className="font-mono text-slate-400">{summary.invalidos}</span>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={handleCloseSummary}
+                      className="w-full py-4 bg-sud-turquoise hover:bg-sud-turquoise/80 text-black rounded-xl text-xs font-black uppercase tracking-widest transition-all"
+                    >
+                      Entendido
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </>,
+        document.body
       )}
     </div>
   );

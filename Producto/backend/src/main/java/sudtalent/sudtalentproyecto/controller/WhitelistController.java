@@ -15,6 +15,8 @@ import sudtalent.sudtalentproyecto.dto.StudentWhitelistDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistNumberDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistReportDTO;
 import sudtalent.sudtalentproyecto.dto.WhitelistStatsDTO;
+import sudtalent.sudtalentproyecto.dto.WhitelistCandidateDTO;
+import sudtalent.sudtalentproyecto.dto.ImportSummaryDTO;
 import sudtalent.sudtalentproyecto.service.WhitelistService;
 
 @RestController
@@ -149,5 +151,21 @@ public class WhitelistController {
             "message", "Reparación de passwords completada",
             "passwordsReparados", fixed
         ));
+    }
+
+    // ==================== IMPORTACIÓN MASIVA DESDE WHATSAPP ====================
+    @PostMapping("/import/preview")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<List<WhitelistCandidateDTO>> previewImport(
+        @RequestBody java.util.Map<String, String> body) {
+        String text = body != null ? body.get("text") : "";
+        return ResponseEntity.ok(whitelistService.previewImport(text));
+    }
+
+    @PostMapping("/import/confirm")
+    @PreAuthorize("hasAuthority('ROLE_ADMIN')")
+    public ResponseEntity<ImportSummaryDTO> confirmImport(
+        @RequestBody List<WhitelistCandidateDTO> candidates) {
+        return ResponseEntity.ok(whitelistService.confirmImport(candidates));
     }
 }

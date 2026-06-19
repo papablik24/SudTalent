@@ -47,6 +47,12 @@ public class VoiceAudio {
     @Column(name = "visual_genre", length = 50)
     private String visualGenre;
 
+    @Column(name = "demo_category", length = 50)
+    private String demoCategory;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
     @Builder.Default
     private boolean isPublic = true;
 

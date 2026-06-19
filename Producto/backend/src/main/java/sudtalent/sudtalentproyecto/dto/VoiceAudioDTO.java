@@ -20,6 +20,8 @@ public class VoiceAudioDTO {
     private String fileFormat;  // Calculado desde mediaType o storagePath
     private String category;
     private String visualGenre;
+    private String demoCategory;
+    private String description;
     private boolean isPublic;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

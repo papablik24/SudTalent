@@ -34,7 +34,7 @@ public class VoiceAudioService {
             MultipartFile file,
             String title,
             String category) throws IOException {
-        return uploadAudio(user, file, title, category, null);
+        return uploadAudio(user, file, title, category, null, null, null);
     }
 
     public VoiceAudioDTO uploadAudio(
@@ -43,6 +43,17 @@ public class VoiceAudioService {
             String title,
             String category,
             String visualGenre) throws IOException {
+        return uploadAudio(user, file, title, category, visualGenre, null, null);
+    }
+
+    public VoiceAudioDTO uploadAudio(
+            User user,
+            MultipartFile file,
+            String title,
+            String category,
+            String visualGenre,
+            String demoCategory,
+            String description) throws IOException {
 
         // 1️⃣ Subir archivo a Supabase Storage
         String storagePath = supabaseStorageService.uploadFile(
@@ -64,6 +75,8 @@ public class VoiceAudioService {
                 .mediaType(file.getContentType() != null ? file.getContentType() : "audio/mpeg")
                 .category(category)
                 .visualGenre(visualGenre)
+                .demoCategory(demoCategory)
+                .description(description)
                 .isPublic(true)
                 .build();
 
@@ -163,6 +176,45 @@ public class VoiceAudioService {
     }
 
     /**
+     * 📝 Actualizar metadatos de un audio
+     */
+    @org.springframework.transaction.annotation.Transactional
+    public VoiceAudioDTO updateAudioMetadata(
+            UUID userId,
+            UUID audioId,
+            String title,
+            String demoCategory,
+            String visualGenre,
+            String description) {
+        
+        VoiceAudio audio = voiceAudioRepository.findById(audioId)
+                .orElseThrow(() -> new RuntimeException("Audio no encontrado"));
+        
+        if (!audio.getUser().getId().equals(userId)) {
+            throw new RuntimeException("No tienes permiso para editar este audio");
+        }
+        
+        if (audio.isDeleted()) {
+            throw new RuntimeException("El audio ha sido eliminado");
+        }
+        
+        if (title != null && !title.trim().isEmpty()) {
+            audio.setTitle(title.trim());
+        }
+        
+        if (demoCategory != null) {
+            audio.setDemoCategory(demoCategory.trim());
+        }
+        
+        audio.setVisualGenre(visualGenre);
+        audio.setDescription(description);
+        audio.setUpdatedAt(java.time.LocalDateTime.now());
+        
+        VoiceAudio saved = voiceAudioRepository.save(audio);
+        return toDTO(saved);
+    }
+
+    /**
      * 🔄 Convertir VoiceAudio Entity a DTO
      */
     private VoiceAudioDTO toDTO(VoiceAudio audio) {
@@ -177,6 +229,8 @@ public class VoiceAudioService {
                 .mediaType(audio.getMediaType())
                 .category(audio.getCategory())
                 .visualGenre(audio.getVisualGenre())
+                .demoCategory(audio.getDemoCategory())
+                .description(audio.getDescription())
                 .isPublic(audio.isPublic())
                 .createdAt(audio.getCreatedAt())
                 .updatedAt(audio.getUpdatedAt())

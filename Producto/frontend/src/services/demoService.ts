@@ -20,6 +20,8 @@ export interface DemoDTO extends DemoUploadResult {
   category: string;
   isPublic: boolean;
   updatedAt: string;
+  demoCategory?: string;
+  description?: string;
 }
 
 const API_URL = 'http://localhost:8080/api/demos';
@@ -34,7 +36,7 @@ export const demoService = {
     title?: string,
     token?: string,
     visualGenre?: string
-  ): Promise<DemoUploadResult> {
+  ): Promise<DemoDTO> {
     try {
       console.log('1️⃣ Iniciando uploadDemo...');
       console.log('   - Archivo:', file.name, `(${(file.size / 1024 / 1024).toFixed(2)}MB)`);
@@ -174,6 +176,43 @@ export const demoService = {
       console.log('✅ Demo eliminada');
     } catch (error) {
       console.error('❌ Error eliminando:', error);
+      throw error;
+    }
+  },
+
+  /**
+   * 📝 Editar metadatos de una demo
+   */
+  async updateDemo(
+    demoId: string,
+    data: { title: string; category: string; visualGenre?: string; description?: string },
+    token: string
+  ): Promise<DemoDTO> {
+    try {
+      console.log('📝 Editando demo:', demoId, data);
+      if (!token) {
+        throw new Error('No hay token de autenticación');
+      }
+
+      const response = await fetch(`${API_URL}/${demoId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData?.error || `Error ${response.status}`);
+      }
+
+      const result: DemoDTO = await response.json();
+      console.log('✅ Demo editada:', result);
+      return result;
+    } catch (error) {
+      console.error('❌ Error editando demo:', error);
       throw error;
     }
   },

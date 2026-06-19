@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AudioLines, Video, Film, Trash2, ChevronDown } from 'lucide-react';
+import { AudioLines, Video, Film, Trash2, ChevronDown, Pencil } from 'lucide-react';
 import { VoiceDemo } from '../../types';
 import { AudioPlayer } from './AudioPlayer';
 import { Postulacion } from '../../services/postulacionService';
@@ -22,10 +22,11 @@ const GENRE_COLORS: Record<string, string> = {
 interface DemoItemProps {
   demo: VoiceDemo;
   onDelete?: (id: string) => void;
+  onEdit?: (demo: VoiceDemo) => void;
   postulacionesAsociadas?: Postulacion[];
 }
 
-export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete, postulacionesAsociadas }) => {
+export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete, onEdit, postulacionesAsociadas }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isVideo = demo.mediaType === 'VIDEO' || (demo.mediaType as string)?.toLowerCase().includes('video');
   const genreColor = demo.visualGenre ? (GENRE_COLORS[demo.visualGenre] ?? GENRE_COLORS['Otro']) : null;
@@ -102,6 +103,18 @@ export const DemoItem: React.FC<DemoItemProps> = ({ demo, onDelete, postulacione
                   title="Expandir reproductor"
                 >
                   <ChevronDown size={14} className={`transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                </button>
+              )}
+              {onEdit && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onEdit(demo);
+                  }}
+                  className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center hover:bg-sud-orange/20 hover:text-sud-orange transition-all"
+                  title="Editar demo"
+                >
+                  <Pencil size={13} />
                 </button>
               )}
               {onDelete && (

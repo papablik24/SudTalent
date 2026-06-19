@@ -48,6 +48,20 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   const [form, setForm] = useState<DemoForm>(DEFAULT_FORM);
   const [fileError, setFileError] = useState<string | null>(null);
 
+  // Edit states
+  const [editingDemo, setEditingDemo] = useState<VoiceDemo | null>(null);
+  const [editForm, setEditForm] = useState<{
+    title: string;
+    category: DemoCategory;
+    visualGenre: VisualGenre | '';
+    description: string;
+  }>({
+    title: '',
+    category: 'Doblaje',
+    visualGenre: '',
+    description: '',
+  });
+
   // ── Link externo ────────────────────────────────────────────────────
   const [externalLink, setExternalLink] = useState('');
   const [externalLinkSaved, setExternalLinkSaved] = useState('');
@@ -91,7 +105,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
             id: demo.id,
             userId: user.uid,
             title: demo.title,
-            category: demo.category as DemoCategory || 'Doblaje',
+            category: (demo.demoCategory || demo.category) as DemoCategory || 'Doblaje',
             fileUrl: demo.fileUrl,
             duration: demo.durationSeconds
               ? `${Math.floor(demo.durationSeconds / 60)}:${String(demo.durationSeconds % 60).padStart(2, '0')}`
@@ -100,6 +114,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
             mediaType: normalizedType,
             fileFormat: demo.fileFormat as FileFormat | undefined,
             visualGenre: demo.visualGenre as VisualGenre | undefined,
+            description: demo.description || undefined,
           };
         });
 
@@ -188,7 +203,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
         id: result.id,
         userId: user.uid,
         title: result.title,
-        category: form.category,
+        category: (result.demoCategory || form.category) as DemoCategory,
         fileUrl: result.fileUrl,
         duration: result.durationSeconds ? `${Math.floor(result.durationSeconds / 60)}:${String(result.durationSeconds % 60).padStart(2, '0')}` : '—',
         createdAt: result.createdAt,
@@ -243,6 +258,49 @@ export function UserDemosView({ user }: { user: UserProfile }) {
       const errorMessage = error instanceof Error ? error.message : 'Error al eliminar demo';
       setFileError(errorMessage);
       console.error('❌ Error:', errorMessage);
+    }
+  };
+
+  const handleStartEdit = (demo: VoiceDemo) => {
+    setEditingDemo(demo);
+    setEditForm({
+      title: demo.title,
+      category: demo.category,
+      visualGenre: demo.visualGenre || '',
+      description: demo.description || '',
+    });
+  };
+
+  const handleSaveEdit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingDemo || !editForm.title) return;
+
+    try {
+      const token = localStorage.getItem('sud_jwt_token');
+      if (!token) throw new Error('No hay sesión activa');
+
+      console.log('📝 Guardando cambios en demo:', editingDemo.id, editForm);
+
+      const result = await demoService.updateDemo(editingDemo.id, {
+        title: editForm.title,
+        category: editForm.category,
+        visualGenre: editForm.visualGenre || undefined,
+        description: editForm.description || undefined,
+      }, token);
+
+      // Actualizar estado local
+      setDemos(prev => prev.map(d => d.id === editingDemo.id ? {
+        ...d,
+        title: result.title,
+        category: (result.demoCategory || result.category) as DemoCategory,
+        visualGenre: result.visualGenre as VisualGenre | undefined,
+        description: result.description || undefined,
+      } : d));
+
+      setEditingDemo(null);
+    } catch (error) {
+      console.error('❌ Error guardando edición:', error);
+      alert(error instanceof Error ? error.message : 'Error al guardar cambios');
     }
   };
 
@@ -522,6 +580,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
                     <DemoItem 
                       demo={demo} 
                       onDelete={handleDelete} 
+                      onEdit={handleStartEdit}
                       postulacionesAsociadas={associatedPosts}
                     />
                   </motion.div>
@@ -571,6 +630,113 @@ export function UserDemosView({ user }: { user: UserProfile }) {
                   Eliminar de todas formas
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* ── Edit Demo Modal ────────────────────────────────────────── */}
+      <AnimatePresence>
+        {editingDemo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 backdrop-blur-md bg-black/60" onClick={() => setEditingDemo(null)}>
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="sud-glass-panel w-full max-w-md p-8 relative space-y-6"
+              onClick={e => e.stopPropagation()}
+            >
+              <button onClick={() => setEditingDemo(null)} className="absolute top-6 right-6 text-slate-500 hover:text-white"><X size={22} /></button>
+              
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black text-white uppercase tracking-tight">Editar Demo</h3>
+                <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Modificar metadatos de la demo</p>
+              </div>
+              
+              <form onSubmit={handleSaveEdit} className="space-y-5">
+                {/* Title */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                    Título de la Demo *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.title}
+                    onChange={e => setEditForm({ ...editForm, title: e.target.value })}
+                    className="sud-input w-full"
+                    placeholder="Ej: Personaje Anime – Batalla"
+                    required
+                  />
+                </div>
+
+                {/* Category */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                    Categoría Principal
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editForm.category}
+                      onChange={e => setEditForm({ ...editForm, category: e.target.value as DemoCategory })}
+                      className="sud-input w-full appearance-none pr-10"
+                    >
+                      {DEMO_CATEGORIES.map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Visual Genre */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                    Género Visual / Tipo de Escena
+                  </label>
+                  <div className="relative">
+                    <select
+                      value={editForm.visualGenre}
+                      onChange={e => setEditForm({ ...editForm, visualGenre: e.target.value as VisualGenre | '' })}
+                      className="sud-input w-full appearance-none pr-10"
+                    >
+                      <option value="">— Sin clasificar —</option>
+                      {VISUAL_GENRES.map(g => (
+                        <option key={g} value={g}>{g}</option>
+                      ))}
+                    </select>
+                    <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
+                    Descripción <span className="text-slate-700">(opcional)</span>
+                  </label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={e => setEditForm({ ...editForm, description: e.target.value })}
+                    className="sud-input w-full h-24 py-3 resize-none"
+                    placeholder="Breve descripción de la demo..."
+                  />
+                </div>
+
+                <div className="flex gap-4 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setEditingDemo(null)}
+                    className="flex-1 px-5 py-3.5 rounded-2xl border border-white/10 bg-white/5 hover:bg-white/10 text-xs font-black uppercase tracking-widest text-slate-300 transition-all cursor-pointer text-center"
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    type="submit"
+                    className="flex-1 px-5 py-3.5 rounded-2xl sud-btn-primary text-xs font-black uppercase tracking-widest transition-all cursor-pointer text-center"
+                  >
+                    Guardar
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}

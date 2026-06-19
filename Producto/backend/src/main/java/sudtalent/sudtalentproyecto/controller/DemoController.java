@@ -78,7 +78,9 @@ public class DemoController {
                 file,
                 demoTitle,
                 "demo",  // Categoría interna diferente
-                visualGenre
+                visualGenre,
+                category, // Nueva columna: demoCategory
+                null      // descripción inicial vacía
             );
 
             System.out.println("✅ [DEMO] Subido exitosamente");
@@ -99,6 +101,41 @@ public class DemoController {
             return ResponseEntity.status(500).body(Map.of(
                 "error", "Error al subir demo"
             ));
+        }
+    }
+
+    /**
+     * 📝 PUT /api/demos/{id} - Actualizar metadatos de la demo
+     */
+    @PutMapping("/{id}")
+    public ResponseEntity<?> updateDemo(
+            @PathVariable UUID id,
+            @RequestBody Map<String, String> body) {
+        try {
+            System.out.println("📝 [DEMO] PUT iniciado para ID: " + id);
+            User user = getAuthenticatedUser();
+            
+            String title = body.get("title");
+            String demoCategory = body.get("category");
+            String visualGenre = body.get("visualGenre");
+            String description = body.get("description");
+            
+            VoiceAudioDTO updated = voiceAudioService.updateAudioMetadata(
+                user.getId(), 
+                id, 
+                title, 
+                demoCategory, 
+                visualGenre, 
+                description
+            );
+            return ResponseEntity.ok(updated);
+        } catch (RuntimeException e) {
+            System.err.println("❌ [DEMO] Error de autenticación: " + e.getMessage());
+            return ResponseEntity.status(401).body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            System.err.println("❌ [DEMO] Error al actualizar: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body(Map.of("error", "Error al actualizar demo: " + e.getMessage()));
         }
     }
 

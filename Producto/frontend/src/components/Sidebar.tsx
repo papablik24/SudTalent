@@ -326,7 +326,7 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
             />
             <NavItem 
               icon={<BarChart3 size={20} />} 
-              label="Reportería" 
+              label="Dashboard Ejecutivo" 
               active={currentPath === '/admin/reports'} 
               onClick={() => onNavigate('/admin/reports')}
             />

@@ -43,6 +43,7 @@ export interface Postulacion {
   audicionLink?: string;
   audicionEstado?: string;
   audicionResultado?: string;
+  audicionProfesorNombre?: string;
 }
 
 export interface CreatePostulacionDTO {

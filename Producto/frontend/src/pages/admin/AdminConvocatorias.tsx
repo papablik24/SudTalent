@@ -46,7 +46,6 @@ const formatFecha = (fechaStr: string) => {
 
 export function ConvocatoriasAdmin() {
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
-  const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -76,12 +75,8 @@ export function ConvocatoriasAdmin() {
     setLoading(true);
     setError(null);
     try {
-      const [convs, posts] = await Promise.all([
-        convocatoriaService.getConvocatorias(),
-        postulacionService.getAllPostulaciones(),
-      ]);
+      const convs = await convocatoriaService.getConvocatorias();
       setConvocatorias(convs);
-      setPostulaciones(posts);
     } catch (err: any) {
       setError(err.message || 'Error al cargar datos.');
     } finally {
@@ -92,11 +87,11 @@ export function ConvocatoriasAdmin() {
   // ── Postulaciones count per convocatoria ─────────────────────────────
   const postCountMap = useMemo(() => {
     const map: Record<string, number> = {};
-    postulaciones.forEach(p => {
-      map[p.convocatoriaId] = (map[p.convocatoriaId] || 0) + 1;
+    convocatorias.forEach(c => {
+      map[c.id] = c.postulacionesCount || 0;
     });
     return map;
-  }, [postulaciones]);
+  }, [convocatorias]);
 
   // ── Filtered and sorted list ─────────────────────────────────────────
   const getVisualEstado = (conv: Convocatoria): string => {

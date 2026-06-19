@@ -34,4 +34,5 @@ public class ConvocatoriaDTO {
     private LocalDateTime updatedAt;
     /** ID del profesor que creó la convocatoria */
     private UUID createdBy;
+    private Long postulacionesCount;
 }

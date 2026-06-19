@@ -55,6 +55,7 @@ public class PostulacionDTO {
     private String audicionLink;
     private String audicionEstado;
     private String audicionResultado;
+    private String audicionProfesorNombre;
     
     private Boolean convocatoriaDeleted;
     

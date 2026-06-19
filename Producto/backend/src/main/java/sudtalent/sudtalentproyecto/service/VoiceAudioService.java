@@ -169,8 +169,7 @@ public class VoiceAudioService {
      * Obtener todas las demos de todos los usuarios (no eliminadas y categoría 'demo')
      */
     public List<VoiceAudioDTO> getAllDemos() {
-        return voiceAudioRepository.findAll().stream()
-                .filter(v -> v.getDeletedAt() == null && "demo".equals(v.getCategory()))
+        return voiceAudioRepository.findByCategoryNotDeleted("demo").stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }

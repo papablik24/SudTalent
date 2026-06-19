@@ -25,7 +25,6 @@ import {
 export function AdminPostulaciones() {
   const [postulaciones, setPostulaciones] = useState<Postulacion[]>([]);
   const [convocatorias, setConvocatorias] = useState<Convocatoria[]>([]);
-  const [audiciones, setAudiciones] = useState<Audicion[]>([]);
   const [profesores, setProfesores] = useState<ProfesorDTO[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -78,15 +77,13 @@ export function AdminPostulaciones() {
       setError(null);
     }
     try {
-      const [posts, convs, auds, profs] = await Promise.all([
+      const [posts, convs, profs] = await Promise.all([
         postulacionService.getAllPostulaciones(),
         convocatoriaService.getConvocatorias(),
-        audicionService.getAllAudiciones(),
         profesorService.getAll(),
       ]);
       setPostulaciones(posts);
       setConvocatorias(convs);
-      setAudiciones(auds);
       setProfesores(profs.filter(p => p.active !== false)); // Cargar solo profesores activos
     } catch (err: any) {
       if (!silent) {
@@ -125,7 +122,7 @@ export function AdminPostulaciones() {
     const oldStatus = postToUpdate.estado;
 
     if (newStatus === 'EN_REVISION') {
-      const hasAudition = getAudicionPrincipal(postId);
+      const hasAudition = getAudicionPrincipal(postToUpdate);
       if (!hasAudition) {
         setToastMessage('Programa una audición para enviar esta postulación al profesor.');
         handleOpenScheduleModal(postToUpdate);
@@ -238,27 +235,32 @@ export function AdminPostulaciones() {
   };
 
   // Helper to select the main audition to display for a application card
-  const getAudicionPrincipal = (postId: string): Audicion | undefined => {
-    const postAuds = audiciones.filter(a => a.postulacionId === postId);
-    if (postAuds.length === 0) return undefined;
-
-    const evaluadas = postAuds.filter(a => a.estado === 'EVALUADA');
-    const programadas = postAuds.filter(a => a.estado === 'PROGRAMADA');
-    const canceladas = postAuds.filter(a => a.estado === 'CANCELADA');
-
-    const sortByDate = (list: Audicion[]) => {
-      return [...list].sort((a, b) => {
-        const dateA = new Date(a.updatedAt || a.createdAt).getTime();
-        const dateB = new Date(b.updatedAt || b.createdAt).getTime();
-        return dateB - dateA; // Descending, most recent first
-      });
+  const getAudicionPrincipal = (post: Postulacion): Audicion | undefined => {
+    if (!post.audicionId) return undefined;
+    return {
+      id: post.audicionId,
+      postulacionId: post.id,
+      alumnoId: post.alumnoId || '',
+      profesorId: '',
+      alumnoNombre: post.userName || '',
+      alumnoEmail: post.userEmail || '',
+      alumnoTelefono: post.userPhone || '',
+      profesorNombre: post.audicionProfesorNombre || 'Profesor',
+      profesorEspecialidad: '',
+      convocatoriaTitulo: post.convocatoriaTitulo || '',
+      convocatoriaCategoria: post.convocatoriaCategoria || '',
+      fecha: post.audicionFecha || '',
+      hora: post.audicionHora || '',
+      modalidad: (post.audicionModalidad as any) || 'ONLINE',
+      lugar: post.audicionLugar || '',
+      link: post.audicionLink,
+      estado: (post.audicionEstado as any) || 'PROGRAMADA',
+      puntaje: post.audicionPuntaje,
+      observaciones: post.audicionObservaciones,
+      resultado: (post.audicionResultado as any) || 'PENDIENTE',
+      createdAt: '',
+      updatedAt: '',
     };
-
-    if (evaluadas.length > 0) return sortByDate(evaluadas)[0];
-    if (programadas.length > 0) return sortByDate(programadas)[0];
-    if (canceladas.length > 0) return sortByDate(canceladas)[0];
-
-    return sortByDate(postAuds)[0];
   };
 
   // ── Loading / Error ──────────────────────────────────────────────────
@@ -422,7 +424,7 @@ export function AdminPostulaciones() {
 
                 {/* Sección de Audición Asociada */}
                 {(() => {
-                  const postAudicion = getAudicionPrincipal(post.id);
+                  const postAudicion = getAudicionPrincipal(post);
                   
                   // Si NO hay audición
                   if (!postAudicion) {

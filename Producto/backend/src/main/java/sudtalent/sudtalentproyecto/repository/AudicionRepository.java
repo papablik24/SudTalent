@@ -15,6 +15,9 @@ public interface AudicionRepository extends JpaRepository<Audicion, UUID> {
     @Query("SELECT a FROM Audicion a WHERE a.postulacion.id = ?1")
     List<Audicion> findByPostulacionId(UUID postulacionId);
 
+    @Query("SELECT a FROM Audicion a WHERE a.postulacion.id IN ?1")
+    List<Audicion> findByPostulacionIds(List<UUID> postulacionIds);
+
     @Query("SELECT COUNT(a) FROM Audicion a WHERE a.alumno.id = ?1")
     long countAllByAlumnoId(UUID alumnoId);
 }

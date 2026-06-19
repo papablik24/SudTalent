@@ -53,15 +53,30 @@ public class ConvocatoriaService {
 
     // ── Read ─────────────────────────────────────────────────────────────
 
+    private java.util.Map<UUID, Long> getActivePostulacionesCountMap() {
+        try {
+            return postulacionRepository.countActivePostulacionesGroupedByConvocatoria()
+                    .stream()
+                    .collect(Collectors.toMap(
+                            obj -> (UUID) obj[0],
+                            obj -> (Long) obj[1]
+                    ));
+        } catch (Exception e) {
+            return java.util.Collections.emptyMap();
+        }
+    }
+
     public List<ConvocatoriaDTO> getAllConvocatorias() {
+        java.util.Map<UUID, Long> countsMap = getActivePostulacionesCountMap();
         return convocatoriaRepository.findAllActive().stream()
-                .map(this::toDTO)
+                .map(c -> toDTO(c, countsMap))
                 .collect(Collectors.toList());
     }
 
     public List<ConvocatoriaDTO> getConvocatoriasActivas() {
+        java.util.Map<UUID, Long> countsMap = getActivePostulacionesCountMap();
         return convocatoriaRepository.findByEstado("ACTIVA").stream()
-                .map(this::toDTO)
+                .map(c -> toDTO(c, countsMap))
                 .collect(Collectors.toList());
     }
 
@@ -71,14 +86,16 @@ public class ConvocatoriaService {
     }
 
     public List<ConvocatoriaDTO> getConvocatoriasByProfesor(UUID profesorId) {
+        java.util.Map<UUID, Long> countsMap = getActivePostulacionesCountMap();
         return convocatoriaRepository.findByProfesorId(profesorId).stream()
-                .map(this::toDTO)
+                .map(c -> toDTO(c, countsMap))
                 .collect(Collectors.toList());
     }
 
     public List<ConvocatoriaDTO> getConvocatoriasByEstado(String estado) {
+        java.util.Map<UUID, Long> countsMap = getActivePostulacionesCountMap();
         return convocatoriaRepository.findByEstado(estado).stream()
-                .map(this::toDTO)
+                .map(c -> toDTO(c, countsMap))
                 .collect(Collectors.toList());
     }
 
@@ -197,6 +214,16 @@ public class ConvocatoriaService {
     }
 
     private ConvocatoriaDTO toDTO(Convocatoria c) {
+        return toDTO(c, null);
+    }
+
+    private ConvocatoriaDTO toDTO(Convocatoria c, java.util.Map<UUID, Long> countsMap) {
+        Long count = 0L;
+        if (countsMap != null) {
+            count = countsMap.getOrDefault(c.getId(), 0L);
+        } else {
+            count = postulacionRepository.countActiveByConvocatoriaId(c.getId());
+        }
         return ConvocatoriaDTO.builder()
                 .id(c.getId())
                 .titulo(c.getTitulo())
@@ -209,6 +236,7 @@ public class ConvocatoriaService {
                 .createdAt(c.getCreatedAt())
                 .updatedAt(c.getUpdatedAt())
                 .createdBy(c.getProfesor() != null ? c.getProfesor().getUsuarioId() : null)
+                .postulacionesCount(count)
                 .build();
     }
 }

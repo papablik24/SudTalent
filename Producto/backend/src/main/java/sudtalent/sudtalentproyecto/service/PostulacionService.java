@@ -196,9 +196,23 @@ public class PostulacionService {
 
     // ── Read ─────────────────────────────────────────────────────────────
 
+    private java.util.Map<UUID, List<Audicion>> getAuditionsMapForPostulaciones(List<Postulacion> postulaciones) {
+        if (postulaciones == null || postulaciones.isEmpty()) {
+            return java.util.Collections.emptyMap();
+        }
+        List<UUID> postIds = postulaciones.stream().map(Postulacion::getId).collect(Collectors.toList());
+        List<Audicion> auditions = audicionRepository.findByPostulacionIds(postIds);
+        if (auditions == null) {
+            return java.util.Collections.emptyMap();
+        }
+        return auditions.stream().collect(Collectors.groupingBy(a -> a.getPostulacion().getId()));
+    }
+
     public List<PostulacionDTO> getAllPostulaciones() {
-        return postulacionRepository.findAllActive().stream()
-                .map(this::toDTO)
+        List<Postulacion> postulaciones = postulacionRepository.findAllActive();
+        java.util.Map<UUID, List<Audicion>> auditionsMap = getAuditionsMapForPostulaciones(postulaciones);
+        return postulaciones.stream()
+                .map(p -> toDTO(p, auditionsMap))
                 .collect(Collectors.toList());
     }
 
@@ -209,14 +223,18 @@ public class PostulacionService {
     }
 
     public List<PostulacionDTO> getPostulacionesByAlumno(UUID alumnoId) {
-        return postulacionRepository.findByAlumnoId(alumnoId).stream()
-                .map(this::toDTO)
+        List<Postulacion> postulaciones = postulacionRepository.findByAlumnoId(alumnoId);
+        java.util.Map<UUID, List<Audicion>> auditionsMap = getAuditionsMapForPostulaciones(postulaciones);
+        return postulaciones.stream()
+                .map(p -> toDTO(p, auditionsMap))
                 .collect(Collectors.toList());
     }
 
     public List<PostulacionDTO> getPostulacionesByConvocatoria(UUID convocatoriaId) {
-        return postulacionRepository.findByConvocatoriaId(convocatoriaId).stream()
-                .map(this::toDTO)
+        List<Postulacion> postulaciones = postulacionRepository.findByConvocatoriaId(convocatoriaId);
+        java.util.Map<UUID, List<Audicion>> auditionsMap = getAuditionsMapForPostulaciones(postulaciones);
+        return postulaciones.stream()
+                .map(p -> toDTO(p, auditionsMap))
                 .collect(Collectors.toList());
     }
 
@@ -349,6 +367,10 @@ public class PostulacionService {
     }
 
     private PostulacionDTO toDTO(Postulacion p) {
+        return toDTO(p, null);
+    }
+
+    private PostulacionDTO toDTO(Postulacion p, java.util.Map<UUID, List<Audicion>> auditionsMap) {
         User user = p.getAlumno();
         Convocatoria conv = p.getConvocatoria();
         VoiceAudio audio = p.getVoiceAudio();
@@ -375,7 +397,12 @@ public class PostulacionService {
                 .deletedAt(p.getDeletedAt());
 
         if (audicionRepository != null) {
-            List<Audicion> auds = audicionRepository.findByPostulacionId(p.getId());
+            List<Audicion> auds = null;
+            if (auditionsMap != null) {
+                auds = auditionsMap.get(p.getId());
+            } else {
+                auds = audicionRepository.findByPostulacionId(p.getId());
+            }
             if (auds != null && !auds.isEmpty()) {
                 // Priorizar evaluadas, luego programadas, luego canceladas u otras
                 Audicion mainAud = auds.stream()
@@ -397,7 +424,10 @@ public class PostulacionService {
                        .audicionLugar(mainAud.getLugar())
                        .audicionLink(mainAud.getLink())
                        .audicionEstado(mainAud.getEstado())
-                       .audicionResultado(mainAud.getResultado());
+                       .audicionResultado(mainAud.getResultado())
+                       .audicionProfesorNombre(mainAud.getProfesor() != null && mainAud.getProfesor().getUsuario() != null 
+                                               ? mainAud.getProfesor().getUsuario().getName() 
+                                               : (mainAud.getProfesor() != null ? "Profesor" : null));
             }
         }
 

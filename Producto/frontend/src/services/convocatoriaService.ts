@@ -54,6 +54,7 @@ export interface Convocatoria {
   createdAt: string;
   updatedAt: string;
   createdBy?: string;                // UUID del profesor
+  postulacionesCount?: number;
 }
 
 export interface CreateConvocatoriaDTO {

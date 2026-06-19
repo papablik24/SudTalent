@@ -19,6 +19,9 @@ public interface VoiceAudioRepository extends JpaRepository<VoiceAudio, UUID> {
     @Query("SELECT v FROM VoiceAudio v WHERE v.user.id = ?1 AND v.category = ?2 AND v.deletedAt IS NULL ORDER BY v.createdAt DESC")
     List<VoiceAudio> findByUserIdAndCategoryNotDeleted(UUID userId, String category);
 
+    @Query("SELECT v FROM VoiceAudio v WHERE v.category = ?1 AND v.deletedAt IS NULL")
+    List<VoiceAudio> findByCategoryNotDeleted(String category);
+
     @Query("SELECT COUNT(v) FROM VoiceAudio v WHERE v.user.id = ?1")
     long countAllByUserId(UUID userId);
 }

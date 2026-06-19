@@ -84,43 +84,28 @@ export function AdminReports() {
       setLoading(true);
       setError(null);
 
-      // Variables locales para ir guardando la data cargada
-      let usersData: any[] = [];
-      let profesoresData: any[] = [];
-      let cursosData: any[] = [];
-      let convocatoriasData: any[] = [];
-      let postulacionesData: any[] = [];
+      // Ejecutamos todas las peticiones en paralelo con Promise.allSettled para optimizar el tiempo de carga
+      const results = await Promise.allSettled([
+        backendService.getAllUsers(),
+        profesorService.getAll(),
+        cursoService.getAll(),
+        convocatoriaService.getConvocatorias(),
+        postulacionService.getAllPostulaciones()
+      ]);
 
-      // Ejecutamos cada petición en un bloque try-catch independiente para que si una falla, no rompa la reportería
-      try {
-        usersData = await backendService.getAllUsers();
-      } catch (err) {
-        console.error('Error al cargar alumnos en reportería:', err);
-      }
+      const usersData = results[0].status === 'fulfilled' ? (results[0].value as any[]) : [];
+      const profesoresData = results[1].status === 'fulfilled' ? (results[1].value as any[]) : [];
+      const cursosData = results[2].status === 'fulfilled' ? (results[2].value as any[]) : [];
+      const convocatoriasData = results[3].status === 'fulfilled' ? (results[3].value as any[]) : [];
+      const postulacionesData = results[4].status === 'fulfilled' ? (results[4].value as any[]) : [];
 
-      try {
-        profesoresData = await profesorService.getAll();
-      } catch (err) {
-        console.error('Error al cargar profesores en reportería:', err);
-      }
-
-      try {
-        cursosData = await cursoService.getAll();
-      } catch (err) {
-        console.error('Error al cargar cursos en reportería:', err);
-      }
-
-      try {
-        convocatoriasData = await convocatoriaService.getConvocatorias();
-      } catch (err) {
-        console.error('Error al cargar convocatorias en reportería:', err);
-      }
-
-      try {
-        postulacionesData = await postulacionService.getAllPostulaciones();
-      } catch (err) {
-        console.error('Error al cargar postulaciones en reportería:', err);
-      }
+      // Registrar en consola errores individuales de peticiones fallidas sin bloquear la página
+      results.forEach((res, idx) => {
+        if (res.status === 'rejected') {
+          const names = ['alumnos', 'profesores', 'cursos', 'convocatorias', 'postulaciones'];
+          console.error(`Error al cargar ${names[idx]} en el dashboard ejecutivo:`, res.reason);
+        }
+      });
 
       // 1. Cálculos de Alumnos
       const alumnos = usersData.filter(u => u.role === 'USER' || u.role === 'ALUMNO' || !u.role);
@@ -277,7 +262,7 @@ export function AdminReports() {
     return (
       <div className="p-12 text-center border border-red-500/20 rounded-[2.5rem] bg-red-500/5 max-w-xl mx-auto my-12">
         <AlertCircle size={40} className="mx-auto text-red-400 mb-4" />
-        <p className="text-red-400 font-bold text-base">Error al cargar la reportería</p>
+        <p className="text-red-400 font-bold text-base">Error al cargar el dashboard ejecutivo</p>
         <p className="text-slate-500 text-xs mt-2">{error}</p>
         <button
           onClick={() => window.location.reload()}

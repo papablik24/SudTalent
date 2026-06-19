@@ -56,6 +56,8 @@ public class PostulacionDTO {
     private String audicionEstado;
     private String audicionResultado;
     
+    private Boolean convocatoriaDeleted;
+    
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
     private LocalDateTime deletedAt;

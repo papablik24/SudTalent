@@ -128,7 +128,30 @@ public class PostulacionService {
                     existingCancelled.setMensaje(null);
                 }
                 existingCancelled.setVoiceAudio(audioRef);
-                return toDTO(postulacionRepository.save(existingCancelled));
+                Postulacion reactivated = postulacionRepository.save(existingCancelled);
+                
+                // Notificar a todos los administradores
+                try {
+                    List<User> admins = userRepository.findByRoleAndDeletedAtIsNull(User.Role.ADMIN);
+                    if (admins != null && !admins.isEmpty()) {
+                        String nombreAlumno = userObj.getName();
+                        String tituloConv = convCheck.getTitulo();
+                        String tituloNotif = "Nueva postulación recibida";
+                        String mensajeNotif = nombreAlumno + " postuló a la convocatoria '" + tituloConv + "'.";
+                        notificacionService.crearNotificacionesParaUsuarios(
+                                admins,
+                                tituloNotif,
+                                mensajeNotif,
+                                "POSTULACION",
+                                reactivated.getId(),
+                                "POSTULACION"
+                        );
+                    }
+                } catch (Exception e) {
+                    System.err.println("Error enviando notificaciones a administradores al reactivar: " + e.getMessage());
+                }
+                
+                return toDTO(reactivated);
             }
         }
 
@@ -145,7 +168,30 @@ public class PostulacionService {
                 .voiceAudio(audioRef)
                 .build();
 
-        return toDTO(postulacionRepository.save(postulacion));
+        Postulacion saved = postulacionRepository.save(postulacion);
+
+        // Notificar a todos los administradores
+        try {
+            List<User> admins = userRepository.findByRoleAndDeletedAtIsNull(User.Role.ADMIN);
+            if (admins != null && !admins.isEmpty()) {
+                String nombreAlumno = userObj.getName();
+                String tituloConv = convCheck.getTitulo();
+                String tituloNotif = "Nueva postulación recibida";
+                String mensajeNotif = nombreAlumno + " postuló a la convocatoria '" + tituloConv + "'.";
+                notificacionService.crearNotificacionesParaUsuarios(
+                        admins,
+                        tituloNotif,
+                        mensajeNotif,
+                        "POSTULACION",
+                        saved.getId(),
+                        "POSTULACION"
+                );
+            }
+        } catch (Exception e) {
+            System.err.println("Error enviando notificaciones a administradores: " + e.getMessage());
+        }
+
+        return toDTO(saved);
     }
 
     // ── Read ─────────────────────────────────────────────────────────────
@@ -317,6 +363,7 @@ public class PostulacionService {
                 .alumnoSpecialties(user != null ? user.getSpecialties() : null)
                 .convocatoriaTitulo(conv != null ? conv.getTitulo() : null)
                 .convocatoriaCategoria(conv != null ? conv.getCategoria() : null)
+                .convocatoriaDeleted(conv != null && conv.getDeletedAt() != null)
                 .fechaPostulacion(p.getFechaPostulacion())
                 .estado(p.getEstado())
                 .mensaje(p.getMensaje())

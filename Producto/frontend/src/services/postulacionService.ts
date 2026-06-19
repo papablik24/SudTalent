@@ -20,6 +20,7 @@ export interface Postulacion {
   convocatoriaId: string; // UUID
   convocatoriaTitulo?: string;
   convocatoriaCategoria?: string;
+  convocatoriaDeleted?: boolean;
   userName?: string;
   userEmail?: string;
   userPhone?: string;

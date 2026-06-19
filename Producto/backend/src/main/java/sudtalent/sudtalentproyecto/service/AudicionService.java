@@ -199,6 +199,27 @@ public class AudicionService {
                              && !"CANCELADA".equals(a.getPostulacion().getEstado()) 
                              && a.getPostulacion().getDeletedAt() == null)
                 .map(this::toDTO)
+                .sorted((a, b) -> {
+                    // Sort status: PROGRAMADA first, then EVALUADA
+                    boolean aProg = "PROGRAMADA".equals(a.getEstado());
+                    boolean bProg = "PROGRAMADA".equals(b.getEstado());
+                    if (aProg && !bProg) return -1;
+                    if (!aProg && bProg) return 1;
+
+                    // Date compare (descending)
+                    String dtA = (a.getFecha() != null ? a.getFecha() : "") + "T" + (a.getHora() != null ? a.getHora() : "");
+                    String dtB = (b.getFecha() != null ? b.getFecha() : "") + "T" + (b.getHora() != null ? b.getHora() : "");
+                    int dateComp = dtB.compareTo(dtA);
+                    if (dateComp != 0) {
+                        return dateComp;
+                    }
+
+                    // Fallback to createdAt (descending)
+                    if (a.getCreatedAt() != null && b.getCreatedAt() != null) {
+                        return b.getCreatedAt().compareTo(a.getCreatedAt());
+                    }
+                    return 0;
+                })
                 .collect(Collectors.toList());
     }
 

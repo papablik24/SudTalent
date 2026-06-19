@@ -229,7 +229,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
 
   // ── Delete demo ─────────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
-    const associatedPosts = userPostulaciones.filter(p => p.voiceAudioId === id && !p.deletedAt);
+    const associatedPosts = userPostulaciones.filter(p => p.voiceAudioId === id && !p.deletedAt && p.estado !== 'CANCELADA' && !p.convocatoriaDeleted);
     if (associatedPosts.length > 0) {
       setConfirmDeleteDemo({ id, count: associatedPosts.length });
       return;
@@ -569,7 +569,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
           ) : (
             <div className="grid grid-cols-1 gap-4">
               {demos.map(demo => {
-                const associatedPosts = userPostulaciones.filter(p => p.voiceAudioId === demo.id && !p.deletedAt);
+                const associatedPosts = userPostulaciones.filter(p => p.voiceAudioId === demo.id && !p.deletedAt && p.estado !== 'CANCELADA' && !p.convocatoriaDeleted);
                 return (
                   <motion.div
                     key={demo.id}

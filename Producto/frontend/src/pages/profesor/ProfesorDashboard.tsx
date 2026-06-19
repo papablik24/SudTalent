@@ -236,7 +236,25 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
     setAudicionesError(null);
     try {
       const data = await audicionService.getMisAudicionesProfesor();
-      setAudiciones(data);
+      const sorted = [...data].sort((a, b) => {
+        const aProg = a.estado === 'PROGRAMADA';
+        const bProg = b.estado === 'PROGRAMADA';
+        if (aProg && !bProg) return -1;
+        if (!aProg && bProg) return 1;
+
+        const dateStrA = `${a.fecha}T${a.hora || '00:00'}`;
+        const dateStrB = `${b.fecha}T${b.hora || '00:00'}`;
+        const timeA = new Date(dateStrA).getTime() || 0;
+        const timeB = new Date(dateStrB).getTime() || 0;
+        if (timeA !== timeB) {
+          return timeB - timeA;
+        }
+
+        const createdA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+        const createdB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+        return createdB - createdA;
+      });
+      setAudiciones(sorted);
     } catch (err: any) {
       console.error('Error al cargar audiciones del profesor:', err);
       setAudicionesError(err.message || 'Error al cargar tus audiciones asignadas.');

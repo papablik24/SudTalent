@@ -20,4 +20,6 @@ public interface UserRepository extends SoftDeleteRepository<User> {
     boolean existsByEmail(String email);
 
     List<User> findByRoleAndActiveTrueAndDeletedAtIsNullAndStatusNot(User.Role role, User.ProfileStatus status);
+
+    List<User> findByRoleAndDeletedAtIsNull(User.Role role);
 }

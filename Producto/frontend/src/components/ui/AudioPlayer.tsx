@@ -27,13 +27,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [muted, setMuted] = useState(false);
   const [volumeHovered, setVolumeHovered] = useState(false);
 
-  useEffect(() => {
-    const el = volumeAreaRef.current;
-    if (!el) return;
-    const onLeave = () => setVolumeHovered(false);
-    el.addEventListener('mouseleave', onLeave);
-    return () => el.removeEventListener('mouseleave', onLeave);
-  }, []);
+  // Volume hover collapse handled via React event handlers directly on the container
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -150,11 +144,12 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <span className="text-xs text-slate-500 font-mono shrink-0">{formatTime(duration)}</span>
 
         {/* Volumen — botón + slider estilo YouTube */}
-        {showVolume && !compact && (
+        {showVolume && (
           <div
             ref={volumeAreaRef}
             className="flex items-center gap-1.5 shrink-0"
             onMouseEnter={() => setVolumeHovered(true)}
+            onMouseLeave={() => setVolumeHovered(false)}
           >
             <button
               type="button"
@@ -170,7 +165,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
             {/* Slider expandible */}
             <div
               className={`overflow-hidden transition-all duration-200 ease-out flex items-center ${
-                volumeHovered ? 'w-20 opacity-100' : 'w-0 opacity-0'
+                volumeHovered ? (compact ? 'w-14 opacity-100' : 'w-20 opacity-100') : 'w-0 opacity-0'
               }`}
             >
               <div className="relative w-full h-4 flex items-center group/vol">

@@ -174,14 +174,28 @@ Instrucciones adicionales:
 - Recuerda que no evalúas el archivo de audio real de las demos, sino sus metadatos (título, descripción, categoría, etc.), e indícalo al usuario de manera profesional.
 `.trim();
 
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: contents,
-      config: {
-        systemInstruction: finalInstruction,
-        temperature: 0.7,
-      }
-    });
+    let response;
+    try {
+      response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: contents,
+        config: {
+          systemInstruction: finalInstruction,
+          temperature: 0.7,
+        }
+      });
+    } catch (firstError) {
+      console.warn('⚠️ Primera llamada fallida a Gemini, reintentando en 300ms...', firstError);
+      await new Promise(resolve => setTimeout(resolve, 300));
+      response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: contents,
+        config: {
+          systemInstruction: finalInstruction,
+          temperature: 0.7,
+        }
+      });
+    }
 
     if (!response || !response.text) {
       throw new Error('No se recibió texto de respuesta de la IA.');

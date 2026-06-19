@@ -211,26 +211,51 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
     }
   }, []);
 
-  // Mensaje de bienvenida inicial personalizado por rol
-  useEffect(() => {
-    if (!apiKeyConfigured || !currentUser) return;
-    
-    let welcomeText = '';
+  // Helper para generar el mensaje de bienvenida dinámico
+  const getWelcomeText = () => {
+    if (!currentUser) return '';
     if (currentUser.role === 'PROFESOR') {
-      welcomeText = `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
+      return `¡Hola, Profesor ${currentUser.name || 'Docente'}! Soy tu Asistente IA en SudTalent. Te puedo ayudar a estructurar tus clases, sugerir actividades didácticas de doblaje o locución, preparar feedback pedagógico para tus alumnos y organizar tus tutorías. ¿En qué te gustaría trabajar hoy para potenciar tus cursos?`;
     } else if (currentUser.role === 'ADMIN') {
-      welcomeText = '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
+      return '¡Hola! Soy tu Asistente IA de SudTalent para Administradores. Puedo ayudarte a analizar estadísticas globales de la plataforma, redactar convocatorias, revisar perfiles de talento y resolver dudas sobre la gestión. ¿Qué necesitas revisar hoy?';
     } else {
-      welcomeText = `¡Hola, ${currentUser.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+      return `¡Hola, ${currentUser.name || 'Talento'}! Soy tu Asistente IA de SudTalent. Te puedo ayudar a completar tu perfil de talento, recomendarte cursos del catálogo que se adapten a tu experiencia, sugerir convocatorias compatibles, guiarte en qué demos de voz te convendría subir y darte consejos prácticos para mejorar tus grabaciones. ¿Cómo te puedo ayudar en tu camino hoy?`;
+    }
+  };
+
+  // Cargar historial desde localStorage al cambiar de usuario/rol
+  useEffect(() => {
+    if (!currentUser) return;
+    
+    const key = `sud_chat_history_${currentUser.uid || currentUser.email || 'anon'}_${currentUser.role}`;
+    const stored = localStorage.getItem(key);
+    
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          // Filtrar o descartar historiales obsoletos que contengan "Historial limpio"
+          const hasObsoleteMsg = parsed.some(msg => msg.text && msg.text.includes('Historial limpio'));
+          if (!hasObsoleteMsg) {
+            setMessages(parsed);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Error parsing stored chat history:', e);
+      }
     }
     
-    setMessages([
+    // Si no hay historial previo, inicializar con el mensaje de bienvenida
+    const initialMessages: ChatMessage[] = [
       {
         role: 'model',
-        text: welcomeText
+        text: getWelcomeText()
       }
-    ]);
-  }, [currentUser, apiKeyConfigured]);
+    ];
+    setMessages(initialMessages);
+    localStorage.setItem(key, JSON.stringify(initialMessages));
+  }, [currentUser]);
 
   // Hacer scroll automático al último mensaje
   useEffect(() => {
@@ -239,27 +264,33 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || loading || !apiKeyConfigured) return;
+    if (!input.trim() || loading || !apiKeyConfigured || !currentUser) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
       text: input.trim()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    const key = `sud_chat_history_${currentUser.uid || currentUser.email || 'anon'}_${currentUser.role}`;
+    const newMessages = [...messages, userMessage];
+
+    setMessages(newMessages);
+    localStorage.setItem(key, JSON.stringify(newMessages));
     setInput('');
     setLoading(true);
     setError(null);
 
     try {
       // Enviamos el historial completo para mantener el contexto básico de la conversación
-      const historyToSend = [...messages, userMessage];
-      const botResponse = await sendMessageToGemini(historyToSend, userContext);
+      const botResponse = await sendMessageToGemini(newMessages, userContext);
       
-      setMessages(prev => [...prev, { role: 'model', text: botResponse }]);
-    } catch (err: any) {
+      const finalMessages = [...newMessages, { role: 'model' as const, text: botResponse }];
+      setMessages(finalMessages);
+      localStorage.setItem(key, JSON.stringify(finalMessages));
+    } catch (err) {
       console.error('Error al enviar el mensaje:', err);
-      if (err.message === 'API_KEY_MISSING') {
+      const errMsg = err instanceof Error ? err.message : '';
+      if (errMsg === 'API_KEY_MISSING') {
         setApiKeyConfigured(false);
       } else {
         setError('No se pudo obtener respuesta de la IA. Intenta nuevamente.');
@@ -270,13 +301,19 @@ CATÁLOGO DE CURSOS DISPONIBLES EN SUDTALENT:
   };
 
   const handleClearChat = () => {
+    if (!currentUser) return;
+    const key = `sud_chat_history_${currentUser.uid || currentUser.email || 'anon'}_${currentUser.role}`;
+    
+    const clearedMessages: ChatMessage[] = [
+      {
+        role: 'model',
+        text: getWelcomeText()
+      }
+    ];
+
     if (confirmClear) {
-      setMessages([
-        {
-          role: 'model',
-          text: 'Historial limpio. ¿En qué más te puedo asistir sobre SudTalent?'
-        }
-      ]);
+      setMessages(clearedMessages);
+      localStorage.setItem(key, JSON.stringify(clearedMessages));
       setError(null);
       setConfirmClear(false);
     } else {

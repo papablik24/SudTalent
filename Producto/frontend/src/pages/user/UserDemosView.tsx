@@ -138,7 +138,12 @@ export function UserDemosView({ user }: { user: UserProfile }) {
     setFileError(null);
     const detected = detectFormat(file);
     if (!detected) {
-      setFileError('Formato no permitido. Usa MP3 o WAV.');
+      setFileError('Formato no permitido. Sube un archivo MP3 o WAV.');
+      setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }));
+      return;
+    }
+    if (file.size / (1024 * 1024) > 10) {
+      setFileError('El archivo supera el límite de 10 MB. Sube un audio más liviano o usa un enlace externo.');
       setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }));
       return;
     }
@@ -170,11 +175,20 @@ export function UserDemosView({ user }: { user: UserProfile }) {
   // ── Submit ──────────────────────────────────────────────────────────
   const handleUploadDemo = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.title || !form.file) return;
 
     // Límite de 3 demos
     if (demos.length >= MAX_DEMOS) {
-      setFileError(`Solo puedes tener un máximo de ${MAX_DEMOS} demos subidas. Elimina una para agregar otra.`);
+      setFileError('Ya alcanzaste el límite de 3 demos de audio. Elimina una demo existente o usa un enlace externo.');
+      return;
+    }
+
+    if (!form.file) {
+      setFileError('Selecciona un archivo de audio antes de confirmar la carga.');
+      return;
+    }
+
+    if (!form.title.trim()) {
+      setFileError('Ingresa un título para la demo.');
       return;
     }
 
@@ -220,7 +234,21 @@ export function UserDemosView({ user }: { user: UserProfile }) {
       setForm(DEFAULT_FORM);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Error desconocido al subir demo';
-      setFileError(errorMessage);
+      let cleanErrorMessage = errorMessage;
+      const lowerErr = errorMessage.toLowerCase();
+      if (
+        lowerErr.includes('413') || 
+        lowerErr.includes('too large') || 
+        lowerErr.includes('size') || 
+        lowerErr.includes('multipart') || 
+        lowerErr.includes('supabase') || 
+        lowerErr.includes('storage') ||
+        lowerErr.includes('exceeded') ||
+        lowerErr.includes('limit')
+      ) {
+        cleanErrorMessage = 'No se pudo subir la demo. Revisa que el archivo pese menos de 10 MB e inténtalo nuevamente.';
+      }
+      setFileError(cleanErrorMessage);
       console.error('❌ Error:', errorMessage);
     } finally {
       setIsUploading(false);
@@ -352,14 +380,19 @@ export function UserDemosView({ user }: { user: UserProfile }) {
                 <Plus className="text-sud-turquoise" size={20} />
                 Añadir Nueva Demo
               </h4>
-              {/* Contador */}
-              <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border ${
-                demos.length >= MAX_DEMOS
-                  ? 'bg-red-500/10 border-red-500/20 text-red-400'
-                  : 'bg-white/5 border-white/10 text-slate-400'
-              }`}>
-                {demos.length}/{MAX_DEMOS}
-              </span>
+              <div className="flex flex-col items-end gap-1">
+                {/* Contador */}
+                <span className={`text-[10px] font-black uppercase tracking-widest px-3 py-1.5 rounded-xl border ${
+                  demos.length >= MAX_DEMOS
+                    ? 'bg-red-500/10 border-red-500/20 text-red-400'
+                    : 'bg-white/5 border-white/10 text-slate-400'
+                }`}>
+                  {demos.length}/{MAX_DEMOS} audio disponibles
+                </span>
+                <span className="text-[8px] font-bold text-slate-500 uppercase tracking-widest">
+                  Límite 10 MB c/u
+                </span>
+              </div>
             </div>
 
             {/* Aviso límite alcanzado */}
@@ -367,14 +400,14 @@ export function UserDemosView({ user }: { user: UserProfile }) {
               <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3">
                 <AlertCircle size={16} className="text-amber-400 shrink-0 mt-0.5" />
                 <p className="text-[10px] text-amber-400 font-black uppercase tracking-widest leading-relaxed">
-                  Límite de {MAX_DEMOS} demos alcanzado. Elimina una para poder subir otra.
+                  Ya alcanzaste el límite de 3 demos de audio. Elimina una demo existente o usa un enlace externo.
                 </p>
               </div>
             )}
 
             {/* Format info banner */}
             <div className="p-4 bg-white/[0.02] border border-white/10 rounded-2xl space-y-3">
-              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Formatos permitidos</p>
+              <p className="text-[9px] font-black text-slate-500 uppercase tracking-[0.2em]">Formatos permitidos · máximo 10 MB</p>
               <div className="flex flex-wrap gap-2">
                 {['MP3', 'WAV'].map(f => (
                   <span key={f} className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sud-orange/10 border border-sud-orange/20 text-[9px] font-black uppercase text-sud-orange">
@@ -398,10 +431,11 @@ export function UserDemosView({ user }: { user: UserProfile }) {
                 <AudioDropZone
                   file={form.file}
                   isUploading={isUploading}
+                  disabled={demos.length >= MAX_DEMOS}
                   error={fileError}
                   onFileSelected={handleFileSelected}
                   onClear={() => setForm(f => ({ ...f, file: null, mediaType: null, fileFormat: null }))}
-                  hint="MP3 o WAV · Máximo 10MB"
+                  hint="MP3 o WAV · máximo 10 MB"
                 />
               </div>
 
@@ -474,7 +508,7 @@ export function UserDemosView({ user }: { user: UserProfile }) {
 
               <button
                 type="submit"
-                disabled={isUploading || !form.title || !form.file || demos.length >= MAX_DEMOS}
+                disabled={isUploading || demos.length >= MAX_DEMOS}
                 className="w-full sud-btn-primary py-5 text-sm shadow-xl shadow-sud-orange/10 transition-all hover:scale-[1.02] disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {isUploading ? (

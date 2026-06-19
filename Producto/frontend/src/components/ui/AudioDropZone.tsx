@@ -10,6 +10,8 @@ interface AudioDropZoneProps {
   file: File | null;
   /** Si se está subiendo */
   isUploading?: boolean;
+  /** Si la zona de carga está inactiva por límite */
+  disabled?: boolean;
   /** Mensaje de error */
   error?: string | null;
   /** Callback cuando el usuario elige o suelta un archivo válido */
@@ -23,6 +25,7 @@ interface AudioDropZoneProps {
 export function AudioDropZone({
   file,
   isUploading = false,
+  disabled = false,
   error,
   onFileSelected,
   onClear,
@@ -34,10 +37,10 @@ export function AudioDropZone({
 
   const validate = (f: File): string | null => {
     if (!f.type.includes('audio') && !f.name.match(/\.(mp3|wav)$/i)) {
-      return 'Formato no permitido. Solo MP3 o WAV.';
+      return 'Formato no permitido. Sube un archivo MP3 o WAV.';
     }
     if (f.size / (1024 * 1024) > MAX_SIZE_MB) {
-      return `El archivo supera el límite de ${MAX_SIZE_MB}MB.`;
+      return 'El archivo supera el límite de 10 MB. Sube un audio más liviano o usa un enlace externo.';
     }
     return null;
   };
@@ -79,10 +82,12 @@ export function AudioDropZone({
         onDragOver={onDragOver}
         onDragLeave={onDragLeave}
         onDrop={onDrop}
-        onClick={() => !isUploading && inputRef.current?.click()}
+        onClick={() => !isUploading && !disabled && inputRef.current?.click()}
         className={`relative flex flex-col items-center justify-center gap-3 p-6 rounded-2xl border-2 border-dashed cursor-pointer transition-all select-none ${
           isUploading
             ? 'border-sud-orange/30 bg-sud-orange/5 cursor-not-allowed'
+            : disabled
+            ? 'border-white/5 bg-white/[0.01] cursor-not-allowed opacity-40'
             : isDragging
             ? 'border-sud-orange bg-sud-orange/10 scale-[1.01]'
             : file
@@ -143,7 +148,7 @@ export function AudioDropZone({
           accept={AUDIO_ACCEPT}
           onChange={e => handleFiles(e.target.files)}
           className="hidden"
-          disabled={isUploading}
+          disabled={isUploading || disabled}
         />
       </div>
 

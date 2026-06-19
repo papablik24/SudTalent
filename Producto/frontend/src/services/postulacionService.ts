@@ -5,10 +5,10 @@
 
 import { fetchAPI } from './backendService';
 
-export type PostulacionEstado = 'PENDIENTE' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA';
+export type PostulacionEstado = 'PENDIENTE' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA' | 'CANCELADA';
 
 export const POSTULACION_ESTADOS: PostulacionEstado[] = [
-  'PENDIENTE', 'EN_REVISION', 'ACEPTADA', 'RECHAZADA'
+  'PENDIENTE', 'EN_REVISION', 'ACEPTADA', 'RECHAZADA', 'CANCELADA'
 ];
 
 /**

@@ -634,9 +634,10 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
       setFeedback({ type: 'success', message: 'Alumno autorizado correctamente.' });
     } catch (err) {
       console.error('Error al autorizar alumno:', err);
+      const errorMsg = err instanceof Error ? err.message : 'No se pudo autorizar el alumno. Verifica si el teléfono o correo ya existen.';
       setFeedback({
         type: 'error',
-        message: 'No se pudo autorizar el alumno. Verifica si el teléfono o correo ya existen.'
+        message: errorMsg
       });
     } finally {
       setIsSubmitting(false);

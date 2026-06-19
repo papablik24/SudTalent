@@ -125,26 +125,24 @@ public class WhitelistService {
 
     private WhitelistNumber getWhitelistNumberByPhoneRobust(String phone) {
         String cleanPhone = phone != null ? phone.replaceAll("[^0-9]", "") : "";
-        return repository.findByPhone(phone)
-            .or(() -> {
-                if (!cleanPhone.isEmpty()) {
-                    return repository.findByPhone(cleanPhone);
-                }
-                return java.util.Optional.empty();
-            })
-            .or(() -> {
-                if (!cleanPhone.isEmpty()) {
-                    return repository.findByPhone("+" + cleanPhone);
-                }
-                return java.util.Optional.empty();
-            })
+        return repository.findAll().stream()
+            .filter(w -> phonesMatch(w.getPhone(), cleanPhone))
+            .findFirst()
             .orElseThrow(() -> new RuntimeException("Número no encontrado: " + phone));
     }
 
     // Eliminar por teléfono
     public void deleteByPhone(String phone) {
-        WhitelistNumber number = getWhitelistNumberByPhoneRobust(phone);
-        repository.deleteById(number.getId());
+        String cleanPhone = phone != null ? phone.replaceAll("[^0-9]", "") : "";
+        if (!cleanPhone.isEmpty()) {
+            List<WhitelistNumber> matches = repository.findAll().stream()
+                .filter(w -> phonesMatch(w.getPhone(), cleanPhone))
+                .collect(Collectors.toList());
+            for (WhitelistNumber wl : matches) {
+                repository.deleteById(wl.getId());
+            }
+            repository.flush();
+        }
     }
 
     // ==================== FUNCIONALIDAD 1: Obtener todos los alumnos con estado en whitelist ====================
@@ -210,32 +208,60 @@ public class WhitelistService {
         System.out.println("   name: " + finalName);
         System.out.println("   email: " + finalEmail);
         
-        // Buscar si ya existe en whitelist por teléfono
-        var existingWl = repository.findByPhone(cleanPhone);
-        if (existingWl.isEmpty() && finalEmail != null) {
-            existingWl = repository.findAll().stream()
-                .filter(w -> finalEmail.equalsIgnoreCase(w.getEmail()))
-                .findFirst();
+        // Buscar si ya existe en whitelist por teléfono (robusto) o por email
+        List<WhitelistNumber> matches = repository.findAll().stream()
+            .filter(w -> phonesMatch(w.getPhone(), cleanPhone) || 
+                         (finalEmail != null && finalEmail.equalsIgnoreCase(w.getEmail())))
+            .collect(Collectors.toList());
+
+        // Si existe un registro ACTIVO (ACTIVO o PENDIENTE) en la whitelist con el mismo correo o teléfono,
+        // no debemos actualizarlo silenciosamente ni crear una nueva fila. Debemos bloquear con error.
+        boolean hasActiveWl = matches.stream()
+            .anyMatch(w -> w.getStatus() == WhitelistNumber.Status.ACTIVO || w.getStatus() == WhitelistNumber.Status.PENDIENTE);
+        if (hasActiveWl) {
+            throw new IllegalArgumentException("Ya existe un alumno autorizado con este correo o teléfono.");
+        }
+
+        java.util.Optional<WhitelistNumber> existingWl = java.util.Optional.empty();
+        if (!matches.isEmpty()) {
+            existingWl = java.util.Optional.of(matches.get(0));
+            // Eliminar registros duplicados de whitelist en la base de datos para consolidar
+            if (matches.size() > 1) {
+                for (int i = 1; i < matches.size(); i++) {
+                    repository.delete(matches.get(i));
+                }
+                repository.flush();
+            }
         }
         
-        // Verificar si el usuario ya existe por teléfono o por email (usuario real o placeholder)
-        var existingUser = userRepository.findByPhoneActive(cleanPhone);
+        // Verificar si el usuario ya existe por teléfono (robusto) o por email (usuario real o placeholder)
+        java.util.Optional<User> existingUser = userRepository.findAll().stream()
+            .filter(u -> u.getDeletedAt() == null) // solo usuarios activos
+            .filter(u -> phonesMatch(u.getPhone(), cleanPhone) || 
+                         (finalEmail != null && finalEmail.equalsIgnoreCase(u.getEmail())))
+            .findFirst();
+        
         User user = null;
-        
-        if (existingUser.isEmpty() && finalEmail != null) {
-            existingUser = userRepository.findByEmailActive(finalEmail);
-        }
-        
-        if (existingUser.isPresent()) {
-            user = existingUser.get();
-            System.out.println("ℹ️ Usuario ya existe: " + user.getEmail());
-        }
-        
         User.Role roleEnumWL = User.Role.ALUMNO;
         if (roleStr != null) {
             try {
                 roleEnumWL = User.Role.valueOf(roleStr);
             } catch(Exception e) {}
+        }
+        
+        if (existingUser.isPresent()) {
+            user = existingUser.get();
+            System.out.println("ℹ️ Usuario ya existe: " + user.getEmail());
+            // Si el usuario existente es un usuario REAL (onboarded), ahí sí debemos bloquear registro duplicado
+            if (user.isOnboarded()) {
+                throw new IllegalArgumentException("Ya existe un alumno real registrado con este correo o teléfono.");
+            }
+            // Si es placeholder, actualizamos sus campos básicos si es necesario
+            user.setName(finalName != null ? finalName : "");
+            user.setEmail(finalEmail != null ? finalEmail : user.getEmail());
+            user.setPhone(cleanPhone);
+            user.setRole(roleEnumWL);
+            user = userRepository.save(user);
         }
 
         WhitelistNumber number;
@@ -246,8 +272,9 @@ public class WhitelistService {
             }
             number.setName(finalName);
             number.setEmail(finalEmail);
-            number.setRole(roleEnumWL != null ? roleEnumWL.name() : User.Role.ALUMNO.name());
+            number.setRole(roleEnumWL != null ? roleEnumWL : User.Role.ALUMNO);
             number.setUser(user);
+            number.setStatus(WhitelistNumber.Status.PENDIENTE);
             number.setUpdatedAt(LocalDateTime.now());
         } else {
             number = WhitelistNumber.builder()
@@ -301,9 +328,11 @@ public class WhitelistService {
 
     // Vincular un número de whitelist con un usuario existente
     private void linkUserToWhitelist(WhitelistNumber whitelist) {
-        // Buscar usuario por teléfono
+        // Buscar usuario por teléfono (robusto)
         if(whitelist.getPhone() != null) {
-            var userByPhone = userRepository.findByPhoneActive(whitelist.getPhone());
+            var userByPhone = userRepository.findAll().stream()
+                .filter(u -> u.getDeletedAt() == null && phonesMatch(u.getPhone(), whitelist.getPhone()))
+                .findFirst();
             if(userByPhone.isPresent()) {
                 whitelist.setUser(userByPhone.get());
                 if(whitelist.getName() == null) {
@@ -341,9 +370,11 @@ public class WhitelistService {
         for (WhitelistNumber wl : unlinked) {
             boolean linked = false;
 
-            // Intentar vincular por teléfono
+            // Intentar vincular por teléfono (robusto)
             if (wl.getPhone() != null) {
-                var userByPhone = userRepository.findByPhoneActive(wl.getPhone());
+                var userByPhone = userRepository.findAll().stream()
+                    .filter(u -> u.getDeletedAt() == null && phonesMatch(u.getPhone(), wl.getPhone()))
+                    .findFirst();
                 if (userByPhone.isPresent()) {
                     wl.setUser(userByPhone.get());
                     if (wl.getName() == null && userByPhone.get().getName() != null) {
@@ -409,13 +440,18 @@ public class WhitelistService {
     }
 
     private boolean checkPhoneExistsInDB(String normalizedPhone) {
+        if (normalizedPhone == null) return false;
         String clean = normalizedPhone.replaceAll("[^0-9]", "");
-        if (repository.findByPhone(normalizedPhone).isPresent()) return true;
-        if (repository.findByPhone(clean).isPresent()) return true;
-        if (repository.findByPhone("+" + clean).isPresent()) return true;
-        if (userRepository.findByPhoneActive(normalizedPhone).isPresent()) return true;
-        if (userRepository.findByPhoneActive(clean).isPresent()) return true;
-        return false;
+        if (clean.isEmpty()) return false;
+        
+        boolean existsInWl = repository.findAll().stream()
+            .anyMatch(w -> phonesMatch(w.getPhone(), clean));
+        if (existsInWl) return true;
+        
+        boolean existsInUser = userRepository.findAll().stream()
+            .filter(u -> u.getDeletedAt() == null)
+            .anyMatch(u -> phonesMatch(u.getPhone(), clean));
+        return existsInUser;
     }
 
     public List<WhitelistCandidateDTO> previewImport(String text) {
@@ -550,5 +586,25 @@ public class WhitelistService {
             .createdAt(number.getCreatedAt())
             .updatedAt(number.getUpdatedAt())
             .build();
+    }
+
+    private boolean phonesMatch(String phone1, String phone2) {
+        if (phone1 == null || phone2 == null) {
+            return false;
+        }
+        String clean1 = phone1.replaceAll("[^0-9]", "");
+        String clean2 = phone2.replaceAll("[^0-9]", "");
+        if (clean1.isEmpty() || clean2.isEmpty()) {
+            return false;
+        }
+        if (clean1.equals(clean2)) {
+            return true;
+        }
+        if (clean1.length() >= 8 && clean2.length() >= 8) {
+            String last8_1 = clean1.substring(clean1.length() - 8);
+            String last8_2 = clean2.substring(clean2.length() - 8);
+            return last8_1.equals(last8_2);
+        }
+        return false;
     }
 }

@@ -2,6 +2,18 @@ import { useState, useEffect, useCallback } from 'react';
 import { UserProfile, TalentProfile, VoiceDemo, WhitelistEntry, ProfileStatus, ProfileCategory } from '../types';
 import { backendService, fetchAPI } from '../services/backendService';
 
+const phonesMatch = (p1?: string, p2?: string): boolean => {
+  if (!p1 || !p2) return false;
+  const c1 = p1.replace(/\D/g, '');
+  const c2 = p2.replace(/\D/g, '');
+  if (!c1 || !c2) return false;
+  if (c1 === c2) return true;
+  if (c1.length >= 8 && c2.length >= 8) {
+    return c1.slice(-8) === c2.slice(-8);
+  }
+  return false;
+};
+
 export function useAdminData(role: string | null, currentUser: UserProfile | null) {
   const [whitelist, setWhitelist] = useState<WhitelistEntry[]>([]);
   const [allUsers, setAllUsers] = useState<UserProfile[]>([]);
@@ -201,7 +213,14 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
         addedBy: currentUser?.uid,
         status: response?.status || 'PENDIENTE'
       };
-      setWhitelist(prev => [newEntry, ...prev]);
+      setWhitelist(prev => {
+        // Filtrar cualquier entrada existente con el mismo teléfono (robusto) o email para evitar duplicados en la UI
+        const filtered = prev.filter(e => 
+          !phonesMatch(e.phone, normalizedPhone) && 
+          (!email || e.email?.toLowerCase().trim() !== email.toLowerCase().trim())
+        );
+        return [newEntry, ...filtered];
+      });
     } catch (err: any) {
       setError(err.message || 'Error al agregar a whitelist');
       throw err;
@@ -222,7 +241,7 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
         console.warn('No se pudo eliminar de la whitelist:', err);
         if (!uid) throw err;
       }
-      setWhitelist(prev => prev.filter(e => e.phone !== phone));
+      setWhitelist(prev => prev.filter(e => !phonesMatch(e.phone, phone)));
     } catch (err: any) {
       setError(err.message || 'Error al eliminar');
       throw err;
@@ -235,8 +254,8 @@ export function useAdminData(role: string | null, currentUser: UserProfile | nul
       setError(null);
       await backendService.updateStudent(phone, updates);
       
-      setWhitelist(prev => prev.map(e => e.phone === phone ? { ...e, ...updates } : e));
-      setAllUsers(prev => prev.map(u => u.phone === phone ? { ...u, ...updates } : u));
+      setWhitelist(prev => prev.map(e => phonesMatch(e.phone, phone) ? { ...e, ...updates } : e));
+      setAllUsers(prev => prev.map(u => phonesMatch(u.phone, phone) ? { ...u, ...updates } : u));
     } catch (err: any) {
       setError(err.message || 'Error al actualizar estudiante');
       throw err;

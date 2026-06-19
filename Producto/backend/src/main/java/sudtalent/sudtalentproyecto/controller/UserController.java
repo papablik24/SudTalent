@@ -168,11 +168,20 @@ public class UserController {
                         if (w.getUser() != null && id.equals(w.getUser().getId())) {
                             return true;
                         }
-                        if (user.getPhone() != null) {
+                        if (user.getPhone() != null && w.getPhone() != null) {
                             String cleanPhone = user.getPhone().replaceAll("[^0-9]", "");
-                            String wClean = w.getPhone() != null ? w.getPhone().replaceAll("[^0-9]", "") : "";
-                            if (!cleanPhone.isEmpty() && cleanPhone.equals(wClean)) {
-                                return true;
+                            String wClean = w.getPhone().replaceAll("[^0-9]", "");
+                            if (!cleanPhone.isEmpty() && !wClean.isEmpty()) {
+                                if (cleanPhone.equals(wClean)) {
+                                    return true;
+                                }
+                                if (cleanPhone.length() >= 8 && wClean.length() >= 8) {
+                                    String last8_1 = cleanPhone.substring(cleanPhone.length() - 8);
+                                    String last8_2 = wClean.substring(wClean.length() - 8);
+                                    if (last8_1.equals(last8_2)) {
+                                        return true;
+                                    }
+                                }
                             }
                         }
                         if (user.getEmail() != null && w.getEmail() != null) {
@@ -182,7 +191,10 @@ public class UserController {
                         }
                         return false;
                     })
-                    .forEach(whitelistRepository::delete);
+                    .forEach(w -> {
+                        whitelistRepository.delete(w);
+                        whitelistRepository.flush();
+                    });
 
                 // 2. Eliminar notificaciones
                 notificacionRepository.deleteAll(notificacionRepository.findByUsuarioIdOrderByFechaCreacionDesc(id));
@@ -194,9 +206,9 @@ public class UserController {
                 if (isAlumno) {
                     Alumno alumno = alumnoRepository.findById(id).orElseThrow();
                     alumnoRepository.delete(alumno);
-                } else {
-                    userRepository.delete(user);
+                    alumnoRepository.flush();
                 }
+                userRepository.delete(user);
                 userRepository.flush(); // Forzar ejecución SQL para capturar excepciones de integridad
 
                 return ResponseEntity.ok(Map.of("message", "Usuario eliminado"));

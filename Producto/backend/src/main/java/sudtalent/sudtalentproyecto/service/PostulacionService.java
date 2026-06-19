@@ -9,6 +9,7 @@ import sudtalent.sudtalentproyecto.model.VoiceAudio;
 import sudtalent.sudtalentproyecto.model.Audicion;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.repository.AudicionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
@@ -27,6 +28,7 @@ import java.util.stream.Collectors;
 public class PostulacionService {
 
     private final PostulacionRepository postulacionRepository;
+    private final AudicionRepository audicionRepository;
     private final SoftDeleteService softDeleteService;
     private final UserRepository userRepository;
     private final NotificacionService notificacionService;
@@ -104,6 +106,18 @@ public class PostulacionService {
                 .orElse(null);
 
             if (existingCancelled != null) {
+                // Cancelar de forma definitiva cualquier audición vieja que pudiera estar colgada
+                List<Audicion> oldAuds = audicionRepository.findByPostulacionId(existingCancelled.getId());
+                if (oldAuds != null) {
+                    for (Audicion aud : oldAuds) {
+                        if (!"CANCELADA".equals(aud.getEstado())) {
+                            aud.setEstado("CANCELADA");
+                            aud.setUpdatedAt(java.time.LocalDateTime.now());
+                            audicionRepository.save(aud);
+                        }
+                    }
+                }
+
                 existingCancelled.setDeletedAt(null);
                 existingCancelled.setEstado("PENDIENTE");
                 existingCancelled.setFechaPostulacion(LocalDate.now());
@@ -218,6 +232,20 @@ public class PostulacionService {
         if (nuevoEstado != null && !nuevoEstado.equals(estadoAnterior)) {
             postulacion.setEstado(nuevoEstado);
             estadoCambiado = true;
+
+            if ("CANCELADA".equals(nuevoEstado)) {
+                // Cancelar también todas las audiciones no evaluadas asociadas a esta postulación
+                List<Audicion> audiciones = audicionRepository.findByPostulacionId(id);
+                if (audiciones != null) {
+                    for (Audicion aud : audiciones) {
+                        if (!"EVALUADA".equals(aud.getEstado())) {
+                            aud.setEstado("CANCELADA");
+                            aud.setUpdatedAt(java.time.LocalDateTime.now());
+                            audicionRepository.save(aud);
+                        }
+                    }
+                }
+            }
         }
         if (nuevoMensaje != null) {
             postulacion.setMensaje(nuevoMensaje);
@@ -279,7 +307,7 @@ public class PostulacionService {
         Convocatoria conv = p.getConvocatoria();
         VoiceAudio audio = p.getVoiceAudio();
 
-        return PostulacionDTO.builder()
+        PostulacionDTO.PostulacionDTOBuilder builder = PostulacionDTO.builder()
                 .id(p.getId())
                 .alumnoId(user != null ? user.getId() : null)
                 .convocatoriaId(conv != null ? conv.getId() : null)
@@ -297,7 +325,35 @@ public class PostulacionService {
                 .voiceAudioUrl(audio != null ? audio.getFileUrl() : null)
                 .createdAt(p.getCreatedAt())
                 .updatedAt(p.getUpdatedAt())
-                .deletedAt(p.getDeletedAt())
-                .build();
+                .deletedAt(p.getDeletedAt());
+
+        if (audicionRepository != null) {
+            List<Audicion> auds = audicionRepository.findByPostulacionId(p.getId());
+            if (auds != null && !auds.isEmpty()) {
+                // Priorizar evaluadas, luego programadas, luego canceladas u otras
+                Audicion mainAud = auds.stream()
+                        .filter(a -> "EVALUADA".equals(a.getEstado()))
+                        .findFirst()
+                        .orElse(
+                            auds.stream()
+                                .filter(a -> "PROGRAMADA".equals(a.getEstado()))
+                                .findFirst()
+                                .orElse(auds.get(0))
+                        );
+
+                builder.audicionId(mainAud.getId())
+                       .audicionPuntaje(mainAud.getPuntaje())
+                       .audicionObservaciones(mainAud.getObservaciones())
+                       .audicionFecha(mainAud.getFecha())
+                       .audicionHora(mainAud.getHora())
+                       .audicionModalidad(mainAud.getModalidad())
+                       .audicionLugar(mainAud.getLugar())
+                       .audicionLink(mainAud.getLink())
+                       .audicionEstado(mainAud.getEstado())
+                       .audicionResultado(mainAud.getResultado());
+            }
+        }
+
+        return builder.build();
     }
 }

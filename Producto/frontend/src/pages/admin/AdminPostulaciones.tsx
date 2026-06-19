@@ -124,6 +124,15 @@ export function AdminPostulaciones() {
     if (!postToUpdate) return;
     const oldStatus = postToUpdate.estado;
 
+    if (newStatus === 'EN_REVISION') {
+      const hasAudition = getAudicionPrincipal(postId);
+      if (!hasAudition) {
+        setToastMessage('Programa una audición para enviar esta postulación al profesor.');
+        handleOpenScheduleModal(postToUpdate);
+        return;
+      }
+    }
+
     // Optimistic update
     setPostulaciones(prev => prev.map(p => p.id === postId ? { ...p, estado: newStatus } : p));
     setUpdatingIds(prev => ({ ...prev, [postId]: true }));
@@ -559,10 +568,10 @@ export function AdminPostulaciones() {
                     updatingIds[post.id] ? 'opacity-50 cursor-not-allowed' : ''
                   }`}
                 >
-                  <option value="PENDIENTE">Pendiente</option>
-                  <option value="EN_REVISION">En Revisión</option>
-                  <option value="ACEPTADA">Aceptada</option>
-                  <option value="RECHAZADA">Rechazada</option>
+                  <option value="PENDIENTE">Pendiente (Inicial)</option>
+                  <option value="EN_REVISION">Enviar a Profesor</option>
+                  <option value="ACEPTADA">Aceptar Postulación (Final)</option>
+                  <option value="RECHAZADA">Rechazar Postulación (Final)</option>
                 </select>
                 <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-600 pointer-events-none" />
               </div>
@@ -609,7 +618,7 @@ export function AdminPostulaciones() {
               <div className="mb-6 p-4 rounded-2xl bg-white/[0.02] border border-white/5 flex gap-3 text-[10px] text-slate-400 leading-relaxed">
                 <AlertCircle className="text-sud-orange shrink-0 mt-0.5" size={14} />
                 <p>
-                  La audición es una evaluación complementaria de la postulación. El profesor asignado revisará al postulante y registrará un puntaje, resultado y observaciones para apoyar la decisión final del administrador.
+                  La audición es una evaluación asignada al profesor. Al programar la audición, la postulación pasará al panel del profesor asignado para su evaluación.
                 </p>
               </div>
 

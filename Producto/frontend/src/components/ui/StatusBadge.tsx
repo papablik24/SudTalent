@@ -2,7 +2,7 @@ import React from 'react';
 
 type BadgeVariant = 
   | 'ACTIVA' | 'BORRADOR' | 'CERRADA' | 'ARCHIVADA'
-  | 'PENDIENTE' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA'
+  | 'PENDIENTE' | 'EN_REVISION' | 'ACEPTADA' | 'RECHAZADA' | 'CANCELADA'
   | 'APPROVED' | 'INACTIVE' | 'PENDING' | 'VENCIDA';
 
 interface StatusBadgeProps {
@@ -22,6 +22,7 @@ const BADGE_CONFIG: Record<string, { label: string; bg: string; text: string; bo
   EN_REVISION:  { label: 'En Revisión',  bg: 'bg-sky-500/10',      text: 'text-sky-400',      border: 'border-sky-500/20' },
   ACEPTADA:     { label: 'Aceptada',     bg: 'bg-emerald-500/10',  text: 'text-emerald-400',  border: 'border-emerald-500/20' },
   RECHAZADA:    { label: 'Rechazada',    bg: 'bg-red-500/10',      text: 'text-red-400',      border: 'border-red-500/20' },
+  CANCELADA:    { label: 'Cancelada',    bg: 'bg-slate-500/10',    text: 'text-slate-400',    border: 'border-slate-500/20' },
   // Profile states
   APPROVED:  { label: 'Aprobado',  bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/20' },
   INACTIVE:  { label: 'Inactivo',  bg: 'bg-slate-500/10',   text: 'text-slate-400',   border: 'border-slate-500/20' },

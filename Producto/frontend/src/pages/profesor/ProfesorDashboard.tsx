@@ -1010,8 +1010,8 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                     <p className="text-slate-400 font-black uppercase tracking-widest text-xs">
                       No tienes audiciones programadas
                     </p>
-                    <p className="text-slate-500 text-[10px] font-medium leading-relaxed max-w-xs mx-auto">
-                      Las audiciones para evaluar postulantes serán programadas por el administrador de la plataforma.
+                    <p className="text-slate-500 text-[10px] font-medium leading-relaxed max-w-sm mx-auto">
+                      Las postulaciones aparecen aquí cuando el administrador las asigna.
                     </p>
                   </div>
                 )}

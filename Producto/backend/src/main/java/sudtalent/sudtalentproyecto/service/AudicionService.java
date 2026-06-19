@@ -22,6 +22,7 @@ import sudtalent.sudtalentproyecto.repository.AudicionRepository;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
 import sudtalent.sudtalentproyecto.repository.ProfesorRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.service.NotificacionService;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +33,7 @@ public class AudicionService {
     private final PostulacionRepository postulacionRepository;
     private final UserRepository userRepository;
     private final ProfesorRepository profesorRepository;
+    private final NotificacionService notificacionService;
 
     public AudicionDTO programarAudicion(AudicionRequestDTO request) {
         if (request.getPostulacionId() == null) {
@@ -91,6 +93,10 @@ public class AudicionService {
             throw new RuntimeException("No se permite evaluar una audición cancelada");
         }
 
+        if (audicion.getPostulacion() != null && "CANCELADA".equals(audicion.getPostulacion().getEstado())) {
+            throw new RuntimeException("No se permite evaluar una audición de una postulación cancelada");
+        }
+
         UUID authenticatedUserId = resolveUserId(authentication);
         if (!audicion.getProfesor().getUsuarioId().equals(authenticatedUserId)) {
             throw new org.springframework.security.access.AccessDeniedException("No tienes permisos para evaluar esta audición (no te pertenece)");
@@ -111,7 +117,35 @@ public class AudicionService {
         audicion.setEstado("EVALUADA");
         audicion.setUpdatedAt(LocalDateTime.now());
 
-        return toDTO(audicionRepository.save(audicion));
+        Audicion savedAudicion = audicionRepository.save(audicion);
+
+        // Actualizar el estado de la postulación asociada
+        Postulacion postulacion = savedAudicion.getPostulacion();
+        if (postulacion != null) {
+            String nuevoEstado = "APROBADA".equals(res) ? "ACEPTADA" : "RECHAZADA";
+            postulacion.setEstado(nuevoEstado);
+            postulacion.setUpdatedAt(LocalDateTime.now());
+            postulacionRepository.save(postulacion);
+
+            // Registrar notificación persistente en el sistema
+            if (postulacion.getAlumno() != null) {
+                try {
+                    String convTitulo = postulacion.getConvocatoria() != null ? postulacion.getConvocatoria().getTitulo() : "Convocatoria";
+                    notificacionService.crearNotificacion(
+                            postulacion.getAlumno(),
+                            "Estado de postulación actualizado",
+                            "Tu postulación a '" + convTitulo + "' fue " + nuevoEstado + ".",
+                            "POSTULACION",
+                            postulacion.getId(),
+                            "POSTULACION"
+                    );
+                } catch (Exception e) {
+                    System.err.println("Error enviando notificación de postulación: " + e.getMessage());
+                }
+            }
+        }
+
+        return toDTO(savedAudicion);
     }
 
     @Transactional(readOnly = true)
@@ -125,6 +159,10 @@ public class AudicionService {
     public List<AudicionDTO> listarPorProfesorLogueado(Authentication authentication) {
         UUID authenticatedUserId = resolveUserId(authentication);
         return audicionRepository.findByProfesorId(authenticatedUserId).stream()
+                .filter(a -> !"CANCELADA".equals(a.getEstado()) 
+                             && a.getPostulacion() != null 
+                             && !"CANCELADA".equals(a.getPostulacion().getEstado()) 
+                             && a.getPostulacion().getDeletedAt() == null)
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }

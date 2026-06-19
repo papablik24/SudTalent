@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, CheckCircle, XCircle, Briefcase, ArrowRight, X, AudioLines, Sparkles } from 'lucide-react';
+import { FileText, Calendar, Search, ChevronDown, Clock, AlertCircle, CheckCircle, XCircle, Briefcase, ArrowRight, X, AudioLines, Sparkles, MapPin, Link as LinkIcon } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile } from '../../types';
 import { StatusBadge } from '../../components/ui/StatusBadge';
@@ -80,7 +80,7 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
     if (!postToCancelId) return;
     try {
       await postulacionService.updatePostulacion(postToCancelId, { estado: 'CANCELADA' });
-      setPostulaciones(prev => prev.map(p => p.id === postToCancelId ? { ...p, estado: 'CANCELADA' as any } : p));
+      setPostulaciones(prev => prev.map(p => p.id === postToCancelId ? { ...p, estado: 'CANCELADA' } : p));
     } catch (err: any) {
       showToast(err.message || 'Error al cancelar la postulación.');
     } finally {
@@ -456,6 +456,66 @@ export function UserPostulacionesView({ user }: { user: UserProfile }) {
                   <p className="text-sm text-slate-500 italic">No se asoció ninguna demo de voz a esta postulación.</p>
                 )}
               </div>
+
+              {/* Información de Audición/Evaluación */}
+              {selectedPost.audicionEstado && (
+                <div className="space-y-3 border-t border-white/5 pt-4 animate-in fade-in duration-200">
+                  <h4 className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">
+                    {selectedPost.audicionEstado === 'EVALUADA' ? 'Resultado de la Audición' : 'Audición Programada'}
+                  </h4>
+                  <div className="p-4 bg-white/[0.02] border border-white/5 rounded-2xl space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] uppercase font-black tracking-widest text-slate-500">Estado de Audición:</span>
+                      <span className={`text-[8px] font-black uppercase tracking-widest px-2.5 py-1 rounded border ${
+                        selectedPost.audicionEstado === 'EVALUADA'
+                          ? selectedPost.audicionResultado === 'APROBADA'
+                            ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-400 border-red-500/20'
+                          : selectedPost.audicionEstado === 'CANCELADA'
+                            ? 'bg-slate-600/10 text-slate-400 border-white/10'
+                            : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                      }`}>
+                        {selectedPost.audicionEstado === 'EVALUADA'
+                          ? `EVALUADA • ${selectedPost.audicionResultado}`
+                          : selectedPost.audicionEstado}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-[11px] text-slate-300">
+                      <div>
+                        <p className="flex items-center gap-1.5"><Calendar size={12} className="text-slate-500" /> <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider">Fecha/Hora:</span> {selectedPost.audicionFecha} a las {selectedPost.audicionHora}</p>
+                      </div>
+                      <div>
+                        <p className="flex items-center gap-1.5"><MapPin size={12} className="text-slate-500" /> <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider">Lugar ({selectedPost.audicionModalidad}):</span> {selectedPost.audicionLugar}</p>
+                      </div>
+                    </div>
+
+                    {selectedPost.audicionLink && (
+                      <p className="text-[11px] text-slate-300 flex items-center gap-1.5 truncate">
+                        <LinkIcon size={12} className="text-slate-500 shrink-0" />
+                        <span className="font-bold text-slate-500 text-[9px] uppercase tracking-wider shrink-0">Enlace:</span>
+                        <a href={selectedPost.audicionLink.startsWith('http') ? selectedPost.audicionLink : `https://${selectedPost.audicionLink}`} target="_blank" rel="noopener noreferrer" className="text-sud-turquoise hover:underline truncate">
+                          {selectedPost.audicionLink}
+                        </a>
+                      </p>
+                    )}
+
+                    {selectedPost.audicionEstado === 'EVALUADA' && (
+                      <div className="mt-2.5 p-3 rounded-xl bg-black/40 border border-white/5 space-y-1.5">
+                        <div className="flex items-center justify-between">
+                          <span className="text-[9px] uppercase font-black tracking-widest text-slate-500">Puntaje Recibido:</span>
+                          <span className="text-sm font-black text-white">{selectedPost.audicionPuntaje}/100</span>
+                        </div>
+                        {selectedPost.audicionObservaciones && (
+                          <p className="text-[10px] leading-relaxed text-slate-400 italic font-medium">
+                            "{selectedPost.audicionObservaciones}"
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
 
               {/* Botones de acción dentro del modal de detalle */}
               {(selectedPost.estado === 'PENDIENTE' || selectedPost.estado === 'EN_REVISION') && (

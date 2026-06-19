@@ -43,6 +43,18 @@ public class PostulacionDTO {
     private UUID voiceAudioId;
     private String voiceAudioTitle;
     private String voiceAudioUrl;
+
+    // Audición info
+    private UUID audicionId;
+    private Integer audicionPuntaje;
+    private String audicionObservaciones;
+    private String audicionFecha;
+    private String audicionHora;
+    private String audicionModalidad;
+    private String audicionLugar;
+    private String audicionLink;
+    private String audicionEstado;
+    private String audicionResultado;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

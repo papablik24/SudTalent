@@ -32,6 +32,16 @@ export interface Postulacion {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
+  audicionId?: string;
+  audicionPuntaje?: number;
+  audicionObservaciones?: string;
+  audicionFecha?: string;
+  audicionHora?: string;
+  audicionModalidad?: string;
+  audicionLugar?: string;
+  audicionLink?: string;
+  audicionEstado?: string;
+  audicionResultado?: string;
 }
 
 export interface CreatePostulacionDTO {

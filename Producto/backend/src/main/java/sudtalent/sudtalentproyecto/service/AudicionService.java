@@ -18,6 +18,7 @@ import sudtalent.sudtalentproyecto.model.Postulacion;
 import sudtalent.sudtalentproyecto.model.Profesor;
 import sudtalent.sudtalentproyecto.model.User;
 import sudtalent.sudtalentproyecto.model.Convocatoria;
+import sudtalent.sudtalentproyecto.model.VoiceAudio;
 import sudtalent.sudtalentproyecto.repository.AudicionRepository;
 import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
 import sudtalent.sudtalentproyecto.repository.ProfesorRepository;
@@ -183,6 +184,7 @@ public class AudicionService {
         User profUser = prof != null ? prof.getUsuario() : null;
         Postulacion post = a.getPostulacion();
         Convocatoria conv = post != null ? post.getConvocatoria() : null;
+        VoiceAudio voiceAudio = post != null ? post.getVoiceAudio() : null;
 
         return AudicionDTO.builder()
                 .id(a.getId())
@@ -205,6 +207,9 @@ public class AudicionService {
                 .puntaje(a.getPuntaje())
                 .observaciones(a.getObservaciones())
                 .resultado(a.getResultado())
+                .voiceAudioId(voiceAudio != null ? voiceAudio.getId() : null)
+                .voiceAudioTitle(voiceAudio != null ? voiceAudio.getTitle() : null)
+                .voiceAudioUrl(voiceAudio != null ? voiceAudio.getFileUrl() : null)
                 .createdAt(a.getCreatedAt())
                 .updatedAt(a.getUpdatedAt())
                 .build();

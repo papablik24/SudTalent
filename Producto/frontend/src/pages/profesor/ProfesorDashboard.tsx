@@ -28,6 +28,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { UserProfile, CursoDTO } from '../../types';
 import { profesorService, ProfesorDTO, ProfesorAlumnoDTO } from '../../services/profesorService';
 import { cursoService } from '../../services/cursoService';
+import { AudioPlayer } from '../../components/ui/AudioPlayer';
 import { anuncioService, AnuncioDTO } from '../../services/anuncioService';
 import { convocatoriaService, Convocatoria } from '../../services/convocatoriaService';
 import { agendaService, AgendaEventoDTO } from '../../services/agendaService';
@@ -241,6 +242,26 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
       setAudicionesError(err.message || 'Error al cargar tus audiciones asignadas.');
     } finally {
       setLoadingAudiciones(false);
+    }
+  };
+
+  const handleDownloadAudio = async (url: string, title: string) => {
+    try {
+      const response = await fetch(url);
+      if (!response.ok) throw new Error('Error al descargar');
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = downloadUrl;
+      const extension = url.split('.').pop()?.split('?')[0] || 'mp3';
+      link.download = `${title}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (err) {
+      console.error('Error al descargar el audio:', err);
+      alert('No se pudo descargar el archivo de audio.');
     }
   };
 
@@ -623,7 +644,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
   return (
     <div className="w-full relative">
       {/* Main Content Area */}
-      <div className="max-w-5xl mx-auto px-6 py-6 z-10 w-full relative">
+      <div className={`${activeView === 'audiciones' ? 'max-w-[1450px]' : 'max-w-5xl'} mx-auto px-6 py-6 z-10 w-full relative`}>
         {/* Visual Toast Notification */}
         {toastMessage && (
           <div className="fixed top-24 right-6 md:right-12 z-[100] max-w-sm w-full bg-[#121212]/95 border border-sud-orange/30 backdrop-blur-md rounded-2xl p-4 shadow-2xl flex items-start gap-3 animate-in fade-in slide-in-from-top-4 duration-300">
@@ -985,6 +1006,27 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                           </div>
                         )}
 
+                        {/* Audio Player in the Card */}
+                        <div className="pt-2.5 border-t border-white/5 space-y-1.5 animate-in fade-in duration-200">
+                          <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                            Demo enviada por el postulante
+                          </p>
+                          {aud.voiceAudioUrl ? (
+                            <div className="bg-white/[0.01] border border-white/5 rounded-xl p-2">
+                              <AudioPlayer
+                                src={aud.voiceAudioUrl}
+                                title={aud.voiceAudioTitle || 'Demo de voz'}
+                                showVolume
+                                onDownload={() => handleDownloadAudio(aud.voiceAudioUrl!, aud.voiceAudioTitle || 'demo')}
+                              />
+                            </div>
+                          ) : (
+                            <p className="text-[9px] text-amber-500 italic font-medium pl-1">
+                              Esta postulación no tiene demo asociada.
+                            </p>
+                          )}
+                        </div>
+
                         {aud.estado === 'PROGRAMADA' && (
                           <div className="pt-3 border-t border-white/5 flex justify-end">
                             <button
@@ -1018,7 +1060,7 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
               </div>
 
               {/* Evaluation Form */}
-              <div className="space-y-6">
+              <div className="space-y-6 lg:sticky lg:top-24 self-start">
                 <h3 className="text-md font-black text-white uppercase tracking-tight border-b border-white/5 pb-2 flex items-center justify-between gap-2">
                   <span className="flex items-center gap-2">
                     <Award className="text-sud-orange" size={18} />
@@ -1039,6 +1081,35 @@ export function ProfesorDashboard({ user, onLogout }: ProfesorDashboardProps) {
                       <p className="font-bold text-white uppercase">Evaluando a:</p>
                       <p>{evaluatingAudicion.alumnoNombre}</p>
                       <p className="text-[8px] uppercase tracking-wider text-slate-500">{evaluatingAudicion.convocatoriaTitulo}</p>
+                    </div>
+
+                    {/* Demo del alumno */}
+                    <div className="space-y-2 pt-2 border-t border-white/5 animate-in fade-in duration-200">
+                      <p className="text-[8px] font-black text-slate-500 uppercase tracking-widest">
+                        Demo de Voz del Alumno
+                      </p>
+                      {evaluatingAudicion.voiceAudioUrl ? (
+                        <div className="p-3 bg-white/[0.02] border border-white/5 rounded-xl space-y-2">
+                          <p className="text-[10px] text-sud-turquoise font-black uppercase tracking-widest truncate">
+                            {evaluatingAudicion.voiceAudioTitle || 'Demo sin título'}
+                          </p>
+                          <AudioPlayer
+                            src={evaluatingAudicion.voiceAudioUrl}
+                            title={evaluatingAudicion.voiceAudioTitle || 'Demo de voz'}
+                            showVolume
+                            compact={true}
+                            onDownload={() => handleDownloadAudio(evaluatingAudicion.voiceAudioUrl!, evaluatingAudicion.voiceAudioTitle || 'demo')}
+                          />
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-amber-500/5 border border-amber-500/20 rounded-xl flex items-start gap-2 text-amber-400">
+                          <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                          <div className="space-y-0.5">
+                            <p className="text-[10px] font-black uppercase tracking-widest">Advertencia de Evaluación</p>
+                            <p className="text-[9px] leading-relaxed font-medium">Esta postulación no tiene demo asociada. Se recomienda precaución al evaluar.</p>
+                          </div>
+                        </div>
+                      )}
                     </div>
 
                     {/* Puntaje */}

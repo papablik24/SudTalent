@@ -41,6 +41,11 @@ export interface Audicion {
 
   createdAt: string;
   updatedAt: string;
+
+  // VoiceAudio Info
+  voiceAudioId?: string;
+  voiceAudioTitle?: string;
+  voiceAudioUrl?: string;
 }
 
 export interface AudicionRequestPayload {

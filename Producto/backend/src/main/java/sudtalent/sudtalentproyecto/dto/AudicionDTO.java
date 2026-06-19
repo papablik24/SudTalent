@@ -43,6 +43,11 @@ public class AudicionDTO {
     private Integer puntaje;
     private String observaciones;
     private String resultado; // PENDIENTE, APROBADA, RECHAZADA
+
+    // VoiceAudio Info
+    private UUID voiceAudioId;
+    private String voiceAudioTitle;
+    private String voiceAudioUrl;
     
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

@@ -6,6 +6,7 @@ interface AudioPlayerProps {
   title?: string;
   onDownload?: () => void;
   showVolume?: boolean;
+  compact?: boolean;
 }
 
 export const AudioPlayer: React.FC<AudioPlayerProps> = ({
@@ -13,6 +14,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   title,
   onDownload,
   showVolume = false,
+  compact = false,
 }) => {
   const audioRef = useRef<HTMLAudioElement>(null);
   const volumeAreaRef = useRef<HTMLDivElement>(null);
@@ -96,12 +98,13 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
   }
 
   return (
-    <div className="w-full bg-black/30 border border-white/10 rounded-xl p-4">
+    <div className={`w-full bg-black/30 border border-white/10 rounded-xl min-w-0 overflow-hidden ${compact ? 'p-2.5' : 'p-4'}`}>
       <audio ref={audioRef} src={src} crossOrigin="anonymous" />
 
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-2 md:gap-3">
         {/* Play */}
         <button
+          type="button"
           onClick={togglePlay}
           disabled={isLoading}
           className="w-10 h-10 rounded-full bg-sud-orange/20 hover:bg-sud-orange/30 flex items-center justify-center transition-colors disabled:opacity-50 shrink-0"
@@ -147,13 +150,14 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         <span className="text-xs text-slate-500 font-mono shrink-0">{formatTime(duration)}</span>
 
         {/* Volumen — botón + slider estilo YouTube */}
-        {showVolume && (
+        {showVolume && !compact && (
           <div
             ref={volumeAreaRef}
             className="flex items-center gap-1.5 shrink-0"
             onMouseEnter={() => setVolumeHovered(true)}
           >
             <button
+              type="button"
               onClick={toggleMute}
               className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors"
               title={muted ? 'Activar sonido' : 'Silenciar'}
@@ -201,6 +205,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
         {/* Descarga */}
         {onDownload && (
           <button
+            type="button"
             onClick={onDownload}
             className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 flex items-center justify-center transition-colors shrink-0"
             title="Descargar"
@@ -211,7 +216,7 @@ export const AudioPlayer: React.FC<AudioPlayerProps> = ({
       </div>
 
       {title && (
-        <p className="text-xs text-slate-400 font-medium truncate mt-2">{title}</p>
+        <p className="text-[10px] text-slate-400 font-medium truncate mt-1.5">{title}</p>
       )}
     </div>
   );

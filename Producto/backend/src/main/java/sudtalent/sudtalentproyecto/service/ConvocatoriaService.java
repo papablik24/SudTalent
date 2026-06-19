@@ -4,12 +4,17 @@ import sudtalent.sudtalentproyecto.dto.ConvocatoriaDTO;
 import sudtalent.sudtalentproyecto.dto.ConvocatoriaRequestDTO;
 import sudtalent.sudtalentproyecto.model.Convocatoria;
 import sudtalent.sudtalentproyecto.model.User;
+import sudtalent.sudtalentproyecto.model.Postulacion;
+import sudtalent.sudtalentproyecto.model.Audicion;
 import sudtalent.sudtalentproyecto.repository.ConvocatoriaRepository;
 import sudtalent.sudtalentproyecto.repository.UserRepository;
+import sudtalent.sudtalentproyecto.repository.PostulacionRepository;
+import sudtalent.sudtalentproyecto.repository.AudicionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
@@ -24,6 +29,8 @@ public class ConvocatoriaService {
     private final ConvocatoriaRepository convocatoriaRepository;
     private final UserRepository userRepository;
     private final NotificacionService notificacionService;
+    private final PostulacionRepository postulacionRepository;
+    private final AudicionRepository audicionRepository;
 
     // ── Create ───────────────────────────────────────────────────────────
 
@@ -47,7 +54,7 @@ public class ConvocatoriaService {
     // ── Read ─────────────────────────────────────────────────────────────
 
     public List<ConvocatoriaDTO> getAllConvocatorias() {
-        return convocatoriaRepository.findAll().stream()
+        return convocatoriaRepository.findAllActive().stream()
                 .map(this::toDTO)
                 .collect(Collectors.toList());
     }
@@ -124,10 +131,55 @@ public class ConvocatoriaService {
         }
     }
 
-    // ── Delete ───────────────────────────────────────────────────────────
-
     public void deleteConvocatoria(UUID id) {
-        convocatoriaRepository.deleteById(id);
+        Convocatoria conv = convocatoriaRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Convocatoria no encontrada"));
+        
+        List<Postulacion> postulaciones = postulacionRepository.findByConvocatoriaId(id);
+        if (postulaciones != null) {
+            for (Postulacion p : postulaciones) {
+                // Postulaciones en estados no finales se cancelan (pero no se les pone deletedAt para que sigan visibles en historial)
+                if (!"ACEPTADA".equals(p.getEstado()) && !"RECHAZADA".equals(p.getEstado()) && !"CANCELADA".equals(p.getEstado())) {
+                    p.setEstado("CANCELADA");
+                    p.setUpdatedAt(LocalDateTime.now());
+                    postulacionRepository.save(p);
+                    
+                    // Cancelar audiciones asociadas que no estén evaluadas
+                    List<Audicion> audiciones = audicionRepository.findByPostulacionId(p.getId());
+                    if (audiciones != null) {
+                        for (Audicion a : audiciones) {
+                            if (!"EVALUADA".equals(a.getEstado()) && !"CANCELADA".equals(a.getEstado())) {
+                                a.setEstado("CANCELADA");
+                                a.setUpdatedAt(LocalDateTime.now());
+                                audicionRepository.save(a);
+                            }
+                        }
+                    }
+                    
+                    // Notificar al alumno
+                    if (p.getAlumno() != null) {
+                        try {
+                            String mensajeNotif = "La convocatoria '" + conv.getTitulo() + "' fue eliminada. Tu postulación fue cancelada.";
+                            notificacionService.crearNotificacion(
+                                    p.getAlumno(),
+                                    "Convocatoria eliminada",
+                                    mensajeNotif,
+                                    "POSTULACION",
+                                    p.getId(),
+                                    "POSTULACION"
+                            );
+                        } catch (Exception e) {
+                            System.err.println("Error enviando notificación por eliminación de convocatoria: " + e.getMessage());
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Soft delete de la convocatoria
+        conv.setDeletedAt(LocalDateTime.now());
+        conv.setUpdatedAt(LocalDateTime.now());
+        convocatoriaRepository.save(conv);
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────

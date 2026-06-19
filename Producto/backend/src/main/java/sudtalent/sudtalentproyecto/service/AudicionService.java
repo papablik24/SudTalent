@@ -74,7 +74,41 @@ public class AudicionService {
                 .updatedAt(LocalDateTime.now())
                 .build();
 
-        return toDTO(audicionRepository.save(audicion));
+        Audicion saved = audicionRepository.save(audicion);
+
+        // Notificar al profesor asignado
+        boolean alreadyNotified = false;
+        List<Audicion> existing = audicionRepository.findByPostulacionId(postulacion.getId());
+        if (existing != null) {
+            for (Audicion a : existing) {
+                if (!a.getId().equals(saved.getId()) && 
+                    a.getProfesor().getUsuarioId().equals(profesor.getUsuarioId()) && 
+                    !"CANCELADA".equals(a.getEstado())) {
+                    alreadyNotified = true;
+                    break;
+                }
+            }
+        }
+
+        if (!alreadyNotified && profesor.getUsuario() != null) {
+            try {
+                String nombrePostulante = alumno.getName();
+                String tituloConv = postulacion.getConvocatoria() != null ? postulacion.getConvocatoria().getTitulo() : "Convocatoria";
+                String mensaje = "Se te asignó una audición para '" + nombrePostulante + "' en la convocatoria '" + tituloConv + "'.";
+                notificacionService.crearNotificacion(
+                        profesor.getUsuario(),
+                        "Nueva audición asignada",
+                        mensaje,
+                        "AUDICION",
+                        saved.getId(),
+                        "AUDICION"
+                );
+            } catch (Exception e) {
+                System.err.println("Error enviando notificación al profesor: " + e.getMessage());
+            }
+        }
+
+        return toDTO(saved);
     }
 
     public AudicionDTO cancelarAudicion(UUID id) {

@@ -155,6 +155,14 @@ export function Sidebar({ role, user, currentPath, onLogout, onNavigate }: Sideb
       } else {
         onNavigate('/convocatorias');
       }
+    } else if (notif.tipo === 'AUDICION') {
+      if (role === 'PROFESOR') {
+        onNavigate('/profesor?view=audiciones');
+      } else if (role === 'ADMIN') {
+        onNavigate('/admin/postulaciones');
+      } else {
+        onNavigate('/mis-postulaciones');
+      }
     } else {
       if (role === 'ADMIN') {
         onNavigate('/admin');

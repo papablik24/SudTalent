@@ -658,7 +658,11 @@ export function ConvocatoriasAdmin() {
 
               <div className="space-y-2">
                 <h3 className="text-2xl font-black text-white uppercase tracking-tight">Eliminar convocatoria</h3>
-                <p className="text-sm text-slate-400 leading-relaxed">Esta acción eliminará la convocatoria seleccionada. ¿Deseas continuar?</p>
+                <p className="text-sm text-slate-400 leading-relaxed">
+                  {convToDeleteId && (postCountMap[convToDeleteId] || 0) > 0
+                    ? "Esta convocatoria tiene postulantes asociados. Si la eliminas, se ocultará de la plataforma y se cancelarán las postulaciones/audiciones pendientes asociadas. ¿Deseas continuar?"
+                    : "Esta acción eliminará la convocatoria seleccionada. ¿Deseas continuar?"}
+                </p>
               </div>
 
               <div className="flex gap-4">
@@ -677,7 +681,7 @@ export function ConvocatoriasAdmin() {
                   }}
                   className="flex-1 h-12 rounded-xl bg-red-500 text-black hover:bg-red-600 text-xs font-black uppercase tracking-widest transition-all cursor-pointer"
                 >
-                  Eliminar
+                  {convToDeleteId && (postCountMap[convToDeleteId] || 0) > 0 ? "Eliminar convocatoria" : "Eliminar"}
                 </button>
               </div>
             </motion.div>

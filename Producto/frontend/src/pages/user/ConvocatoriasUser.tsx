@@ -125,7 +125,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const selectedConvDescripcion = selectedConv?.descripcion || '';
   const selectedConvRequisitos = selectedConv?.requisitos || [];
   const selectedConvFechaLimite = selectedConv?.fechaLimite || '';
-  const selectedPostulacion = selectedConv ? myPostulaciones[selectedConv.id] : undefined;
+  const selectedPostulacion = selectedConv && myPostulaciones[selectedConv.id]?.estado !== 'CANCELADA' ? myPostulaciones[selectedConv.id] : undefined;
 
   // Applying state
   const [applyingId, setApplyingId] = useState<string | null>(null);
@@ -483,7 +483,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
       {/* Cards */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
         {filtered.map(conv => {
-          const hasApplied = !!myPostulaciones[conv.id];
+          const hasApplied = !!myPostulaciones[conv.id] && myPostulaciones[conv.id].estado !== 'CANCELADA';
           const days = daysRemaining(conv.fechaLimite);
           const isFavorite = favoritasIds.includes(conv.id);
           return (

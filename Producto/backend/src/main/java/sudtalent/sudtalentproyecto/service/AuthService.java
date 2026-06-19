@@ -17,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +29,9 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final JwtUtils jwtUtils;
     private final UserDetailsService userDetailsService;
+
+    @jakarta.persistence.PersistenceContext
+    private jakarta.persistence.EntityManager entityManager;
 
     @Value("${app.cookie.name}")
     private String cookieName;
@@ -54,6 +58,7 @@ public class AuthService {
         setJwtCookie(response, token);
 
         var user = userRepository.findByEmailActive(email).orElseThrow();
+        ensureAlumnoRowExists(user);
         autoFixOnboarding(user);
         return toResponse(user, token);
     }
@@ -80,16 +85,30 @@ public class AuthService {
                 "Este número no está autorizado para registrarse en SudTalent. Contacta a la administración de Sudamerican Voices.");
         }
 
-        // 4. Verificar si ya existe un usuario con este teléfono
+        // 4. Verificar si ya existe un usuario con este teléfono o email y comprobar si es un placeholder
+        User user = null;
         var existingUserByPhone = userRepository.findByPhoneActive(phone);
         if (existingUserByPhone.isPresent()) {
-            throw new IllegalArgumentException(
-                "Este número ya tiene una cuenta registrada. Inicia sesión.");
+            User u = existingUserByPhone.get();
+            if (isPlaceholderUser(u, phone)) {
+                user = u;
+            } else {
+                throw new IllegalArgumentException("Este número ya tiene una cuenta registrada. Inicia sesión.");
+            }
         }
 
-        // 5. Verificar si el email ya está registrado
-        if (userRepository.existsByEmail(request.email())) {
-            throw new IllegalArgumentException("El correo electrónico ya está registrado.");
+        var existingUserByEmail = userRepository.findByEmailActive(request.email());
+        if (existingUserByEmail.isPresent()) {
+            User u = existingUserByEmail.get();
+            if (isPlaceholderUser(u, phone)) {
+                if (user == null) {
+                    user = u;
+                } else if (!user.getId().equals(u.getId())) {
+                    throw new IllegalArgumentException("El correo electrónico ya está registrado.");
+                }
+            } else {
+                throw new IllegalArgumentException("El correo electrónico ya está registrado.");
+            }
         }
 
         // 6. Usar el nombre de la whitelist si el del request no es confiable
@@ -97,17 +116,30 @@ public class AuthService {
             ? request.name().trim()
             : (wl.getName() != null && !wl.getName().isBlank() ? wl.getName() : "");
 
-        // 7. Crear usuario
-        var user = User.builder()
-                .name(finalName)
-                .email(request.email())
-                .password(passwordEncoder.encode(request.password()))
-                .phone(phone)
-                .role(User.Role.ALUMNO)
-                .onboarded(false)
-                .build();
-
-        user = userRepository.save(user);
+        // 7. Crear o actualizar usuario
+        if (user != null) {
+            user.setName(finalName);
+            user.setEmail(request.email());
+            user.setPassword(passwordEncoder.encode(request.password()));
+            user.setPhone(phone);
+            user.setOnboarded(false);
+            if (wl.getRole() != null) {
+                user.setRole(wl.getRole());
+            }
+            user = userRepository.save(user);
+        } else {
+            User.Role registeredRole = wl.getRole() != null ? wl.getRole() : User.Role.ALUMNO;
+            user = User.builder()
+                    .name(finalName)
+                    .email(request.email())
+                    .password(passwordEncoder.encode(request.password()))
+                    .phone(phone)
+                    .role(registeredRole)
+                    .onboarded(false)
+                    .build();
+            user = userRepository.save(user);
+        }
+        ensureAlumnoRowExists(user);
 
         // 8. Vincular la entrada whitelist con el nuevo usuario
         wl.setUser(user);
@@ -125,6 +157,40 @@ public class AuthService {
         setJwtCookie(response, token);
 
         return toResponse(user, token);
+    }
+
+    private boolean isPlaceholderUser(User u, String requestPhone) {
+        if (u.isOnboarded()) {
+            return false;
+        }
+        if (u.getPassword() == null) {
+            return true;
+        }
+        
+        // Probar formato de teléfono almacenado en BD
+        if (u.getPhone() != null) {
+            String dbPhone = u.getPhone();
+            if (passwordEncoder.matches("whitelist_" + dbPhone + "_sud2026", u.getPassword())) {
+                return true;
+            }
+            String dbNormalized = normalizePhone(dbPhone);
+            if (passwordEncoder.matches("whitelist_" + dbNormalized + "_sud2026", u.getPassword())) {
+                return true;
+            }
+        }
+        
+        // Probar formato del teléfono de la petición
+        if (requestPhone != null) {
+            if (passwordEncoder.matches("whitelist_" + requestPhone + "_sud2026", u.getPassword())) {
+                return true;
+            }
+            String reqNormalized = normalizePhone(requestPhone);
+            if (passwordEncoder.matches("whitelist_" + reqNormalized + "_sud2026", u.getPassword())) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     // ========== PHONE-BASED AUTH ==========
@@ -164,6 +230,7 @@ public class AuthService {
                 whitelistRepository.save(wl);
             }
             
+            ensureAlumnoRowExists(user);
             autoFixOnboarding(user);
             
             var userDetails = userDetailsService.loadUserByUsername(user.getEmail());
@@ -189,6 +256,7 @@ public class AuthService {
                     .build();
 
             user = userRepository.save(user);
+            ensureAlumnoRowExists(user);
             
             // Vincular whitelist con el nuevo usuario
             wl.setUser(user);
@@ -258,6 +326,7 @@ public class AuthService {
         user.setStatus(User.ProfileStatus.PENDING);
         
         userRepository.save(user);
+        ensureAlumnoRowExists(user);
 
         // Sincronizar whitelist si tiene entrada vinculada
         if (user.getPhone() != null) {
@@ -363,6 +432,27 @@ public class AuthService {
                 userRepository.save(user);
                 System.out.println("✅ Auto-onboarded user: " + user.getEmail() + " (data already complete)");
             }
+        }
+    }
+
+    /**
+     * Asegura la fila en la tabla 'alumnos' para los usuarios que posean el rol de alumno.
+     * Esto evita fallos de integridad referencial.
+     */
+    @Transactional
+    public void ensureAlumnoRowExists(User user) {
+        if (user == null || user.getRole() != User.Role.ALUMNO) {
+            return;
+        }
+        try {
+            entityManager.createNativeQuery(
+                "INSERT INTO alumnos (usuario_id, fecha_nacimiento, created_at, updated_at) " +
+                "VALUES (:id, NULL, NOW(), NOW()) ON CONFLICT (usuario_id) DO NOTHING"
+            ).setParameter("id", user.getId()).executeUpdate();
+            entityManager.flush();
+            System.out.println("✅ Asegurada fila en alumnos para el usuario: " + user.getId());
+        } catch (Exception e) {
+            System.err.println("Error asegurando fila en alumnos: " + e.getMessage());
         }
     }
 

@@ -23,4 +23,7 @@ public interface PostulacionRepository extends SoftDeleteRepository<Postulacion>
     
     @Query("SELECT COUNT(p) FROM Postulacion p WHERE p.alumno.id = ?1")
     long countAllByAlumnoId(UUID alumnoId);
+
+    @Query("SELECT p FROM Postulacion p WHERE p.alumno.id = ?1 AND p.convocatoria.id = ?2")
+    List<Postulacion> findByAlumnoIdAndConvocatoriaId(UUID alumnoId, UUID convocatoriaId);
 }

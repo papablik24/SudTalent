@@ -37,60 +37,90 @@ public class PostulacionService {
     // ── Create ───────────────────────────────────────────────────────────
 
     public PostulacionDTO createPostulacion(PostulacionRequestDTO request, Authentication authentication) {
+        // 1. Validar usuario autenticado
+        if (authentication == null || !authentication.isAuthenticated()) {
+            throw new RuntimeException("Usuario no autenticado");
+        }
+        
         UUID userUUID = resolveUserId(request.getAlumnoId(), authentication);
+        User userObj = userRepository.findByIdActive(userUUID)
+                .orElseThrow(() -> new RuntimeException("Usuario no encontrado"));
 
-        // Verificar duplicado — incluye postulaciones canceladas/eliminadas
-        // para evitar violación de constraint UNIQUE en la BD
-        var existingAny = postulacionRepository.findAll().stream()
-                .filter(p -> p.getAlumno() != null
-                        && p.getAlumno().getId().equals(userUUID)
-                        && p.getConvocatoria() != null
-                        && p.getConvocatoria().getId().equals(request.getConvocatoriaId()))
-                .findFirst();
-
-        if (existingAny.isPresent()) {
-            Postulacion existing = existingAny.get();
-            if (existing.getDeletedAt() == null) {
-                throw new RuntimeException("Ya existe una postulación activa para esta convocatoria");
-            }
-            // Reactivar la postulación cancelada en lugar de crear una nueva
-            existing.setDeletedAt(null);
-            existing.setEstado("PENDIENTE");
-            existing.setFechaPostulacion(LocalDate.now());
-            existing.setUpdatedAt(java.time.LocalDateTime.now());
-            if (request.getMensaje() != null) existing.setMensaje(request.getMensaje());
-            if (request.getVoiceAudioId() != null) {
-                VoiceAudio audioRef = entityManager.find(VoiceAudio.class, request.getVoiceAudioId());
-                if (audioRef != null && !audioRef.isDeleted() && audioRef.getUser().getId().equals(userUUID)) {
-                    existing.setVoiceAudio(audioRef);
-                }
-            }
-            return toDTO(postulacionRepository.save(existing));
+        // 2. Validar que sea alumno
+        if (userObj.getRole() != User.Role.ALUMNO) {
+            throw new RuntimeException("Solo los alumnos pueden postular a convocatorias");
         }
 
-        // Verificar que la convocatoria no haya vencido
+        // 3. Asegurar fila en alumnos (herencia JOINED)
+        try {
+            entityManager.createNativeQuery(
+                "INSERT INTO alumnos (usuario_id, fecha_nacimiento, created_at, updated_at) " +
+                "VALUES (:id, NULL, NOW(), NOW()) ON CONFLICT (usuario_id) DO NOTHING"
+            ).setParameter("id", userUUID).executeUpdate();
+            entityManager.flush();
+            System.out.println("✅ Asegurada fila en alumnos para: " + userUUID);
+        } catch (Exception e) {
+            System.err.println("Error asegurando fila en alumnos: " + e.getMessage());
+        }
+
+        // 4. Validar convocatoria (existe, activa, no vencida)
         Convocatoria convCheck = entityManager.find(Convocatoria.class, request.getConvocatoriaId());
         if (convCheck == null) {
             throw new RuntimeException("Convocatoria no encontrada");
         }
+        if (!"ACTIVA".equals(convCheck.getEstado())) {
+            throw new RuntimeException("Esta convocatoria no está activa");
+        }
         if (convCheck.getFechaLimite() != null && LocalDate.now().isAfter(convCheck.getFechaLimite())) {
             throw new RuntimeException("El plazo de postulación para esta convocatoria ha vencido");
         }
-        if (!"ACTIVA".equals(convCheck.getEstado())) {
-            throw new RuntimeException("Esta convocatoria no está activa");
+
+        // 5. Validar demo seleccionada y que pertenezca al alumno
+        if (request.getVoiceAudioId() == null) {
+            throw new RuntimeException("Debes seleccionar una demo para postular");
+        }
+        VoiceAudio audioRef = entityManager.find(VoiceAudio.class, request.getVoiceAudioId());
+        if (audioRef == null || audioRef.isDeleted() || !audioRef.getUser().getId().equals(userUUID)) {
+            throw new RuntimeException("El audio seleccionado no pertenece al usuario o no es válido");
+        }
+
+        // 6. Validar que no exista una postulación activa previa para esa convocatoria
+        List<Postulacion> existingList = postulacionRepository.findByAlumnoIdAndConvocatoriaId(userUUID, request.getConvocatoriaId());
+        if (existingList != null && !existingList.isEmpty()) {
+            // Un duplicado activo es aquel que no está eliminado y NO está en estado CANCELADA
+            Postulacion activePostulation = existingList.stream()
+                .filter(p -> p.getDeletedAt() == null && !"CANCELADA".equals(p.getEstado()))
+                .findFirst()
+                .orElse(null);
+            
+            if (activePostulation != null) {
+                throw new RuntimeException("Ya existe una postulación activa para esta convocatoria");
+            }
+            
+            // Si la postulación existente está cancelada (y no eliminada), la reactivamos
+            Postulacion existingCancelled = existingList.stream()
+                .filter(p -> p.getDeletedAt() == null && "CANCELADA".equals(p.getEstado()))
+                .findFirst()
+                .orElse(null);
+
+            if (existingCancelled != null) {
+                existingCancelled.setDeletedAt(null);
+                existingCancelled.setEstado("PENDIENTE");
+                existingCancelled.setFechaPostulacion(LocalDate.now());
+                existingCancelled.setUpdatedAt(java.time.LocalDateTime.now());
+                if (request.getMensaje() != null) {
+                    existingCancelled.setMensaje(request.getMensaje());
+                } else {
+                    existingCancelled.setMensaje(null);
+                }
+                existingCancelled.setVoiceAudio(audioRef);
+                return toDTO(postulacionRepository.save(existingCancelled));
+            }
         }
 
         // Usar getReference para evitar cargar entidades completas
         User userRef = entityManager.getReference(User.class, userUUID);
         Convocatoria convRef = entityManager.getReference(Convocatoria.class, request.getConvocatoriaId());
-
-        VoiceAudio audioRef = null;
-        if (request.getVoiceAudioId() != null) {
-            audioRef = entityManager.find(VoiceAudio.class, request.getVoiceAudioId());
-            if (audioRef == null || audioRef.isDeleted() || !audioRef.getUser().getId().equals(userUUID)) {
-                throw new RuntimeException("El audio seleccionado no pertenece al usuario o no es válido");
-            }
-        }
 
         Postulacion postulacion = Postulacion.builder()
                 .alumno(userRef)

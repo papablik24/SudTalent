@@ -195,51 +195,40 @@ public class WhitelistService {
     // ==================== FUNCIONALIDAD 2: Crear usuario cuando se agrega a whitelist ====================
     
     public WhitelistNumberDTO createNumberWithUser(String phone, String name, String email, String roleStr) {
-        if(repository.findByPhone(phone).isPresent()) {
-            throw new IllegalArgumentException("Número ya existe en whitelist");
+        // Normalizar teléfono
+        String cleanPhone = phone != null ? phone.replaceAll("[^0-9]", "") : "";
+        if (cleanPhone.isEmpty()) {
+            throw new IllegalArgumentException("El número de teléfono no es válido.");
         }
-        
+
         // Normalizar valores: convertir strings vacíos a null para DB
         String finalName = (name != null && !name.trim().isEmpty()) ? name.trim() : null;
         String finalEmail = (email != null && !email.trim().isEmpty()) ? email.trim() : null;
         
         System.out.println("✅ createNumberWithUser:");
-        System.out.println("   phone: " + phone);
-        System.out.println("   name (input): " + name + " → (final): " + finalName);
-        System.out.println("   email (input): " + email + " → (final): " + finalEmail);
+        System.out.println("   phone: " + cleanPhone);
+        System.out.println("   name: " + finalName);
+        System.out.println("   email: " + finalEmail);
         
-        // Verificar si el usuario ya existe
-        var existingUser = userRepository.findByPhoneActive(phone);
+        // Buscar si ya existe en whitelist por teléfono
+        var existingWl = repository.findByPhone(cleanPhone);
+        if (existingWl.isEmpty() && finalEmail != null) {
+            existingWl = repository.findAll().stream()
+                .filter(w -> finalEmail.equalsIgnoreCase(w.getEmail()))
+                .findFirst();
+        }
+        
+        // Verificar si el usuario ya existe por teléfono o por email (usuario real o placeholder)
+        var existingUser = userRepository.findByPhoneActive(cleanPhone);
         User user = null;
         
-        if(existingUser.isEmpty()) {
-            // Crear nuevo usuario
-            String syntheticEmail = finalEmail != null ? finalEmail : phone + "@sudtalent.app";
-            String syntheticPassword = "whitelist_" + phone + "_sud2026";
-            
-            User.Role roleEnum = User.Role.ALUMNO;
-            if (roleStr != null) {
-                try {
-                    roleEnum = User.Role.valueOf(roleStr);
-                } catch(Exception e) {}
-            }
-
-            user = User.builder()
-                .name(finalName != null ? finalName : "")
-                .email(syntheticEmail)
-                .password(passwordEncoder.encode(syntheticPassword))
-                .phone(phone)
-                .role(roleEnum)
-                .onboarded(false)
-                .status(User.ProfileStatus.PENDING)
-                .active(true)
-                .build();
-            
-            user = userRepository.save(user);
-            System.out.println("✅ Nuevo usuario creado desde whitelist: " + phone);
-        } else {
+        if (existingUser.isEmpty() && finalEmail != null) {
+            existingUser = userRepository.findByEmailActive(finalEmail);
+        }
+        
+        if (existingUser.isPresent()) {
             user = existingUser.get();
-            System.out.println("ℹ️ Usuario ya existe: " + phone);
+            System.out.println("ℹ️ Usuario ya existe: " + user.getEmail());
         }
         
         User.Role roleEnumWL = User.Role.ALUMNO;
@@ -249,14 +238,27 @@ public class WhitelistService {
             } catch(Exception e) {}
         }
 
-        WhitelistNumber number = WhitelistNumber.builder()
-            .phone(phone)
-            .name(finalName)
-            .email(finalEmail)
-            .role(roleEnumWL != null ? roleEnumWL.name() : User.Role.ALUMNO.name())
-            .status(WhitelistNumber.Status.PENDIENTE)
-            .user(user)
-            .build();
+        WhitelistNumber number;
+        if (existingWl.isPresent()) {
+            number = existingWl.get();
+            if (cleanPhone != null && !cleanPhone.isEmpty()) {
+                number.setPhone(cleanPhone);
+            }
+            number.setName(finalName);
+            number.setEmail(finalEmail);
+            number.setRole(roleEnumWL != null ? roleEnumWL.name() : User.Role.ALUMNO.name());
+            number.setUser(user);
+            number.setUpdatedAt(LocalDateTime.now());
+        } else {
+            number = WhitelistNumber.builder()
+                .phone(cleanPhone)
+                .name(finalName)
+                .email(finalEmail)
+                .role(roleEnumWL != null ? roleEnumWL.name() : User.Role.ALUMNO.name())
+                .status(WhitelistNumber.Status.PENDIENTE)
+                .user(user)
+                .build();
+        }
         
         System.out.println("   Guardando whitelist con name=" + number.getName() + ", email=" + number.getEmail());
         WhitelistNumber saved = repository.save(number);

@@ -1,8 +1,9 @@
-// API_URL — en producción usa la URL de Railway, en desarrollo usa localhost
-const API_URL = import.meta.env.VITE_BACKEND_URL 
-  || (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-      ? 'https://sud-talent.up.railway.app/api' 
-      : 'http://localhost:8080/api');
+// API_URL — usa VITE_BACKEND_URL del .env si está definido,
+// si no: localhost en desarrollo (npm run dev) y Railway en producción (build)
+const API_URL = import.meta.env.VITE_BACKEND_URL
+  || (import.meta.env.DEV
+      ? 'http://localhost:8080/api'
+      : 'https://sud-talent.up.railway.app/api');
 
 // ==================== TOKEN MANAGEMENT ====================
 

@@ -24,7 +24,7 @@ export interface DemoDTO extends DemoUploadResult {
   description?: string;
 }
 
-const API_URL = 'http://localhost:8080/api/demos';
+const API_URL = `${import.meta.env.VITE_BACKEND_URL || (import.meta.env.DEV ? 'http://localhost:8080/api' : 'https://sud-talent.up.railway.app/api')}/demos`;
 
 export const demoService = {
   /**

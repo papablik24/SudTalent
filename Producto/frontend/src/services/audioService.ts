@@ -1,6 +1,7 @@
 import { supabase } from './supabaseClient';
 
-const API_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8080/api'
+const API_URL = import.meta.env.VITE_BACKEND_URL
+  || (import.meta.env.DEV ? 'http://localhost:8080/api' : 'https://sud-talent.up.railway.app/api');
 const SUPABASE_PROJECT_ID = import.meta.env.VITE_SUPABASE_PROJECT_ID || ''
 
 console.log('🔗 API_URL configurada como:', API_URL)

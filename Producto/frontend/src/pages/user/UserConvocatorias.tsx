@@ -57,6 +57,23 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
   const [editingPostulacion, setEditingPostulacion] = useState<Postulacion | null>(null);
   const [loadingEditId, setLoadingEditId] = useState<string | null>(null);
 
+  // Restricción: solo se puede editar la demo 1 vez por postulación
+  const EDIT_STORAGE_KEY = `sudtalent_edited_posts_${user.uid}`;
+  const [editedPostulaciones, setEditedPostulaciones] = useState<Set<string>>(() => {
+    try {
+      const stored = localStorage.getItem(`sudtalent_edited_posts_${user.uid}`);
+      return stored ? new Set(JSON.parse(stored)) : new Set();
+    } catch { return new Set(); }
+  });
+
+  const markAsEdited = (postulacionId: string) => {
+    setEditedPostulaciones(prev => {
+      const next = new Set(prev).add(postulacionId);
+      try { localStorage.setItem(EDIT_STORAGE_KEY, JSON.stringify([...next])); } catch {}
+      return next;
+    });
+  };
+
   // Favorites state
   const [favoritasIds, setFavoritasIds] = useState<string[]>([]);
   const [showOnlyFavorites, setShowOnlyFavorites] = useState(false);
@@ -279,6 +296,7 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
           voiceAudioId: selectedDemoId,
         });
         setMyPostulaciones(prev => ({ ...prev, [applyingConv.id]: updated }));
+        markAsEdited(editingPostulacion.id);
         setApplySuccess(applyingConv.id);
         setShowDemoSelectorModal(false);
         setApplyingConv(null);
@@ -556,11 +574,14 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                         </button>
                         <button
                           onClick={(e) => { e.stopPropagation(); handleEditPostulacion(myPostulaciones[conv.id], conv); }}
-                          disabled={loadingEditId === myPostulaciones[conv.id].id}
-                          className="w-full sm:flex-1 py-3.5 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all text-center flex items-center justify-center gap-1 disabled:opacity-50 disabled:pointer-events-none min-w-0"
+                          disabled={loadingEditId === myPostulaciones[conv.id].id || editedPostulaciones.has(myPostulaciones[conv.id].id)}
+                          title={editedPostulaciones.has(myPostulaciones[conv.id].id) ? 'Solo puedes editar la demo una vez' : undefined}
+                          className="w-full sm:flex-1 py-3.5 px-4 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-300 transition-all text-center flex items-center justify-center gap-1 disabled:opacity-40 disabled:pointer-events-none disabled:cursor-not-allowed min-w-0"
                         >
                           {loadingEditId === myPostulaciones[conv.id].id ? (
                             <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin mx-auto shrink-0" />
+                          ) : editedPostulaciones.has(myPostulaciones[conv.id].id) ? (
+                            <span className="flex items-center gap-1 truncate"><span className="truncate">Demo Editada</span> <CheckCircle2 size={12} className="shrink-0 text-sud-turquoise" /></span>
                           ) : (
                             <span className="flex items-center gap-1 truncate"><span className="truncate">Editar Demo</span> <Sparkles size={12} className="shrink-0" /></span>
                           )}
@@ -709,11 +730,14 @@ export function ConvocatoriasUser({ user }: { user: UserProfile }) {
                           </button>
                           <button
                             onClick={(e) => { e.stopPropagation(); selectedConv && handleEditPostulacion(selectedPostulacion, selectedConv); }}
-                            disabled={loadingEditId === selectedPostulacion.id}
-                            className="flex-1 h-14 rounded-[1.5rem] flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all cursor-pointer text-center disabled:opacity-50 disabled:pointer-events-none"
+                            disabled={loadingEditId === selectedPostulacion.id || editedPostulaciones.has(selectedPostulacion.id)}
+                            title={editedPostulaciones.has(selectedPostulacion.id) ? 'Solo puedes editar la demo una vez' : undefined}
+                            className="flex-1 h-14 rounded-[1.5rem] flex items-center justify-center gap-2 text-xs font-black uppercase tracking-widest sud-btn-primary hover:scale-[1.02] transition-all cursor-pointer text-center disabled:opacity-40 disabled:pointer-events-none disabled:cursor-not-allowed disabled:scale-100"
                           >
                             {loadingEditId === selectedPostulacion.id ? (
                               <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin mx-auto" />
+                            ) : editedPostulaciones.has(selectedPostulacion.id) ? (
+                              <>Demo ya editada <CheckCircle2 size={16} /></>
                             ) : (
                               <>Editar Demo <Sparkles size={16} /></>
                             )}

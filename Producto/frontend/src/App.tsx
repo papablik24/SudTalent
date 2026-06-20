@@ -12,7 +12,7 @@ import { AdminProfesores } from './pages/admin/AdminProfesores';
 import { AdminCursos } from './pages/admin/AdminCursos';
 import { AdminReports } from './pages/admin/AdminReports';
 import { UserCursosView } from './pages/user/UserCursosView';
-import { ConvocatoriasUser } from './pages/user/ConvocatoriasUser';
+import { ConvocatoriasUser } from './pages/user/UserConvocatorias';
 import { UserPostulacionesView } from './pages/user/UserPostulacionesView';
 import { UserProfileView } from './pages/user/UserProfileView';
 import { UserDemosView } from './pages/user/UserDemosView';

@@ -253,7 +253,10 @@ export function UserOnboarding({ onComplete, userPhone, userEmail, userName, ini
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Correo Electrónico <span className="text-slate-700">(opcional)</span></label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} className="sud-input w-full" placeholder="ejemplo@correo.cl" />
+                  <div className="relative group">
+                    <input type="email" value={email} onChange={e => setEmail(e.target.value.slice(0, 35))} maxLength={35} className="sud-input w-full pr-16" placeholder="ejemplo@correo.cl" />
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black tabular-nums pointer-events-none select-none transition-colors ${email.length >= 35 ? 'text-red-400' : email.length >= 28 ? 'text-sud-yellow' : 'text-slate-600'}`}>{email.length}/35</span>
+                  </div>
                 </div>
                 {profileType === 'PERSONAL' && (
                   <div className="space-y-2 md:col-span-2">

@@ -12,6 +12,8 @@ import {
   Loader,
   CheckCircle2,
   XCircle,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { profesorService, ProfesorDTO, CreateProfesorRequest, UpdateProfesorRequest } from '../../services/profesorService';
@@ -65,6 +67,8 @@ export function AdminProfesores() {
   const [form, setForm] = useState<ProfesorForm>(EMPTY_FORM);
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Delete confirmation
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -535,13 +539,17 @@ export function AdminProfesores() {
                   <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                     Email *
                   </label>
-                  <input
-                    type="email"
-                    value={form.email}
-                    onChange={e => setForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder="maria@ejemplo.com"
-                    className="sud-input w-full"
-                  />
+                  <div className="relative group">
+                    <input
+                      type="email"
+                      value={form.email}
+                      onChange={e => setForm(f => ({ ...f, email: e.target.value.slice(0, 35) }))}
+                      maxLength={35}
+                      placeholder="maria@ejemplo.com"
+                      className="sud-input w-full pr-16"
+                    />
+                    <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black tabular-nums pointer-events-none select-none transition-colors ${(form.email?.length ?? 0) >= 35 ? 'text-red-400' : (form.email?.length ?? 0) >= 28 ? 'text-sud-yellow' : 'text-slate-600'}`}>{form.email?.length ?? 0}/35</span>
+                  </div>
                 </div>
 
                 {/* Phone */}
@@ -626,26 +634,46 @@ export function AdminProfesores() {
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                         Contraseña temporal *
                       </label>
-                      <input
-                        type="password"
-                        value={form.password}
-                        onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
-                        placeholder="Mínimo 6 caracteres"
-                        className="sud-input w-full"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          value={form.password}
+                          onChange={e => setForm(f => ({ ...f, password: e.target.value }))}
+                          placeholder="Mínimo 6 caracteres"
+                          className="sud-input w-full pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sud-turquoise transition-colors p-1"
+                          tabIndex={-1}
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2">
                         Confirmar contraseña temporal *
                       </label>
-                      <input
-                        type="password"
-                        value={form.confirmPassword}
-                        onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
-                        placeholder="Repita la contraseña"
-                        className="sud-input w-full"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          value={form.confirmPassword}
+                          onChange={e => setForm(f => ({ ...f, confirmPassword: e.target.value }))}
+                          placeholder="Repita la contraseña"
+                          className="sud-input w-full pr-12"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(v => !v)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-sud-turquoise transition-colors p-1"
+                          tabIndex={-1}
+                        >
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
+                      </div>
                     </div>
                   </>
                 )}

@@ -55,6 +55,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const [resendCooldown, setResendCooldown] = useState(0);
   const [showResetPassword, setShowResetPassword] = useState(false);
 
   const displayError = error || localError;
@@ -71,6 +72,40 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
     return () => clearInterval(timer);
   }, [cooldownSeconds]);
 
+  // Resend cooldown countdown (Step 2)
+  React.useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown(s => {
+        if (s <= 1) { clearInterval(timer); return 0; }
+        return s - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
+
+  const handleResendCode = async () => {
+    if (resendCooldown > 0 || resetLoading) return;
+    setResetLoading(true);
+    setResetError(null);
+    try {
+      await authService.forgotPassword(resetEmail);
+      setResetOtp('');
+      setResendCooldown(60);
+      setResetSuccess('Código reenviado a ' + resetEmail);
+      setTimeout(() => setResetSuccess(null), 4000);
+    } catch (err: any) {
+      if (err?.cooldown && err?.secondsRemaining) {
+        setResendCooldown(err.secondsRemaining);
+        setResetError(null);
+      } else {
+        setResetError(err?.message || 'No se pudo reenviar el código.');
+      }
+    } finally {
+      setResetLoading(false);
+    }
+  };
+
   const clearResetState = () => {
     setResetStep(1);
     setResetEmail('');
@@ -81,6 +116,7 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
     setResetError(null);
     setResetSuccess(null);
     setCooldownSeconds(0);
+    setResendCooldown(0);
     setShowResetPassword(false);
   };
 
@@ -242,7 +278,8 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Correo Electrónico</label>
                     <div className="relative group">
                       <div className="absolute left-5 top-1/2 -translate-y-1/2"><Mail className="text-slate-600 group-focus-within:text-sud-turquoise transition-colors" size={16} /></div>
-                      <input type="email" placeholder="ejemplo@sudtalent.cl" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} className="sud-input w-full pl-14 tracking-wide" autoComplete="email" required />
+                      <input type="email" placeholder="ejemplo@sudtalent.cl" value={email} onChange={e => setEmail(e.target.value.slice(0, 35))} maxLength={35} disabled={loading} className="sud-input w-full pl-14 pr-16 tracking-wide" autoComplete="email" required />
+                      <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black tabular-nums pointer-events-none select-none transition-colors ${email.length >= 35 ? 'text-red-400' : email.length >= 28 ? 'text-sud-yellow' : 'text-slate-600'}`}>{email.length}/35</span>
                     </div>
                   </div>
 
@@ -337,7 +374,8 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                     <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">Correo Electrónico</label>
                     <div className="relative group">
                       <div className="absolute left-5 top-1/2 -translate-y-1/2"><Mail className="text-slate-600 group-focus-within:text-sud-turquoise transition-colors" size={16} /></div>
-                      <input type="email" placeholder="ejemplo@sudtalent.cl" value={email} onChange={e => setEmail(e.target.value)} disabled={loading} className="sud-input w-full pl-14 tracking-wide" autoComplete="email" required />
+                      <input type="email" placeholder="ejemplo@sudtalent.cl" value={email} onChange={e => setEmail(e.target.value.slice(0, 35))} maxLength={35} disabled={loading} className="sud-input w-full pl-14 pr-16 tracking-wide" autoComplete="email" required />
+                      <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black tabular-nums pointer-events-none select-none transition-colors ${email.length >= 35 ? 'text-red-400' : email.length >= 28 ? 'text-sud-yellow' : 'text-slate-600'}`}>{email.length}/35</span>
                     </div>
                   </div>
 
@@ -433,12 +471,14 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                             type="email"
                             placeholder="ejemplo@sudtalent.cl"
                             value={resetEmail}
-                            onChange={e => setResetEmail(e.target.value)}
+                            onChange={e => setResetEmail(e.target.value.slice(0, 35))}
+                            maxLength={35}
                             disabled={resetLoading}
-                            className="sud-input w-full pl-14 tracking-wide"
+                            className="sud-input w-full pl-14 pr-16 tracking-wide"
                             autoComplete="email"
                             required
                           />
+                          <span className={`absolute right-4 top-1/2 -translate-y-1/2 text-[9px] font-black tabular-nums pointer-events-none select-none transition-colors ${resetEmail.length >= 35 ? 'text-red-400' : resetEmail.length >= 28 ? 'text-sud-yellow' : 'text-slate-600'}`}>{resetEmail.length}/35</span>
                         </div>
                       </div>
 
@@ -486,6 +526,20 @@ export function AuthScreen({ onLogin, onRegister, loading, error }: AuthScreenPr
                           ? <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                           : <><span>Verificar código</span><ChevronRight size={18} /></>}
                       </button>
+
+                      {/* Reenviar código */}
+                      <div className="text-center pt-1">
+                        <button
+                          type="button"
+                          onClick={handleResendCode}
+                          disabled={resendCooldown > 0 || resetLoading}
+                          className="text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-40 disabled:cursor-not-allowed text-slate-500 hover:text-sud-turquoise disabled:hover:text-slate-500"
+                        >
+                          {resendCooldown > 0
+                            ? `Reenviar código en ${resendCooldown}s`
+                            : '¿No recibiste el código? Reenviar'}
+                        </button>
+                      </div>
                     </motion.form>
                   )}
 

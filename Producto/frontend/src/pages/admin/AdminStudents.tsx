@@ -265,12 +265,68 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
   };
 
   const [allCursos, setAllCursos] = useState<any[]>([]);
+  const [editingCursos, setEditingCursos] = useState(false);
+  const [pendingCursoIds, setPendingCursoIds] = useState<Set<string>>(new Set());
+  const [savingCursos, setSavingCursos] = useState(false);
 
   useEffect(() => {
     fetchAPI<any[]>('/cursos')
       .then(data => setAllCursos(data || []))
       .catch(err => console.error('Error al cargar cursos:', err));
   }, []);
+
+  // Calcula los IDs de cursos actualmente asignados al alumno seleccionado
+  const getEnrolledIds = (uid: string): Set<string> => {
+    const alumnoId = String(uid);
+    return new Set(
+      allCursos
+        .filter(c => c.alumnos?.some((a: any) => String(a.id || a.alumnoId) === alumnoId))
+        .map(c => c.id)
+    );
+  };
+
+  const startEditCursos = () => {
+    if (!selectedEntry?.uid) return;
+    setPendingCursoIds(getEnrolledIds(selectedEntry.uid));
+    setEditingCursos(true);
+  };
+
+  const cancelEditCursos = () => {
+    setEditingCursos(false);
+    setPendingCursoIds(new Set());
+  };
+
+  const saveEditCursos = async () => {
+    if (!selectedEntry?.uid) return;
+    setSavingCursos(true);
+    const alumnoId = String(selectedEntry.uid);
+    try {
+      const nextCursoIds = [...pendingCursoIds];
+      await fetchAPI(`/cursos/asignar-alumno/${selectedEntry.uid}`, {
+        method: 'PUT',
+        body: JSON.stringify(nextCursoIds)
+      });
+      // Actualizar allCursos local
+      setAllCursos(prev => prev.map(c => {
+        const shouldBeEnrolled = pendingCursoIds.has(c.id);
+        const isEnrolled = c.alumnos?.some((a: any) => String(a.id || a.alumnoId) === alumnoId);
+        if (shouldBeEnrolled && !isEnrolled) {
+          return { ...c, alumnos: [...(c.alumnos || []), { id: selectedEntry.uid, nombreAlumno: selectedEntry.name }] };
+        }
+        if (!shouldBeEnrolled && isEnrolled) {
+          return { ...c, alumnos: (c.alumnos || []).filter((a: any) => String(a.id || a.alumnoId) !== alumnoId) };
+        }
+        return c;
+      }));
+      setEditingCursos(false);
+      setPendingCursoIds(new Set());
+    } catch (err) {
+      console.error('Error al actualizar asignación de cursos:', err);
+      alert('Error al actualizar asignación de cursos');
+    } finally {
+      setSavingCursos(false);
+    }
+  };
 
   const handleToggleCourse = async (cursoId: string, isEnrolled: boolean) => {
     if (!selectedEntry?.uid) return;
@@ -750,8 +806,29 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                 <label className="text-[10px] uppercase font-bold text-slate-500 px-1 tracking-widest">
                   Correo
                 </label>
-                <input type="email" value={newEmail} onChange={e => setNewEmail(e.target.value)}
-                  className="sud-input w-full" placeholder="alumno@ejemplo.cl" required />
+                <div className="relative group">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={e => setNewEmail(e.target.value.slice(0, 35))}
+                    maxLength={35}
+                    className="sud-input w-full pr-16"
+                    placeholder="alumno@ejemplo.cl"
+                    required
+                  />
+                  {/* Contador de caracteres */}
+                  <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-[9px] font-black tabular-nums pointer-events-none select-none transition-colors ${
+                    newEmail.length >= 35 ? 'text-red-400' : newEmail.length >= 28 ? 'text-sud-yellow' : 'text-slate-600'
+                  }`}>
+                    {newEmail.length}/35
+                  </span>
+                  {/* Tooltip aviso límite */}
+                </div>
+                {newEmail.length >= 35 && (
+                  <p className="text-[9px] text-red-400 font-black uppercase tracking-widest px-1">
+                    Límite máximo de 35 caracteres alcanzado
+                  </p>
+                )}
               </div>
 
               {/* Mensajes de Feedback */}
@@ -912,13 +989,23 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
                         {/* Correo */}
                         <td className="px-4 py-3">
                           {isEditing ? (
-                            <input
-                              type="email"
-                              value={editEmail}
-                              onChange={e => setEditEmail(e.target.value)}
-                              placeholder="correo@ejemplo.cl"
-                              className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-sud-turquoise/50 w-full min-w-[150px]"
-                            />
+                            <div className="relative group">
+                              <input
+                                type="email"
+                                value={editEmail}
+                                onChange={e => setEditEmail(e.target.value.slice(0, 35))}
+                                maxLength={35}
+                                placeholder="correo@ejemplo.cl"
+                                className="bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-white outline-none focus:border-sud-turquoise/50 w-full min-w-[160px] pr-14"
+                              />
+                              {/* Contador */}
+                              <span className={`absolute right-2 top-1/2 -translate-y-1/2 text-[8px] font-black tabular-nums pointer-events-none select-none transition-colors ${
+                                editEmail.length >= 35 ? 'text-red-400' : editEmail.length >= 28 ? 'text-sud-yellow' : 'text-slate-600'
+                              }`}>
+                                {editEmail.length}/35
+                              </span>
+                              {/* Tooltip */}
+                            </div>
                           ) : (
                             <span className={`text-xs font-bold ${entry.email ? 'text-slate-400' : 'text-slate-600 italic'}`}>
                               {entry.email || '—'}
@@ -1261,29 +1348,70 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
               {/* Cursos Asignados */}
               {selectedEntry.uid && (
                 <div className="space-y-3">
-                  <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest flex items-center gap-2">
-                    <BookOpen size={13} className="text-sud-orange" /> Cursos Asignados
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <p className="text-[10px] uppercase font-black text-slate-600 tracking-widest flex items-center gap-2">
+                      <BookOpen size={13} className="text-sud-orange" /> Cursos Asignados
+                    </p>
+                    {!editingCursos && (
+                      <button
+                        onClick={startEditCursos}
+                        className="text-[9px] font-black uppercase tracking-widest text-slate-500 hover:text-sud-turquoise transition-colors flex items-center gap-1"
+                      >
+                        <Settings size={11} /> Editar
+                      </button>
+                    )}
+                  </div>
                   <div className="max-h-48 overflow-y-auto border border-white/10 rounded-2xl p-4 bg-white/[0.01] space-y-2.5">
                     {allCursos.map(curso => {
                       const alumnoId = String(selectedEntry?.uid || '');
-                      const isEnrolled = curso.alumnos?.some((a: any) => String(a.id || a.alumnoId) === alumnoId);
+                      const isEnrolled = editingCursos
+                        ? pendingCursoIds.has(curso.id)
+                        : curso.alumnos?.some((a: any) => String(a.id || a.alumnoId) === alumnoId);
                       return (
                         <label
                           key={curso.id}
-                          className="flex items-start gap-3 text-xs font-bold text-slate-300 hover:text-white cursor-pointer select-none py-0.5"
+                          className={`flex items-start gap-3 text-xs font-bold select-none py-0.5 ${editingCursos ? 'cursor-pointer text-slate-300 hover:text-white' : 'cursor-default text-slate-400'}`}
                         >
                           <input
                             type="checkbox"
-                            checked={isEnrolled}
-                            onChange={(e) => handleToggleCourse(curso.id, e.target.checked)}
-                            className="w-4 h-4 rounded border-white/10 bg-black text-sud-turquoise focus:ring-0 accent-sud-turquoise shrink-0 mt-0.5"
+                            checked={!!isEnrolled}
+                            disabled={!editingCursos}
+                            onChange={editingCursos ? (e) => {
+                              setPendingCursoIds(prev => {
+                                const next = new Set(prev);
+                                if (e.target.checked) next.add(curso.id);
+                                else next.delete(curso.id);
+                                return next;
+                              });
+                            } : undefined}
+                            className="w-4 h-4 rounded border-white/10 bg-black text-sud-turquoise focus:ring-0 accent-sud-turquoise shrink-0 mt-0.5 disabled:opacity-50"
                           />
                           <span className="leading-snug">{curso.titulo} ({curso.modalidad})</span>
                         </label>
                       );
                     })}
                   </div>
+                  {/* Botones Aceptar / Cancelar */}
+                  {editingCursos && (
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={cancelEditCursos}
+                        disabled={savingCursos}
+                        className="flex-1 py-2.5 rounded-xl border border-white/10 bg-white/5 hover:bg-white/10 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-all disabled:opacity-40"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        onClick={saveEditCursos}
+                        disabled={savingCursos}
+                        className="flex-1 py-2.5 rounded-xl border border-sud-turquoise/30 bg-sud-turquoise/10 hover:bg-sud-turquoise/20 text-[10px] font-black uppercase tracking-widest text-sud-turquoise transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                      >
+                        {savingCursos
+                          ? <><div className="w-3 h-3 border-2 border-sud-turquoise/30 border-t-sud-turquoise rounded-full animate-spin" /> Guardando...</>
+                          : <><CheckCircle size={12} /> Aceptar</>}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 

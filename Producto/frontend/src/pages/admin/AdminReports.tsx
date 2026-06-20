@@ -11,8 +11,13 @@ import {
   TrendingUp,
   BarChart3,
   Loader,
-  AlertCircle
+  AlertCircle,
+  FileDown,
+  Sheet
 } from 'lucide-react';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 import { backendService, fetchAPI } from '../../services/backendService';
 import { profesorService } from '../../services/profesorService';
 import { cursoService } from '../../services/cursoService';
@@ -249,6 +254,183 @@ export function AdminReports() {
     loadMetrics();
   }, []);
 
+  // ─── Exportar a PDF ───────────────────────────────────────────────
+  function exportPDF() {
+    const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const today = new Date().toLocaleDateString('es-CL');
+
+    // Encabezado
+    doc.setFillColor(17, 24, 39);
+    doc.rect(0, 0, 210, 28, 'F');
+    doc.setFontSize(16);
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.text('SudTalent — Resumen Ejecutivo', 14, 12);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(156, 163, 175);
+    doc.text(`Generado el ${today}`, 14, 20);
+
+    let y = 36;
+
+    // KPIs generales
+    doc.setFontSize(11);
+    doc.setTextColor(30, 30, 30);
+    doc.setFont('helvetica', 'bold');
+    doc.text('Métricas Generales', 14, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Indicador', 'Valor']],
+      body: [
+        ['Total Alumnos', String(metrics.totalAlumnos)],
+        ['Total Profesores', String(metrics.totalProfesores)],
+        ['Cursos Activos', String(metrics.totalCursos)],
+        ['Convocatorias', String(metrics.totalConvocatorias)],
+        ['Postulaciones', String(metrics.totalPostulaciones)],
+        ['Demos Subidas', String(demosCount)],
+      ],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [14, 165, 133] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Estado de Alumnos
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Estado de Alumnos', 14, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Estado', 'Cantidad', '%']],
+      body: [
+        ['Aprobados', String(metrics.alumnosAprobados), `${getPercentage(metrics.alumnosAprobados, metrics.totalAlumnos)}%`],
+        ['En Revisión', String(metrics.alumnosPendientes), `${getPercentage(metrics.alumnosPendientes, metrics.totalAlumnos)}%`],
+        ['Inactivos', String(metrics.alumnosInactivos), `${getPercentage(metrics.alumnosInactivos, metrics.totalAlumnos)}%`],
+      ],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [14, 165, 133] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Postulaciones
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Postulaciones por Estado', 14, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['Estado', 'Cantidad', '%']],
+      body: [
+        ['Aceptadas', String(metrics.postulacionesAceptadas), `${getPercentage(metrics.postulacionesAceptadas, metrics.totalPostulaciones)}%`],
+        ['En Revisión', String(metrics.postulacionesEnRevision), `${getPercentage(metrics.postulacionesEnRevision, metrics.totalPostulaciones)}%`],
+        ['Pendientes', String(metrics.postulacionesPendientes), `${getPercentage(metrics.postulacionesPendientes, metrics.totalPostulaciones)}%`],
+        ['Rechazadas', String(metrics.postulacionesRechazadas), `${getPercentage(metrics.postulacionesRechazadas, metrics.totalPostulaciones)}%`],
+      ],
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [249, 115, 22] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+
+    // Página 2 si hace falta — Top Cursos
+    if (y > 220) { doc.addPage(); y = 20; }
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Top 5 Cursos por Alumnos', 14, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['#', 'Curso', 'Modalidad', 'Alumnos']],
+      body: metrics.topCursos.map((c, i) => [String(i + 1), c.titulo, c.modalidad, String(c.totalAlumnos)]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [139, 92, 246] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    y = (doc as any).lastAutoTable.finalY + 10;
+    if (y > 220) { doc.addPage(); y = 20; }
+
+    // Top Convocatorias
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Top Convocatorias por Postulaciones', 14, y);
+    y += 4;
+
+    autoTable(doc, {
+      startY: y,
+      head: [['#', 'Convocatoria', 'Categoría', 'Estado', 'Postulaciones']],
+      body: metrics.topConvocatorias.map((c, i) => [String(i + 1), c.titulo, c.categoria, c.estado, String(c.totalPostulaciones)]),
+      styles: { fontSize: 9 },
+      headStyles: { fillColor: [234, 179, 8] },
+      alternateRowStyles: { fillColor: [245, 245, 245] },
+    });
+
+    doc.save(`SudTalent_Reporte_${today.replace(/\//g, '-')}.pdf`);
+  }
+
+  // ─── Exportar a Excel ─────────────────────────────────────────────
+  function exportExcel() {
+    const wb = XLSX.utils.book_new();
+    const today = new Date().toLocaleDateString('es-CL');
+
+    // Hoja 1: KPIs
+    const kpiRows = [
+      ['Indicador', 'Valor'],
+      ['Total Alumnos', metrics.totalAlumnos],
+      ['Total Profesores', metrics.totalProfesores],
+      ['Cursos Activos', metrics.totalCursos],
+      ['Convocatorias', metrics.totalConvocatorias],
+      ['Postulaciones', metrics.totalPostulaciones],
+      ['Demos Subidas', demosCount],
+      [],
+      ['Estado de Alumnos', '', ''],
+      ['Estado', 'Cantidad', '%'],
+      ['Aprobados', metrics.alumnosAprobados, getPercentage(metrics.alumnosAprobados, metrics.totalAlumnos)],
+      ['En Revisión', metrics.alumnosPendientes, getPercentage(metrics.alumnosPendientes, metrics.totalAlumnos)],
+      ['Inactivos', metrics.alumnosInactivos, getPercentage(metrics.alumnosInactivos, metrics.totalAlumnos)],
+      [],
+      ['Postulaciones por Estado', '', ''],
+      ['Estado', 'Cantidad', '%'],
+      ['Aceptadas', metrics.postulacionesAceptadas, getPercentage(metrics.postulacionesAceptadas, metrics.totalPostulaciones)],
+      ['En Revisión', metrics.postulacionesEnRevision, getPercentage(metrics.postulacionesEnRevision, metrics.totalPostulaciones)],
+      ['Pendientes', metrics.postulacionesPendientes, getPercentage(metrics.postulacionesPendientes, metrics.totalPostulaciones)],
+      ['Rechazadas', metrics.postulacionesRechazadas, getPercentage(metrics.postulacionesRechazadas, metrics.totalPostulaciones)],
+      [],
+      ['Distribución de Cursos por Modalidad', '', ''],
+      ['Modalidad', 'Cantidad', '%'],
+      ['Online', metrics.cursosOnline, getPercentage(metrics.cursosOnline, metrics.totalCursos)],
+      ['Presencial', metrics.cursosPresencial, getPercentage(metrics.cursosPresencial, metrics.totalCursos)],
+      ['Mixto / Híbrido', metrics.cursosMixto, getPercentage(metrics.cursosMixto, metrics.totalCursos)],
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(kpiRows), 'Resumen');
+
+    // Hoja 2: Top Cursos
+    const cursosRows = [
+      ['#', 'Curso', 'Modalidad', 'Alumnos Inscritos'],
+      ...metrics.topCursos.map((c, i) => [i + 1, c.titulo, c.modalidad, c.totalAlumnos]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(cursosRows), 'Top Cursos');
+
+    // Hoja 3: Top Convocatorias
+    const convRows = [
+      ['#', 'Convocatoria', 'Categoría', 'Estado', 'Postulaciones'],
+      ...metrics.topConvocatorias.map((c, i) => [i + 1, c.titulo, c.categoria, c.estado, c.totalPostulaciones]),
+    ];
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(convRows), 'Top Convocatorias');
+
+    XLSX.writeFile(wb, `SudTalent_Reporte_${today.replace(/\//g, '-')}.xlsx`);
+  }
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[500px] space-y-4">
@@ -286,7 +468,7 @@ export function AdminReports() {
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
           <h2 className="text-3xl font-black tracking-tighter text-white">
-            Resumen <span className="sud-vibrant-text-gradient uppercase tracking-widest">Ejecutivo</span>
+            Dashboard Resumen <span className="sud-vibrant-text-gradient uppercase tracking-widest">Ejecutivo</span>
           </h2>
           <p className="text-slate-400 mt-1 font-medium text-[10px] tracking-widest uppercase">
             Métricas generales e indicadores clave de SudTalent
@@ -295,6 +477,24 @@ export function AdminReports() {
         
         {/* Accesos rápidos */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* Botones de exportación */}
+          <button
+            onClick={exportPDF}
+            className="px-5 py-3 rounded-2xl bg-red-500/10 border border-red-500/20 hover:bg-red-500/20 hover:border-red-500/30 text-[10px] font-black uppercase tracking-widest text-red-400 hover:text-red-300 transition-all flex items-center gap-2"
+          >
+            <FileDown size={14} />
+            <span>Exportar PDF</span>
+          </button>
+          <button
+            onClick={exportExcel}
+            className="px-5 py-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 hover:bg-emerald-500/20 hover:border-emerald-500/30 text-[10px] font-black uppercase tracking-widest text-emerald-400 hover:text-emerald-300 transition-all flex items-center gap-2"
+          >
+            <Sheet size={14} />
+            <span>Exportar Excel</span>
+          </button>
+
+          <div className="w-px h-6 bg-white/10" />
+
           <button 
             onClick={() => navigate('/admin/students')} 
             className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-[10px] font-black uppercase tracking-widest text-slate-300 hover:text-white transition-all flex items-center gap-2"

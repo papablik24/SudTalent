@@ -1,6 +1,6 @@
 import React from 'react';
 
-export function StatCard({ label, value, color }: { label: string; value: string; color: string }) {
+export function StatCard({ label, value, color, subtitle }: { label: string; value: string; color: string; subtitle?: string }) {
   const getGradient = () => {
     switch(color) {
       case 'sud-turquoise': return 'from-sud-turquoise/20 to-sud-turquoise/5';
@@ -20,10 +20,15 @@ export function StatCard({ label, value, color }: { label: string; value: string
   };
 
   return (
-    <div className={`sud-stat-card bg-gradient-to-br ${getGradient()} ${getBorder()} group relative overflow-hidden`}>
+    <div className={`sud-stat-card bg-gradient-to-br ${getGradient()} ${getBorder()} group relative overflow-hidden flex flex-col justify-between h-full`}>
       <div className={`absolute top-0 right-0 w-32 h-32 blur-3xl opacity-30 -mr-16 -mt-16 bg-${color}`} />
-      <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{label}</p>
-      <p className="text-5xl font-black tracking-tighter text-white group-hover:scale-105 transition-transform duration-500">{value}</p>
+      <div>
+        <p className="text-slate-500 text-[10px] font-black uppercase tracking-[0.2em] mb-2">{label}</p>
+        <p className="text-5xl font-black tracking-tighter text-white group-hover:scale-105 transition-transform duration-500">{value}</p>
+      </div>
+      {subtitle && (
+        <p className="text-[9px] text-slate-400 light:text-slate-600 mt-2 font-medium leading-normal relative z-10">{subtitle}</p>
+      )}
     </div>
   );
 }

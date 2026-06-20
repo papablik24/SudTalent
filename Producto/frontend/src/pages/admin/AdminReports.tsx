@@ -528,21 +528,28 @@ export function AdminReports() {
 
       {/* KPI Cards */}
       <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-5">
-        {[
-          { label: 'Total Alumnos', value: metrics.totalAlumnos, icon: <Users size={20} />, color: 'from-sud-turquoise/20 to-sud-turquoise/5 border-sud-turquoise/20 text-sud-turquoise' },
-          { label: 'Profesores', value: metrics.totalProfesores, icon: <GraduationCap size={20} />, color: 'from-pink-500/20 to-pink-500/5 border-pink-500/20 text-pink-400' },
-          { label: 'Cursos Activos', value: metrics.totalCursos, icon: <BookOpen size={20} />, color: 'from-violet-500/20 to-violet-500/5 border-violet-500/20 text-violet-400' },
-          { label: 'Convocatorias', value: metrics.totalConvocatorias, icon: <Briefcase size={20} />, color: 'from-sud-yellow/20 to-sud-yellow/5 border-sud-yellow/20 text-sud-yellow' },
-          { label: 'Postulaciones', value: metrics.totalPostulaciones, icon: <ClipboardList size={20} />, color: 'from-sud-orange/20 to-sud-orange/5 border-sud-orange/20 text-sud-orange' },
-          { label: 'Demos Subidas', value: demosCount, icon: <AudioLines size={20} />, color: 'from-sky-500/20 to-sky-500/5 border-sky-500/20 text-sky-400' },
-        ].map((kpi, idx) => (
-          <div key={idx} className={`relative overflow-hidden p-6 rounded-[2rem] border bg-gradient-to-br ${kpi.color}`}>
-            <div className="flex items-center justify-between mb-4">
-              <span className="opacity-80">{kpi.icon}</span>
-              <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40">Métrica</span>
+        {(
+          [
+            { label: 'Alumnos registrados', value: metrics.totalAlumnos, icon: <Users size={20} />, color: 'from-sud-turquoise/20 to-sud-turquoise/5 border-sud-turquoise/20 text-sud-turquoise', subtitle: 'Usuarios con cuenta creada en la plataforma.' },
+            { label: 'Profesores', value: metrics.totalProfesores, icon: <GraduationCap size={20} />, color: 'from-pink-500/20 to-pink-500/5 border-pink-500/20 text-pink-400' },
+            { label: 'Cursos Activos', value: metrics.totalCursos, icon: <BookOpen size={20} />, color: 'from-violet-500/20 to-violet-500/5 border-violet-500/20 text-violet-400' },
+            { label: 'Convocatorias', value: metrics.totalConvocatorias, icon: <Briefcase size={20} />, color: 'from-sud-yellow/20 to-sud-yellow/5 border-sud-yellow/20 text-sud-yellow' },
+            { label: 'Postulaciones', value: metrics.totalPostulaciones, icon: <ClipboardList size={20} />, color: 'from-sud-orange/20 to-sud-orange/5 border-sud-orange/20 text-sud-orange' },
+            { label: 'Demos Subidas', value: demosCount, icon: <AudioLines size={20} />, color: 'from-sky-500/20 to-sky-500/5 border-sky-500/20 text-sky-400' },
+          ] as Array<{ label: string; value: any; icon: any; color: string; subtitle?: string }>
+        ).map((kpi, idx) => (
+          <div key={idx} className={`relative overflow-hidden p-6 rounded-[2rem] border bg-gradient-to-br ${kpi.color} flex flex-col justify-between h-full`}>
+            <div>
+              <div className="flex items-center justify-between mb-4">
+                <span className="opacity-80">{kpi.icon}</span>
+                <span className="text-[8px] font-black uppercase tracking-[0.2em] opacity-40">Métrica</span>
+              </div>
+              <p className="text-3xl font-black text-white tracking-tight">{kpi.value}</p>
+              <p className="text-[9px] text-slate-400 light:text-slate-600 font-black uppercase tracking-widest mt-2">{kpi.label}</p>
             </div>
-            <p className="text-3xl font-black text-white tracking-tight">{kpi.value}</p>
-            <p className="text-[9px] text-slate-400 light:text-slate-600 font-black uppercase tracking-widest mt-2">{kpi.label}</p>
+            {kpi.subtitle && (
+              <p className="text-[8px] text-slate-500 font-medium mt-1 leading-normal relative z-10">{kpi.subtitle}</p>
+            )}
           </div>
         ))}
       </section>

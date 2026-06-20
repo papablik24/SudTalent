@@ -87,9 +87,24 @@ export function AdminDashboard({ whitelist, users, onNavigate, onUpdateStatus }:
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <StatCard label="Total Alumnos" value={totalAlumnos.toString()} color="sud-turquoise" />
-        <StatCard label="Aprobados" value={usuariosActivos.toString()} color="sud-orange" />
-        <StatCard label="En Revisión" value={enRevision.toString()} color="sud-yellow" />
+        <StatCard 
+          label="Alumnos registrados" 
+          value={totalAlumnos.toString()} 
+          color="sud-turquoise" 
+          subtitle="Usuarios con cuenta creada en la plataforma."
+        />
+        <StatCard 
+          label="Lista blanca activa" 
+          value={whitelist.length.toString()} 
+          color="sud-orange" 
+          subtitle="Entradas vigentes de la lista de acceso."
+        />
+        <StatCard 
+          label="En Revisión" 
+          value={enRevision.toString()} 
+          color="sud-yellow" 
+          subtitle="Perfiles de alumnos pendientes de aprobación."
+        />
         <button
           onClick={() => onNavigate('/admin/casting')}
           className="sud-stat-card bg-gradient-to-br from-sud-turquoise/20 to-sud-turquoise/5 border-sud-turquoise/40 group relative overflow-hidden text-left"

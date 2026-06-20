@@ -858,11 +858,16 @@ export function AdminStudents({ whitelist, users, onAdd, onRemove, onUpdate, onU
         <div className="lg:col-span-8 space-y-6">
           <div className="bg-white/[0.02] border border-white/10 rounded-[2.5rem] overflow-hidden shadow-2xl">
             <div className="p-6 border-b border-white/10 flex items-center justify-between bg-white/[0.01]">
-              <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
-                <ShieldCheck className="text-sud-turquoise" size={20} />
-                Lista de Acceso
-                <span className="text-slate-600 font-mono text-xs ml-1">({filteredList.length})</span>
-              </h3>
+              <div className="flex flex-col gap-1">
+                <h3 className="font-black text-sm uppercase tracking-widest flex items-center gap-2">
+                  <ShieldCheck className="text-sud-turquoise" size={20} />
+                  Autorizaciones registradas
+                  <span className="text-slate-500 font-mono text-xs ml-1">({filteredList.length})</span>
+                </h3>
+                <p className="text-[10px] text-slate-400 font-medium leading-relaxed">
+                  Incluye personas autorizadas a registrarse, aunque aún no tengan cuenta.
+                </p>
+              </div>
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowImportModal(true)}
